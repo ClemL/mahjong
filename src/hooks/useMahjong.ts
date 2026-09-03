@@ -17,11 +17,14 @@ import {
   waitsAfterDiscard,
 } from "@/game/engine";
 import {
+  type ClaimPrompt,
   awaitingHumanClaim,
   needsTurnAdvance,
   resolveWithAi,
+  shouldPromptClaim,
   stepTable,
 } from "@/game/controller";
+import { STRATEGIES, type StrategyName } from "@/game/ai";
 import { type Rng, createRng } from "@/game/rng";
 import { type SoundName, playSound, primeAudio } from "@/game/sound";
 import type { Seat } from "@/game/tiles";
@@ -68,6 +71,12 @@ export interface MahjongApi {
   setMinFaan: (value: number) => void;
   muted: boolean;
   setMuted: (value: boolean) => void;
+  /** Which opponent strategy is playing the other three seats. */
+  opponents: StrategyName;
+  setOpponents: (value: StrategyName) => void;
+  /** How often the table stops to ask about a claim. */
+  claimPrompt: ClaimPrompt;
+  setClaimPrompt: (value: ClaimPrompt) => void;
 }
 
 export function useMahjong(humanSeat: Seat = 0): MahjongApi {
@@ -76,6 +85,8 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const [paused, setPaused] = useState(false);
   const [showHints, setShowHints] = useState(true);
   const [muted, setMutedState] = useState(false);
+  const [opponents, setOpponents] = useState<StrategyName>("greedy");
+  const [claimPrompt, setClaimPrompt] = useState<ClaimPrompt>("useful");
   const rngRef = useRef<Rng>(createRng(1));
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
@@ -135,22 +146,36 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     if (!value) primeAudio();
   }, []);
 
-  const awaitingClaim = state ? awaitingHumanClaim(state) : false;
+  const strategy = STRATEGIES[opponents];
+
+  // A claim the player would never take is passed automatically, so the table
+  // only stops for decisions that are actually decisions.
+  const pendingClaim = state ? awaitingHumanClaim(state) : false;
+  const wantsPrompt = state && pendingClaim ? shouldPromptClaim(state, humanSeat, claimPrompt) : false;
+  const awaitingClaim = pendingClaim && wantsPrompt;
 
   // Drive the table forward whenever it is not the player's move.
   useEffect(() => {
     if (!state || paused) return;
     if (state.phase === "handOver" || state.phase === "gameOver") return;
-    if (awaitingHumanClaim(state)) return;
+    if (awaitingHumanClaim(state) && shouldPromptClaim(state, humanSeat, claimPrompt)) return;
     const humanToAct =
       state.phase === "action" && state.players[state.turn].isHuman && !needsTurnAdvance(state);
     if (humanToAct) return;
 
     const timer = setTimeout(() => {
-      setState((current) => (current === state ? stepTable(state, rngRef.current) : current));
+      setState((current) => {
+        if (current !== state) return current;
+        // An auto-passed claim still resolves through the normal path, so the
+        // other seats' claims on the same discard are honoured.
+        if (awaitingHumanClaim(state)) {
+          return resolveWithAi(state, rngRef.current, { seat: humanSeat, optionId: null }, strategy);
+        }
+        return stepTable(state, rngRef.current, strategy);
+      });
     }, DELAYS[speed]);
     return () => clearTimeout(timer);
-  }, [state, paused, speed]);
+  }, [state, paused, speed, humanSeat, claimPrompt, strategy]);
 
   const actions = useMemo<TurnActions>(
     () => (state ? turnActions(state, humanSeat) : IDLE_ACTIONS),
@@ -204,11 +229,11 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     (optionId: string | null) => {
       setState((current) =>
         current && awaitingHumanClaim(current)
-          ? resolveWithAi(current, rngRef.current, { seat: humanSeat, optionId })
+          ? resolveWithAi(current, rngRef.current, { seat: humanSeat, optionId }, strategy)
           : current,
       );
     },
-    [humanSeat],
+    [humanSeat, strategy],
   );
 
   const claim = useCallback((optionId: string) => respond(optionId), [respond]);
@@ -246,5 +271,9 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     setMinFaan,
     muted,
     setMuted,
+    opponents,
+    setOpponents,
+    claimPrompt,
+    setClaimPrompt,
   };
 }

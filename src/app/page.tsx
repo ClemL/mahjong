@@ -8,6 +8,7 @@ import { PlayerHand } from "@/components/PlayerHand";
 import { ResultModal } from "@/components/ResultModal";
 import { BuildFooter } from "@/components/BuildFooter";
 import { AppearancePanel } from "@/components/AppearancePanel";
+import { PlayPanel } from "@/components/PlayPanel";
 import { useAppearance } from "@/hooks/useAppearance";
 import {
   FaanPanel,
@@ -147,6 +148,7 @@ export default function Page() {
         <aside className="side">
           <ScorePanel state={state} />
           <HistoryPanel state={state} />
+          <PlayPanel api={api} />
           <AppearancePanel api={appearance} />
           <LogPanel state={state} humanSeat={me} />
           <RulesPanel config={state.config} />
