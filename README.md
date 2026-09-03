@@ -118,6 +118,25 @@ vercel --prod   # production
 Both routes produce a fully static export (`○ (Static) prerendered as static
 content`), so the game is served from the CDN edge.
 
+### Appearance
+
+A **Table & tiles** panel in the sidebar carries three independent settings,
+remembered in `localStorage` between visits:
+
+- **Table** — Jade, Slate, Mahogany, Midnight, or Parchment (a light table).
+- **Tile faces** — drawn pips, or the Chinese numeral over the suit mark.
+- **Suit colors** — Vivid (furthest apart), Classic (traditional ink, blue and
+  green), or Monochrome (one ink; the pips carry the suit).
+
+Each setting is a `data-` attribute on the document element consumed entirely by
+CSS, so switching costs no React re-render, and a small inline script restores
+the choice before first paint rather than flashing the default theme. Both tile
+faces are always in the DOM with one hidden, which is why the switch is instant.
+
+Light and dark tables get chart palettes **selected for their own surface**
+rather than one flipped from the other, each validated against the surface it
+actually sits on.
+
 ### Changelog
 
 A footer strip carries the build version and the most recent changelog entry;
