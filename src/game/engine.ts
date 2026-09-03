@@ -452,6 +452,7 @@ export function declareAddedKong(previous: GameState, seat: Seat, code: TileCode
   pung.type = "kong";
   pung.tiles.push(tiles[0]);
   pung.fromAddedKong = true;
+  pung.claimedTileId = tiles[0].id;
   log(state, seat, `${SEAT_NAMES[seat]} adds to the kong of ${tileName(code)}`);
   drawTile(state, seat, true);
   return state;
@@ -466,6 +467,7 @@ function finishAddedKong(state: GameState, seat: Seat, tile: Tile): void {
   pung.type = "kong";
   pung.tiles.push(tile);
   pung.fromAddedKong = true;
+  pung.claimedTileId = tile.id;
   state.robbingKongTile = null;
   state.lastDiscard = null;
   state.pendingClaims = [];
@@ -669,6 +671,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
     tiles: sortTiles([...fromHand, tile]),
     concealed: false,
     claimedFrom: discarder,
+    claimedTileId: tile.id,
   };
   claimer.melds.push(meld);
   sortHand(claimer);
@@ -761,6 +764,21 @@ function endInWashout(state: GameState): void {
   state.robbingKongTile = null;
   state.drawnTileId = null;
   log(state, null, "The wall is exhausted — washed-out hand (流局)");
+}
+
+/** Change the table's faan minimum without disturbing the hand in progress. */
+export function setMinFaan(previous: GameState, minFaan: number): GameState {
+  const state = clone(previous);
+  if (state.config.minFaan === minFaan) return previous;
+  state.config = { ...state.config, minFaan };
+  log(
+    state,
+    null,
+    minFaan <= 0
+      ? "Table minimum set to 0 faan — chicken hands may win"
+      : `Table minimum set to ${minFaan} faan`,
+  );
+  return state;
 }
 
 /** Move to the next hand, rotating the dealership when required. */

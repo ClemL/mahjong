@@ -20,7 +20,12 @@ export function MeldRow({ meld }: { meld: Meld }) {
   return (
     <span className="meld">
       {meld.tiles.map((t) => (
-        <TileFace key={t.id} code={t.code} size="sm" />
+        <TileFace
+          key={t.id}
+          code={t.code}
+          size="sm"
+          entry={t.id === meld.claimedTileId ? "claim" : null}
+        />
       ))}
     </span>
   );

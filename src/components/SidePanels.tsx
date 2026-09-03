@@ -2,7 +2,7 @@
 
 import type { GameState } from "@/game/engine";
 import { SEAT_NAMES, type Seat, tileGlyph, seatWind } from "@/game/tiles";
-import { DEFAULT_RULES, RULE_NOTES } from "@/game/rules";
+import { DEFAULT_RULES, type RuleConfig, ruleNotes } from "@/game/rules";
 
 export function ScorePanel({ state }: { state: GameState }) {
   return (
@@ -47,13 +47,13 @@ export function LogPanel({ state, humanSeat }: { state: GameState; humanSeat: Se
   );
 }
 
-export function RulesPanel() {
+export function RulesPanel({ config }: { config: RuleConfig }) {
   return (
     <section className="panel rules">
       <details>
         <summary>House rules</summary>
         <dl style={{ marginTop: 10 }}>
-          {RULE_NOTES.map((note) => (
+          {ruleNotes(config).map((note) => (
             <div key={note.title}>
               <dt>{note.title}</dt>
               <dd>{note.body}</dd>
@@ -93,14 +93,16 @@ const FAAN_ROWS: [string, string, number][] = [
   ["八仙過海", "All Eight Bonus Tiles", DEFAULT_RULES.faan.allEightBonus],
 ];
 
-export function FaanPanel() {
+export function FaanPanel({ config }: { config: RuleConfig }) {
   return (
     <section className="panel">
       <details>
         <summary>Faan table</summary>
         <p className="seat__meta" style={{ margin: "10px 0" }}>
-          Minimum {DEFAULT_RULES.minFaan} faan to win; capped at {DEFAULT_RULES.limitFaan} faan
-          ({DEFAULT_RULES.payoutTable[DEFAULT_RULES.limitFaan]} points).
+          {config.minFaan <= 0
+            ? "No faan minimum — a chicken hand (雞糊) wins for 1 point."
+            : `Minimum ${config.minFaan} faan to win.`}{" "}
+          Capped at {config.limitFaan} faan ({config.payoutTable[config.limitFaan]} points).
         </p>
         <table className="faan-table">
           <thead>

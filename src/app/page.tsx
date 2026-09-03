@@ -7,6 +7,7 @@ import { Pond } from "@/components/Pond";
 import { PlayerHand } from "@/components/PlayerHand";
 import { ResultModal } from "@/components/ResultModal";
 import { FaanPanel, LogPanel, RulesPanel, ScorePanel } from "@/components/SidePanels";
+import { MIN_FAAN_CHOICES } from "@/game/rules";
 
 const SPEEDS: Speed[] = ["slow", "normal", "fast"];
 
@@ -61,6 +62,20 @@ export default function Page() {
         <span className="topbar__spacer" />
 
         <div className="actions">
+          <label className="field">
+            <span className="field__label">Min faan</span>
+            <select
+              className="field__select"
+              value={api.minFaan}
+              onChange={(e) => api.setMinFaan(Number(e.target.value))}
+            >
+              {MIN_FAAN_CHOICES.map((n) => (
+                <option key={n} value={n}>
+                  {n === 0 ? "0 (chicken)" : n === 3 ? "3 (HK standard)" : n}
+                </option>
+              ))}
+            </select>
+          </label>
           <button
             type="button"
             className="btn btn--sm btn--ghost"
@@ -99,7 +114,7 @@ export default function Page() {
             <SeatPanel state={state} seat={left} />
           </div>
           <div className="table__center">
-            <Pond state={state} order={pondOrder} />
+            <Pond state={state} order={pondOrder} viewer={me} />
           </div>
           <div className="table__right">
             <SeatPanel state={state} seat={right} />
@@ -112,8 +127,8 @@ export default function Page() {
         <aside className="side">
           <ScorePanel state={state} />
           <LogPanel state={state} humanSeat={me} />
-          <RulesPanel />
-          <FaanPanel />
+          <RulesPanel config={state.config} />
+          <FaanPanel config={state.config} />
         </aside>
       </div>
 

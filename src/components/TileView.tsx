@@ -12,6 +12,25 @@ import {
 
 export type TileSize = "sm" | "md" | "lg";
 
+/** Where a tile animates in from, expressed relative to the viewer. */
+export type TossFrom = "bottom" | "top" | "left" | "right";
+
+/** How a tile entered its current place, driving the entry animation. */
+export type TileEntry = "toss" | "claim" | "draw" | null;
+
+function entryClass(entry: TileEntry, from: TossFrom): string {
+  switch (entry) {
+    case "toss":
+      return `tile--toss-${from}`;
+    case "claim":
+      return "tile--claimed";
+    case "draw":
+      return "tile--drew";
+    default:
+      return "";
+  }
+}
+
 function colorClass(code: TileCode): string {
   if (isFlower(code)) return "tile--f";
   if (isHonor(code)) return code[0] === "w" ? "tile--w" : `tile--${code}`;
@@ -27,6 +46,10 @@ interface FaceProps {
   dim?: boolean;
   /** Green dot marking a discard that would leave the hand ready. */
   ready?: boolean;
+  /** Entry animation played once when the tile appears. */
+  entry?: TileEntry;
+  /** Direction a tossed tile flies in from. */
+  tossFrom?: TossFrom;
   className?: string;
 }
 
@@ -37,6 +60,8 @@ export function TileFace({
   justDiscarded,
   dim,
   ready,
+  entry = null,
+  tossFrom = "bottom",
   className = "",
 }: FaceProps) {
   const suit = tileSuitGlyph(code);
@@ -49,6 +74,7 @@ export function TileFace({
         drawn ? "tile--drawn" : "",
         justDiscarded ? "tile--just-discarded" : "",
         dim ? "tile--dim" : "",
+        entryClass(entry, tossFrom),
         className,
       ]
         .filter(Boolean)
@@ -82,7 +108,7 @@ export function TileButton({ onClick, disabled, ariaLabel, ...face }: ButtonProp
         `tile--${face.size ?? "md"}`,
         colorClass(face.code),
         face.drawn ? "tile--drawn" : "",
-        face.ready ? "" : "",
+        entryClass(face.entry ?? null, face.tossFrom ?? "bottom"),
       ]
         .filter(Boolean)
         .join(" ")}

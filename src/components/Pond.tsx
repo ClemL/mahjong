@@ -2,9 +2,23 @@
 
 import type { GameState } from "@/game/engine";
 import { SEAT_NAMES, type Seat, tileGlyph } from "@/game/tiles";
-import { TileFace } from "./TileView";
+import { TileFace, type TossFrom } from "./TileView";
 
-export function Pond({ state, order }: { state: GameState; order: Seat[] }) {
+/** Screen edge a seat sits on, given who is viewing. */
+function tossDirection(seat: Seat, viewer: Seat): TossFrom {
+  const offset = (((seat - viewer) % 4) + 4) % 4;
+  return (["bottom", "right", "top", "left"] as TossFrom[])[offset];
+}
+
+export function Pond({
+  state,
+  order,
+  viewer,
+}: {
+  state: GameState;
+  order: Seat[];
+  viewer: Seat;
+}) {
   const lastId = state.lastDiscard?.tile.id;
   return (
     <div className="pond">
@@ -30,6 +44,8 @@ export function Pond({ state, order }: { state: GameState; order: Seat[] }) {
                   size="sm"
                   justDiscarded={t.id === lastId}
                   dim={t.id !== lastId}
+                  entry="toss"
+                  tossFrom={tossDirection(seat, viewer)}
                 />
               ))
             )}

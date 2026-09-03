@@ -17,6 +17,8 @@ export interface Meld {
   concealed: boolean;
   /** Seat the claimed tile came from (undefined for concealed kongs). */
   claimedFrom?: Seat;
+  /** Id of the tile taken from the discard pond, for animation and display. */
+  claimedTileId?: string;
   /** True when a kong was upgraded from an existing exposed pung (加槓). */
   fromAddedKong?: boolean;
 }
