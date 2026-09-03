@@ -207,13 +207,32 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 
 ### Table and tiles
 
-Dots (筒) and Bamboo (索) are drawn as **real pip artwork** — inline SVG in the
-traditional arrangements, including the slanted three across the top of the
-seven of Dots. Characters (萬) keep the numeral-over-萬 face and honors keep
-their glyphs, because that is already how those tiles look. Traditional sets
-color individual pips (a red five, a green one bamboo); we draw every pip in
-its suit color instead, since the suits have to stay apart at a glance and a
-red pip would read as a Red Dragon.
+A tile is a bone face set into a rounded body: the shell carries the edge and
+the drop shadow, an inset ring is the bevel catching the light from above, and
+a radial sheen sits over the top-left. Glyphs are given a light lip below the
+stroke and shade above, so they read as carved rather than printed. Tile backs
+get the same treatment with a moulded recessed panel.
+
+Dots (筒) and Bamboo (索) are drawn as **original SVG artwork**, sized on a
+0–100 square and stroked in `currentColor` so they stay crisp from the 22px
+pond to the zoomed hand and recolor with the chosen palette:
+
+- **Dots** are concentric rings around a solid centre, the way the pips are
+  carved. The one of Dots takes an extra ring.
+- **Bamboo** canes are stalks broken by node gaps, narrow enough that each
+  segment stays taller than it is wide — split any further and they read as a
+  stack of beads.
+- **One Bamboo is a bird**, as on every traditional set, drawn as a perched
+  sparrow with a fanned tail. A faithful peacock would be mud at 22px.
+
+Nothing is filled with the tile's face color: rings are strokes and canes are
+separate segments, so the suit's faint wash shows through the gaps rather than
+being covered by a near-match.
+
+Characters (萬) and honors keep their glyph faces, which is already how those
+tiles look. Traditional sets color individual pips (a red five, a green one
+bamboo); we draw every pip in its suit color instead, since the suits have to
+stay apart at a glance and a red pip would read as a Red Dragon.
 
 Suits are set far apart in both hue and lightness — blue Characters,
 burnt-orange Dots, green Bamboo, purple bonus tiles — with a matching wash
