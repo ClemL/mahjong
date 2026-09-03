@@ -6,10 +6,12 @@ import {
   discard,
   nextHand,
   resolveClaims,
+  setMinFaan,
   turnActions,
 } from "../engine";
 import { autoPlayHand } from "../controller";
 import { createRng } from "../rng";
+import { DEFAULT_RULES } from "../rules";
 import { compareCodes, isFlower, rankOf } from "../tiles";
 import type { Seat, Tile } from "../tiles";
 
@@ -170,7 +172,7 @@ describe("turn actions", () => {
   });
 
   it("does not allow a win below the faan minimum", () => {
-    const state = createGame({ seed: 11 });
+    const state = createGame({ seed: 11, config: { ...DEFAULT_RULES, minFaan: 3 } });
     const seat = state.dealer;
     // A complete but valueless hand: chows across three suits with a plain pair,
     // exposed, so neither the concealed-hand nor self-draw bonus applies.
@@ -183,6 +185,31 @@ describe("turn actions", () => {
     const actions = turnActions(state, seat);
     // All sequences (1) + self draw (1) = 2 faan, below the 3 faan minimum.
     expect(actions.canWin).toBe(false);
+  });
+
+  it("allows a chicken hand when the table minimum is 0", () => {
+    const state = createGame({ seed: 11, config: { ...DEFAULT_RULES, minFaan: 0 } });
+    const seat = state.dealer;
+    state.players[seat].hand = "m1 m2 m3 p4 p5 p6 s7 s8 s9 m5 m6 m7 p2 p2"
+      .split(" ")
+      .map((code, i) => ({ id: `h${i}`, code }));
+    state.players[seat].flowers = [{ id: "f", code: "f2" }];
+    state.players[seat].melds = [];
+    state.drawnTileId = "h13";
+    const actions = turnActions(state, seat);
+    expect(actions.canWin).toBe(true);
+    expect(actions.winScore!.faan).toBe(2);
+  });
+
+  it("changes the table minimum without disturbing the hand", () => {
+    const before = createGame({ seed: 33, config: { ...DEFAULT_RULES, minFaan: 3 } });
+    const after = setMinFaan(before, 0);
+    expect(after.config.minFaan).toBe(0);
+    expect(before.config.minFaan).toBe(3);
+    expect(after.players.map((p) => p.hand.length)).toEqual(
+      before.players.map((p) => p.hand.length),
+    );
+    expect(setMinFaan(after, 0)).toBe(after);
   });
 });
 

@@ -78,6 +78,7 @@ export function PlayerHand({ api }: { api: MahjongApi }) {
               code={drawn.code}
               size="lg"
               drawn
+              entry="draw"
               ready={readyDiscards.has(drawn.id)}
               disabled={!actions.canDiscard}
               onClick={() => api.discard(drawn.id)}

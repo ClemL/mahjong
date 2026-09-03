@@ -5,7 +5,7 @@ other three seats are played by the computer. Built as a Next.js app that
 deploys to Vercel as a fully static site — the whole game runs client-side, with
 no backend, database or API keys.
 
-![Status](https://img.shields.io/badge/tests-58%20passing-brightgreen)
+![Status](https://img.shields.io/badge/tests-60%20passing-brightgreen)
 
 ## What is implemented
 
@@ -36,8 +36,11 @@ no backend, database or API keys.
   used, so 111 222 333 is read as triplets or sequences — whichever pays more.
 - Faan patterns with correct exclusions (Big Three Dragons suppresses the
   individual dragon triplets, Full Flush suppresses Half Flush, and so on).
-- Classic Hong Kong payout table: 3 faan minimum to win, 10 faan limit
-  (滿糊 = 128 points), doubling 1 · 2 · 4 · 8 · 16 · 24 · 32 · 48 · 64 · 96 · 128.
+- Classic Hong Kong payout table: 10 faan limit (滿糊 = 128 points), doubling
+  1 · 2 · 4 · 8 · 16 · 24 · 32 · 48 · 64 · 96 · 128.
+- **The faan minimum is a table setting** — 0, 1, 3 (the Hong Kong standard) or
+  5 — changeable mid-hand from the top bar. It defaults to **0**, so a chicken
+  hand (雞糊) can be declared for a single point.
 - Self-draw: all three opponents pay. Win on a discard: the discarder alone
   pays (出銃全包).
 
@@ -52,19 +55,23 @@ can declare a legal win it discards a uniformly random tile. On a discard it
 picks uniformly from `{pass, ...legal claims}`, except that a winning claim is
 always taken. Kongs on its own turn are taken half the time.
 
-One consequence worth knowing before you play: random discarding almost never
-assembles a 3-faan hand. Over 400 simulated all-AI hands:
+One consequence worth knowing before you play: random discarding rarely
+completes a hand at all. Over 300 simulated all-AI hands at each table minimum:
 
-| Metric | Value |
-| --- | --- |
-| Hands won | 2.5% |
-| Washed out (流局) | 97.5% |
-| Average faan when a hand is won | 4.2 |
-| Melds claimed per hand (all four seats) | 7.2 |
+| Table minimum | Hands won | Washed out (流局) | Avg. faan when won |
+| --- | --- | --- | --- |
+| 0 faan (default) | 5.0% | 95.0% | 2.5 |
+| 3 faan (HK standard) | 2.7% | 97.3% | 4.3 |
 
-You will win far more often than the machines do, and most AI-vs-AI hands will
-run the wall out. That is the expected behaviour of a random agent, not a bug —
-but it is the first thing a smarter strategy should fix.
+Dropping the minimum to 0 roughly doubles how often the machines go out, but
+washouts still dominate — the binding constraint is that a random agent seldom
+assembles four sets and a pair, not the faan gate at the finish line. The
+setting helps a deliberate human far more, since it stops a well-shaped hand
+being unwinnable for want of a scoring pattern.
+
+You will win far more often than the machines do. That is the expected
+behaviour of a random agent, not a bug — but it is the first thing a smarter
+strategy should fix.
 
 Adding one is a single file: implement the `AiStrategy` interface in
 [`src/game/ai.ts`](src/game/ai.ts) and register it in `STRATEGIES`.
@@ -86,7 +93,7 @@ Useful primitives already exist for a greedy or shanten-based opponent:
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 58 unit tests
+npm test           # 60 unit tests
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
 ```
@@ -138,13 +145,24 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 ## Playing
 
 - Click a tile in your hand to discard it.
+- **Hover any tile to zoom it** — in your hand, in the pond, or in an
+  opponent's meld — so a 22px discard is still readable.
 - When an opponent discards something you can use, Chow / Pung / Kong / Win
   buttons appear with a preview of the meld they would form. **Pass** declines.
 - A green dot on a tile means discarding it leaves you ready (聽牌). Toggle this
   with **Hints**.
+- **Min faan** sets the table minimum and applies immediately, mid-hand.
 - **Speed** cycles the pace of the computer players; **Pause** stops the table.
 - A game runs one East round — four dealerships. The dealer keeps the deal
   after winning (連莊); a loss or a washout passes it on.
+
+Tiles are animated so the table is readable at a glance: a discard flies in
+from the direction of the player who threw it, a tile retrieved from the pond
+pops into the meld that claimed it, and the tile you just drew slides into your
+hand. Suits are set far apart in both hue and lightness — blue Characters,
+burnt-orange Dots, green Bamboo, purple bonus tiles — with a matching wash
+across the tile face, which also keeps them separable for red-green color
+vision deficiency. All motion respects `prefers-reduced-motion`.
 
 ## Known limitations
 

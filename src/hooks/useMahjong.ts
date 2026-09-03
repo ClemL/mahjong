@@ -12,6 +12,7 @@ import {
   declareSelfDraw,
   discard as discardTile,
   nextHand as nextHandOf,
+  setMinFaan as setMinFaanOf,
   turnActions,
   waitsAfterDiscard,
 } from "@/game/engine";
@@ -24,6 +25,7 @@ import {
 import { type Rng, createRng } from "@/game/rng";
 import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
+import { DEFAULT_RULES } from "@/game/rules";
 
 export type Speed = "slow" | "normal" | "fast";
 
@@ -60,6 +62,9 @@ export interface MahjongApi {
   pass: () => void;
   nextHand: () => void;
   newGame: () => void;
+  /** Table faan minimum, and a setter that applies mid-hand. */
+  minFaan: number;
+  setMinFaan: (value: number) => void;
 }
 
 export function useMahjong(humanSeat: Seat = 0): MahjongApi {
@@ -162,6 +167,10 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     setState((current) => (current ? nextHandOf(current) : current));
   }, []);
 
+  const setMinFaan = useCallback((value: number) => {
+    setState((current) => (current ? setMinFaanOf(current, value) : current));
+  }, []);
+
   return {
     state,
     humanSeat,
@@ -182,5 +191,7 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     pass,
     nextHand,
     newGame: start,
+    minFaan: state?.config.minFaan ?? DEFAULT_RULES.minFaan,
+    setMinFaan,
   };
 }

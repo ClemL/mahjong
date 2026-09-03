@@ -31,8 +31,15 @@ export interface FaanTable {
   noBonus: number;
 }
 
+/** Faan minimums a table can be set to. 3 is the Hong Kong standard. */
+export const MIN_FAAN_CHOICES = [0, 1, 3, 5] as const;
+export type MinFaan = (typeof MIN_FAAN_CHOICES)[number];
+
 export interface RuleConfig {
-  /** Minimum faan required to declare a win (HK standard is 3). */
+  /**
+   * Minimum faan required to declare a win. The Hong Kong standard is 3;
+   * 0 allows a chicken hand (雞糊) to win for a single point.
+   */
   minFaan: number;
   /** Faan cap — 滿糊. */
   limitFaan: number;
@@ -76,7 +83,7 @@ export const DEFAULT_FAAN: FaanTable = {
 export const DEFAULT_PAYOUT_TABLE = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128];
 
 export const DEFAULT_RULES: RuleConfig = {
-  minFaan: 3,
+  minFaan: 0,
   limitFaan: 10,
   payoutTable: DEFAULT_PAYOUT_TABLE,
   discarderPaysAll: true,
@@ -89,53 +96,65 @@ export interface RuleNote {
   body: string;
 }
 
+function describeMinimum(minFaan: number): string {
+  if (minFaan <= 0) {
+    return "There is no faan minimum, so even a chicken hand (雞糊, 0 faan) may be declared for one point.";
+  }
+  return `A win must be worth at least ${minFaan} faan, bonus tiles included.`;
+}
+
 /** Plain-language summary of the ruleset, rendered in the Rules panel. */
-export const RULE_NOTES: RuleNote[] = [
-  {
-    title: "Tiles",
-    body:
-      "144 tiles: three suits of 1–9 (Characters 萬, Dots 筒, Bamboo 索) in four copies, " +
-      "four Winds and three Dragons in four copies, plus four Flowers and four Seasons as bonus tiles.",
-  },
-  {
-    title: "Dealing",
-    body:
-      "Each player receives 13 tiles; the dealer (East) starts with 14 and discards first. " +
-      "Bonus tiles are revealed immediately and replaced from the back of the wall.",
-  },
-  {
-    title: "Turn order",
-    body: "Play passes East → South → West → North. Draw one tile, then discard one.",
-  },
-  {
-    title: "Claiming a discard",
-    body:
-      "Pung and Kong may be claimed by any player; Chow only by the player to the discarder's " +
-      "right (the next to play). Priority is Win > Kong > Pung > Chow. A claim skips the players in between.",
-  },
-  {
-    title: "Kongs",
-    body:
-      "Exposed kong (from a discard), concealed kong (four in hand), and added kong (a fourth tile " +
-      "onto your own exposed pung). Each draws a replacement tile from the back of the wall. " +
-      "An added kong can be robbed by a player who wins on that tile (搶槓).",
-  },
-  {
-    title: "Winning hand",
-    body:
-      "Four sets and a pair, or Thirteen Orphans (十三么) / Nine Gates (九蓮寶燈). " +
-      "A win must be worth at least 3 faan, bonus tiles included.",
-  },
-  {
-    title: "Payment",
-    body:
-      "Self-draw (自摸): all three opponents pay the hand's value. " +
-      "Win on a discard: the discarder alone pays. A washed-out wall (流局) pays nothing.",
-  },
-  {
-    title: "Dealership",
-    body:
-      "The dealer keeps the deal after winning (連莊); a loss or a washout passes it to the right. " +
-      "A game runs one East round — four dealerships.",
-  },
-];
+export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
+  return [
+    {
+      title: "Tiles",
+      body:
+        "144 tiles: three suits of 1–9 (Characters 萬, Dots 筒, Bamboo 索) in four copies, " +
+        "four Winds and three Dragons in four copies, plus four Flowers and four Seasons as bonus tiles.",
+    },
+    {
+      title: "Dealing",
+      body:
+        "Each player receives 13 tiles; the dealer (East) starts with 14 and discards first. " +
+        "Bonus tiles are revealed immediately and replaced from the back of the wall.",
+    },
+    {
+      title: "Turn order",
+      body: "Play passes East → South → West → North. Draw one tile, then discard one.",
+    },
+    {
+      title: "Claiming a discard",
+      body:
+        "Pung and Kong may be claimed by any player; Chow only by the player to the discarder's " +
+        "right (the next to play). Priority is Win > Kong > Pung > Chow. A claim skips the players in between.",
+    },
+    {
+      title: "Kongs",
+      body:
+        "Exposed kong (from a discard), concealed kong (four in hand), and added kong (a fourth tile " +
+        "onto your own exposed pung). Each draws a replacement tile from the back of the wall. " +
+        "An added kong can be robbed by a player who wins on that tile (搶槓).",
+    },
+    {
+      title: "Winning hand",
+      body:
+        "Four sets and a pair, or Thirteen Orphans (十三么) / Nine Gates (九蓮寶燈). " +
+        describeMinimum(config.minFaan),
+    },
+    {
+      title: "Payment",
+      body:
+        "Self-draw (自摸): all three opponents pay the hand's value. " +
+        "Win on a discard: the discarder alone pays. A washed-out wall (流局) pays nothing.",
+    },
+    {
+      title: "Dealership",
+      body:
+        "The dealer keeps the deal after winning (連莊); a loss or a washout passes it to the right. " +
+        "A game runs one East round — four dealerships.",
+    },
+  ];
+}
+
+/** The notes for the default ruleset. */
+export const RULE_NOTES: RuleNote[] = ruleNotes(DEFAULT_RULES);

@@ -15,14 +15,21 @@
   --panel: rgba(0, 0, 0, 0.28);
   --panel-border: rgba(255, 255, 255, 0.12);
 
-  --suit-m: #1d4e89;
-  --suit-p: #0f766e;
-  --suit-s: #166534;
-  --honor: #23303a;
-  --dragon-r: #b3261e;
-  --dragon-g: #146c43;
-  --dragon-w: #1e40af;
-  --flower: #a3591b;
+  /* Suits are set far apart in hue AND lightness so they read at any size,
+     and stay separable for red-green color vision deficiency. */
+  --suit-m: #1f45c4;        /* Characters 萬 — blue */
+  --suit-m-tint: #1f45c40f;
+  --suit-p: #b3540a;        /* Dots 筒 — burnt orange */
+  --suit-p-tint: #b3540a12;
+  --suit-s: #127a3c;        /* Bamboo 索 — green */
+  --suit-s-tint: #127a3c12;
+  --honor: #1e2732;         /* Winds — near black */
+  --honor-tint: #1e273209;
+  --dragon-r: #c01f16;
+  --dragon-g: #0b6b38;
+  --dragon-w: #2b4ea8;
+  --flower: #7c2ba8;        /* Bonus tiles — purple */
+  --flower-tint: #7c2ba812;
 }
 
 * {
@@ -270,6 +277,9 @@ button {
   color: var(--honor);
   user-select: none;
   flex: none;
+  transition: transform 140ms cubic-bezier(0.2, 0.9, 0.3, 1.2), box-shadow 140ms ease,
+    border-color 140ms ease;
+  transform-origin: center center;
 }
 
 .tile--sm { --tile-w: 26px; }
@@ -302,14 +312,72 @@ button {
   letter-spacing: -0.02em;
 }
 
-.tile--m { color: var(--suit-m); }
-.tile--p { color: var(--suit-p); }
-.tile--s { color: var(--suit-s); }
+.tile--m {
+  color: var(--suit-m);
+  background:
+    linear-gradient(180deg, var(--suit-m-tint), var(--suit-m-tint)),
+    linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+}
+
+.tile--p {
+  color: var(--suit-p);
+  background:
+    linear-gradient(180deg, var(--suit-p-tint), var(--suit-p-tint)),
+    linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+}
+
+.tile--s {
+  color: var(--suit-s);
+  background:
+    linear-gradient(180deg, var(--suit-s-tint), var(--suit-s-tint)),
+    linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+}
+
 .tile--w { color: var(--honor); }
 .tile--dr { color: var(--dragon-r); }
 .tile--dg { color: var(--dragon-g); }
 .tile--dw { color: var(--dragon-w); }
-.tile--f { color: var(--flower); }
+
+.tile--f {
+  color: var(--flower);
+  background:
+    linear-gradient(180deg, var(--flower-tint), var(--flower-tint)),
+    linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+}
+
+/* The suit mark carries the suit color at full strength; combined with the
+   tinted face it keeps suits apart down to the 22px pond size. */
+.tile__suit {
+  font-size: calc(var(--tile-w) * 0.32);
+  opacity: 1;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------- hover to zoom */
+
+/* Pointer devices only, so a tap on a phone does not leave a tile enlarged. */
+@media (hover: hover) and (pointer: fine) {
+  .tile:not(.tile--back):hover {
+    transform: scale(1.85);
+    z-index: 40;
+    box-shadow: 0 6px 2px var(--tile-shadow), 0 12px 26px rgba(0, 0, 0, 0.55);
+    border-color: var(--gold);
+  }
+
+  .tile--lg:not(.tile--back):hover {
+    transform: scale(1.4);
+  }
+
+  .tile--button:hover:not(:disabled) {
+    transform: translateY(-10px) scale(1.4);
+    box-shadow: 0 10px 2px var(--tile-shadow), 0 16px 26px rgba(0, 0, 0, 0.5);
+  }
+
+  /* A zoomed tile must not be clipped by, or hidden behind, its neighbours. */
+  .tile:hover .tile__label {
+    color: rgba(0, 0, 0, 0.55);
+  }
+}
 
 .tile--back {
   background: linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
@@ -327,13 +395,7 @@ button {
 
 .tile--button {
   cursor: pointer;
-  transition: transform 100ms ease, box-shadow 100ms ease;
   padding: 0;
-}
-
-.tile--button:hover:not(:disabled) {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 0 var(--tile-shadow), 0 10px 14px rgba(0, 0, 0, 0.4);
 }
 
 .tile--button:disabled {
@@ -533,6 +595,40 @@ button {
 .btn--sm {
   padding: 4px 9px;
   font-size: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.field__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.field__select {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
+.field__select:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.field__select option {
+  color: #12241d;
+  background: var(--ink);
 }
 
 .btn__preview {
@@ -753,4 +849,85 @@ details[open] > summary::after {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* ------------------------------------------------------------- animations */
+
+/* A discard flies in from the direction of the player who threw it. */
+@keyframes toss-from-bottom {
+  0%   { transform: translateY(120px) scale(1.5) rotate(-8deg); opacity: 0; }
+  60%  { transform: translateY(-6px) scale(1.08) rotate(2deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-top {
+  0%   { transform: translateY(-120px) scale(1.5) rotate(8deg); opacity: 0; }
+  60%  { transform: translateY(6px) scale(1.08) rotate(-2deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-left {
+  0%   { transform: translateX(-160px) scale(1.5) rotate(-10deg); opacity: 0; }
+  60%  { transform: translateX(8px) scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: translateX(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-right {
+  0%   { transform: translateX(160px) scale(1.5) rotate(10deg); opacity: 0; }
+  60%  { transform: translateX(-8px) scale(1.08) rotate(-3deg); opacity: 1; }
+  100% { transform: translateX(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* A tile retrieved from the pond into a meld. */
+@keyframes claim-pop {
+  0%   { transform: scale(2.1) translateY(-26px); opacity: 0; }
+  55%  { transform: scale(1.15) translateY(3px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* The tile just drawn from the wall. */
+@keyframes draw-in {
+  0%   { transform: translateY(-22px) scale(0.85); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.tile--toss-bottom { animation: toss-from-bottom 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-top    { animation: toss-from-top 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-left   { animation: toss-from-left 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-right  { animation: toss-from-right 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--claimed     { animation: claim-pop 380ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--drew        { animation: draw-in 260ms ease-out both; }
+
+/* Hovering must win over an in-flight animation. */
+@media (hover: hover) and (pointer: fine) {
+  .tile:not(.tile--back):hover {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile--toss-bottom,
+  .tile--toss-top,
+  .tile--toss-left,
+  .tile--toss-right,
+  .tile--claimed,
+  .tile--drew {
+    animation: none;
+    transition: none;
+  }
+
+  .tile:not(.tile--back):hover,
+  .tile--button:hover:not(:disabled) {
+    transform: scale(1.25);
+  }
+}
+
+/* Rows hold zoomed and animated tiles without clipping them. */
+.seat__row,
+.pond__row,
+.hand__tiles,
+.meld,
+.modal__tiles {
+  overflow: visible;
 }
