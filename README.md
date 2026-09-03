@@ -118,6 +118,13 @@ vercel --prod   # production
 Both routes produce a fully static export (`○ (Static) prerendered as static
 content`), so the game is served from the CDN edge.
 
+### Changelog
+
+A footer strip carries the build version and the most recent changelog entry;
+clicking it opens the full changelog, newest first. Entries live in
+[`public/updates.txt`](public/updates.txt), one per line, oldest first — add a
+line there whenever you ship a user-visible change.
+
 ## Project layout
 
 ```
@@ -135,6 +142,7 @@ src/hooks/         React binding for the engine
 src/game/sound.ts  Web Audio cues, synthesised at runtime
 src/components/    Tiles, pip artwork, seats, pond, hand, result modal, chart
 src/app/           Next.js App Router entry and styles
+public/updates.txt Changelog, oldest first
 ```
 
 The engine is a pure state machine: every mutator takes a `GameState` and

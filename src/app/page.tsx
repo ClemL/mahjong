@@ -6,6 +6,7 @@ import { SeatPanel } from "@/components/SeatPanel";
 import { Pond } from "@/components/Pond";
 import { PlayerHand } from "@/components/PlayerHand";
 import { ResultModal } from "@/components/ResultModal";
+import { BuildFooter } from "@/components/BuildFooter";
 import {
   FaanPanel,
   HistoryPanel,
@@ -25,6 +26,7 @@ export default function Page() {
     return (
       <main className="app">
         <div className="panel">Shuffling the wall…</div>
+        <BuildFooter />
       </main>
     );
   }
@@ -149,6 +151,8 @@ export default function Page() {
       </div>
 
       <ResultModal state={state} onNextHand={api.nextHand} onNewGame={api.newGame} />
+
+      <BuildFooter />
     </main>
   );
 }
