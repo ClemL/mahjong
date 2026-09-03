@@ -15,6 +15,40 @@
   --panel: rgba(0, 0, 0, 0.28);
   --panel-border: rgba(255, 255, 255, 0.12);
 
+  /* Surfaces and rules, so a theme can invert the whole UI from one block. */
+  --raise-0: rgba(255, 255, 255, 0.06);
+  --raise-1: rgba(255, 255, 255, 0.08);
+  --raise-2: rgba(255, 255, 255, 0.16);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --shade-1: rgba(0, 0, 0, 0.16);
+  --shade-2: rgba(0, 0, 0, 0.2);
+  --shade-3: rgba(0, 0, 0, 0.25);
+  --accent-wash: rgba(232, 196, 106, 0.1);
+  --accent-wash-2: rgba(232, 196, 106, 0.22);
+  --table-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.16));
+  --backdrop: rgba(0, 0, 0, 0.62);
+  --modal-bg: linear-gradient(180deg, #123f31, #0b2c22);
+  --tooltip-bg: rgba(4, 24, 18, 0.96);
+  --claim-outline: #7dd3fc;
+  --score-pos: #9ae6b4;
+  --score-neg: #f4a3a0;
+  --chip-pos: rgba(46, 163, 107, 0.28);
+  --chip-neg: rgba(217, 83, 79, 0.26);
+  --option-bg: #f4f1e8;
+  --option-fg: #12241d;
+
+  /* Chart tokens — series colors are the reference categorical slots 1–4,
+     validated against this theme's chart surface. */
+  --chart-surface: #0e3428;
+  --chart-grid: rgba(255, 255, 255, 0.09);
+  --chart-zero: rgba(255, 255, 255, 0.26);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+
   /* Suits are set far apart in hue AND lightness so they read at any size,
      and stay separable for red-green color vision deficiency. */
   --suit-m: #1f45c4;        /* Characters 萬 — blue */
@@ -143,7 +177,7 @@ button {
     "bottom bottom bottom";
   gap: 10px;
   padding: 14px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.16));
+  background: var(--table-bg);
   border: 1px solid var(--panel-border);
   border-radius: 16px;
   min-height: 460px;
@@ -194,18 +228,18 @@ button {
   gap: 6px;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--shade-2);
   border: 1px solid transparent;
   transition: border-color 120ms ease, background 120ms ease;
 }
 
 .seat--active {
   border-color: var(--gold);
-  background: rgba(232, 196, 106, 0.1);
+  background: var(--accent-wash);
 }
 
 .seat--claiming {
-  border-color: #7dd3fc;
+  border-color: var(--claim-outline);
 }
 
 .seat__head {
@@ -232,7 +266,7 @@ button {
   letter-spacing: 0.06em;
   padding: 1px 5px;
   border-radius: 999px;
-  background: rgba(232, 196, 106, 0.22);
+  background: var(--accent-wash-2);
   color: var(--gold);
 }
 
@@ -242,8 +276,8 @@ button {
   font-weight: 700;
 }
 
-.seat__score--neg { color: #f4a3a0; }
-.seat__score--pos { color: #9ae6b4; }
+.seat__score--neg { color: var(--score-neg); }
+.seat__score--pos { color: var(--score-pos); }
 
 .seat__row {
   display: flex;
@@ -401,7 +435,7 @@ button {
   position: absolute;
   inset: 4px;
   border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line);
 }
 
 .tile--button {
@@ -419,7 +453,7 @@ button {
 }
 
 .tile--just-discarded {
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid var(--claim-outline);
   outline-offset: 2px;
 }
 
@@ -443,7 +477,7 @@ button {
   gap: 2px;
   padding: 2px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--raise-0);
 }
 
 /* ----------------------------------------------------------------- pond */
@@ -457,7 +491,7 @@ button {
   height: 100%;
   padding: 8px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.16);
+  background: var(--shade-1);
   border: 1px solid var(--panel-border);
 }
 
@@ -468,7 +502,7 @@ button {
   gap: 2px;
   padding: 6px 16px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--shade-3);
 }
 
 .pond__round {
@@ -522,7 +556,7 @@ button {
   gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.24);
+  background: var(--shade-3);
   border: 1px solid var(--panel-border);
 }
 
@@ -561,8 +595,8 @@ button {
 }
 
 .btn {
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--line-strong);
+  background: var(--raise-1);
   color: var(--ink);
   padding: 7px 14px;
   border-radius: 8px;
@@ -572,7 +606,7 @@ button {
 }
 
 .btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--raise-2);
 }
 
 .btn:active:not(:disabled) {
@@ -631,20 +665,20 @@ button {
   font-size: 12px;
   font-weight: 600;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: var(--raise-1);
+  border: 1px solid var(--line-strong);
   border-radius: 8px;
   padding: 4px 6px;
   cursor: pointer;
 }
 
 .field__select:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--raise-2);
 }
 
 .field__select option {
-  color: #12241d;
-  background: var(--ink);
+  color: var(--option-fg);
+  background: var(--option-bg);
 }
 
 .btn__preview {
@@ -693,7 +727,7 @@ button {
 }
 
 .scores__row + .scores__row {
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--line-soft);
 }
 
 .scores__name {
@@ -718,7 +752,7 @@ button {
 .log__entry {
   color: var(--ink-dim);
   padding: 2px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .log__entry--own {
@@ -754,7 +788,7 @@ button {
 .faan-table td {
   text-align: left;
   padding: 3px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .faan-table td:last-child,
@@ -790,7 +824,7 @@ details[open] > summary::after {
 .modal__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--backdrop);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -802,7 +836,7 @@ details[open] > summary::after {
   width: min(520px, 100%);
   max-height: 88vh;
   overflow-y: auto;
-  background: linear-gradient(180deg, #123f31, #0b2c22);
+  background: var(--modal-bg);
   border: 1px solid var(--panel-border);
   border-radius: 14px;
   padding: 18px 20px;
@@ -833,7 +867,7 @@ details[open] > summary::after {
   align-items: baseline;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  border-top: 1px solid var(--line);
   font-weight: 700;
 }
 
@@ -848,12 +882,12 @@ details[open] > summary::after {
   font-size: 12px;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--raise-1);
   font-variant-numeric: tabular-nums;
 }
 
-.chip--pos { background: rgba(46, 163, 107, 0.28); }
-.chip--neg { background: rgba(217, 83, 79, 0.26); }
+.chip--pos { background: var(--chip-pos); }
+.chip--neg { background: var(--chip-neg); }
 
 .sr-only {
   position: absolute;
@@ -967,7 +1001,7 @@ details[open] > summary::after {
   grid-template-columns: 26px minmax(0, 1fr);
   gap: 4px 6px;
   padding: 4px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line-soft);
   align-items: baseline;
 }
 
@@ -1003,13 +1037,12 @@ details[open] > summary::after {
   min-width: 30px;
 }
 
-.history__delta--pos { color: #9ae6b4; }
-.history__delta--neg { color: #f4a3a0; }
+.history__delta--pos { color: var(--score-pos); }
+.history__delta--neg { color: var(--score-neg); }
 
 /* --------------------------------------------------------------- chart */
 
 .chart {
-  --chart-surface: #0e3428;
   margin: 16px 0 4px;
   padding: 10px 12px 6px;
   background: var(--chart-surface);
@@ -1059,17 +1092,17 @@ details[open] > summary::after {
 }
 
 .chart__grid {
-  stroke: rgba(255, 255, 255, 0.09);
+  stroke: var(--chart-grid);
   stroke-width: 1;
 }
 
 .chart__zero {
-  stroke: rgba(255, 255, 255, 0.26);
+  stroke: var(--chart-zero);
   stroke-width: 1;
 }
 
 .chart__crosshair {
-  stroke: rgba(255, 255, 255, 0.34);
+  stroke: var(--chart-zero);
   stroke-width: 1;
   stroke-dasharray: 3 3;
 }
@@ -1091,7 +1124,7 @@ details[open] > summary::after {
   position: absolute;
   top: 4px;
   pointer-events: none;
-  background: rgba(4, 24, 18, 0.96);
+  background: var(--tooltip-bg);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
   padding: 6px 9px;
@@ -1201,4 +1234,223 @@ details[open] > summary::after {
 
 .changelog__item:first-child {
   color: var(--ink);
+}
+
+/* ============================================================== themes ==
+   Each theme overrides only the surface tokens; the suit palette is a
+   separate axis so any tile coloring works on any table.
+   ====================================================================== */
+
+[data-theme="slate"] {
+  --felt: #23272e;
+  --felt-light: #2f353e;
+  --felt-edge: #15181d;
+  --ink: #eceef1;
+  --ink-dim: #a4abb6;
+  --gold: #e2bb63;
+  --tile-back: #4b5564;
+  --tile-back-2: #333b46;
+  --modal-bg: linear-gradient(180deg, #2b313a, #1c2027);
+  --tooltip-bg: rgba(12, 14, 18, 0.96);
+  --chart-surface: #1f232a;
+}
+
+[data-theme="mahogany"] {
+  --felt: #3b201a;
+  --felt-light: #4f2c23;
+  --felt-edge: #221110;
+  --ink: #f6ece5;
+  --ink-dim: #c2a396;
+  --gold: #edb96f;
+  --tile-back: #7d4030;
+  --tile-back-2: #55271b;
+  --accent-wash: rgba(237, 185, 111, 0.12);
+  --accent-wash-2: rgba(237, 185, 111, 0.24);
+  --modal-bg: linear-gradient(180deg, #4a2921, #2c1512);
+  --tooltip-bg: rgba(28, 12, 9, 0.96);
+  --chart-surface: #331c17;
+}
+
+[data-theme="midnight"] {
+  --felt: #131e3f;
+  --felt-light: #1d2d5c;
+  --felt-edge: #0a1128;
+  --ink: #eef1fa;
+  --ink-dim: #a2acc9;
+  --gold: #e6c672;
+  --tile-back: #2e4177;
+  --tile-back-2: #1d2d5c;
+  --modal-bg: linear-gradient(180deg, #1c2b57, #101a36);
+  --tooltip-bg: rgba(6, 11, 26, 0.96);
+  --chart-surface: #15203f;
+}
+
+/* A light table. Every surface token flips; the chart takes the light steps
+   of the same categorical palette, which are selected for a light surface
+   rather than flipped from the dark ones. */
+[data-theme="parchment"] {
+  --felt: #d8ded3;
+  --felt-light: #e9ede4;
+  --felt-edge: #c3ccbc;
+  --ink: #1f231c;
+  --ink-dim: #5b6157;
+  --gold: #8a6a12;
+  --danger: #b03a36;
+  /* Ivory tiles on a light table need a firmer edge to stay defined. */
+  --tile-edge: #a2977a;
+  --tile-shadow: #8d8265;
+  --tile-back: #3f7a63;
+  --tile-back-2: #2c5a48;
+  --panel: rgba(255, 255, 255, 0.6);
+  --panel-border: rgba(0, 0, 0, 0.14);
+  --raise-0: rgba(0, 0, 0, 0.04);
+  --raise-1: rgba(0, 0, 0, 0.06);
+  --raise-2: rgba(0, 0, 0, 0.12);
+  --line-soft: rgba(0, 0, 0, 0.08);
+  --line: rgba(0, 0, 0, 0.14);
+  --line-strong: rgba(0, 0, 0, 0.2);
+  --shade-1: rgba(0, 0, 0, 0.05);
+  --shade-2: rgba(0, 0, 0, 0.06);
+  --shade-3: rgba(0, 0, 0, 0.07);
+  --accent-wash: rgba(138, 106, 18, 0.12);
+  --accent-wash-2: rgba(138, 106, 18, 0.18);
+  --table-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.05));
+  --backdrop: rgba(30, 35, 28, 0.42);
+  --modal-bg: linear-gradient(180deg, #f6f3e8, #e9e5d6);
+  --tooltip-bg: rgba(255, 255, 255, 0.97);
+  --claim-outline: #1668a8;
+  --score-pos: #14663c;
+  --score-neg: #a3302b;
+  --chip-pos: rgba(20, 102, 60, 0.18);
+  --chip-neg: rgba(163, 48, 43, 0.16);
+  --option-bg: #ffffff;
+  --option-fg: #1f231c;
+  --chart-surface: #efe9d8;
+  --chart-grid: rgba(0, 0, 0, 0.1);
+  --chart-zero: rgba(0, 0, 0, 0.3);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+}
+
+/* ======================================================== suit palettes ==
+   The tile face keeps a faint wash of its suit color, which is a second cue
+   that does not depend on reading the glyph.
+   ====================================================================== */
+
+/* Traditional ink: near-black Characters, blue Dots, green Bamboo, red bonus. */
+[data-suits="classic"] {
+  --suit-m: #23303a;
+  --suit-m-tint: #23303a0d;
+  --suit-p: #1d4e89;
+  --suit-p-tint: #1d4e8912;
+  --suit-s: #146c43;
+  --suit-s-tint: #146c4312;
+  --flower: #b3261e;
+  --flower-tint: #b3261e12;
+}
+
+/* One ink for every suit — the pips and numerals carry all the meaning. */
+[data-suits="mono"] {
+  --suit-m: #23303a;
+  --suit-m-tint: transparent;
+  --suit-p: #23303a;
+  --suit-p-tint: transparent;
+  --suit-s: #23303a;
+  --suit-s-tint: transparent;
+  --honor: #23303a;
+  --dragon-r: #23303a;
+  --dragon-g: #23303a;
+  --dragon-w: #23303a;
+  --flower: #23303a;
+  --flower-tint: transparent;
+}
+
+/* ==================================================== tile face styles ==
+   Both faces are rendered and one is hidden, so switching is instant and no
+   component needs to know the setting.
+   ====================================================================== */
+
+.tile__glyph--alt,
+.tile__suit--alt {
+  display: none;
+}
+
+[data-tiles="numerals"] .tile__pips {
+  display: none;
+}
+
+[data-tiles="numerals"] .tile__glyph--alt {
+  display: block;
+}
+
+[data-tiles="numerals"] .tile__suit--alt {
+  display: block;
+}
+
+/* ------------------------------------------------------ appearance panel */
+
+.appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.appearance__preview {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--shade-1);
+  justify-content: center;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.choice__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+
+.choice__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.choice__btn {
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  color: var(--ink-dim);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.choice__btn:hover {
+  background: var(--raise-2);
+  color: var(--ink);
+}
+
+.choice__btn--on {
+  background: var(--accent-wash-2);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.choice__hint {
+  font-size: 11px;
+  color: var(--ink-dim);
+  line-height: 1.35;
 }

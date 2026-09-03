@@ -32,14 +32,24 @@ function entryClass(entry: TileEntry, from: TossFrom): string {
   }
 }
 
-/** The face itself — pip artwork for Dots and Bamboo, a glyph for the rest. */
+/**
+ * The face itself. Dots and Bamboo carry both a pip drawing and a numeral
+ * face; CSS shows one according to the chosen tile style, so switching is
+ * instant and no component has to know the setting. Characters and honors
+ * only ever have the glyph face.
+ */
 function TileArt({ code }: { code: TileCode }) {
-  if (hasPips(code)) return <TilePips code={code} />;
+  const pips = hasPips(code);
   const suit = tileSuitGlyph(code);
   return (
     <>
-      <span className="tile__glyph">{tileGlyph(code)}</span>
-      {suit ? <span className="tile__suit">{suit}</span> : null}
+      {pips ? <TilePips code={code} /> : null}
+      <span className={pips ? "tile__glyph tile__glyph--alt" : "tile__glyph"}>
+        {tileGlyph(code)}
+      </span>
+      {suit ? (
+        <span className={pips ? "tile__suit tile__suit--alt" : "tile__suit"}>{suit}</span>
+      ) : null}
     </>
   );
 }

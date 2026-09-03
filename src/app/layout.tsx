@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { APPEARANCE_INIT_SCRIPT } from "@/game/appearance";
 
 export const metadata: Metadata = {
   title: "Hong Kong Mahjong",
@@ -16,7 +17,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="jade" data-suits="vivid" data-tiles="pips">
+      <head>
+        {/* Restores the saved appearance before first paint, so a chosen
+            theme never flashes the default one. */}
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

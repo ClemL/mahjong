@@ -7,13 +7,21 @@ import { SEAT_NAMES, type Seat } from "@/game/tiles";
 /**
  * Cumulative score by hand — a four-series line chart.
  *
- * Colors are categorical slots 1–4 of the reference dark palette, validated
- * against this panel's dark-green surface (#0e3428): worst adjacent CVD ΔE 8.4,
- * normal-vision ΔE 19.8, all four above 3:1 contrast. Identity is never carried
- * by color alone — every series is direct-labeled and listed in the legend, and
- * the modal shows the same numbers as a table.
+ * Colors are categorical slots 1–4 of the reference palette, read from the
+ * active theme so light and dark tables get steps selected for their own
+ * surface rather than one flipped from the other. Dark (#0e3428): worst
+ * adjacent CVD ΔE 8.4, normal-vision ΔE 19.8, all four above 3:1 contrast.
+ * Light (#efe9d8): CVD ΔE 9.1, normal-vision ΔE 22.9, with three series below
+ * 3:1 — the relief that permits is already here, since identity never rests on
+ * color alone: every series is direct-labeled, listed in the legend, and
+ * repeated in the modal's table.
  */
-export const SERIES_COLORS = ["#3987e5", "#d95926", "#199e70", "#c98500"];
+export const SERIES_COLORS = [
+  "var(--series-1)",
+  "var(--series-2)",
+  "var(--series-3)",
+  "var(--series-4)",
+];
 
 const W = 640;
 const H = 250;

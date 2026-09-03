@@ -10,3 +10,4 @@
 2026-09-03T18:20:00Z - Dots and Bamboo are drawn with real pip artwork instead of numerals
 2026-09-03T18:20:00Z - Score history panel and an end-of-round summary with a cumulative score chart
 2026-09-03T18:30:00Z - Footer shows the build version and latest change; click it for the full changelog
+2026-09-03T18:40:00Z - Table & tiles panel: five table themes, two tile face styles and three suit palettes, remembered between visits

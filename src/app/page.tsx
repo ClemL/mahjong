@@ -7,6 +7,8 @@ import { Pond } from "@/components/Pond";
 import { PlayerHand } from "@/components/PlayerHand";
 import { ResultModal } from "@/components/ResultModal";
 import { BuildFooter } from "@/components/BuildFooter";
+import { AppearancePanel } from "@/components/AppearancePanel";
+import { useAppearance } from "@/hooks/useAppearance";
 import {
   FaanPanel,
   HistoryPanel,
@@ -20,6 +22,7 @@ const SPEEDS: Speed[] = ["slow", "normal", "fast"];
 
 export default function Page() {
   const api = useMahjong(0);
+  const appearance = useAppearance();
   const { state } = api;
 
   if (!state) {
@@ -144,6 +147,7 @@ export default function Page() {
         <aside className="side">
           <ScorePanel state={state} />
           <HistoryPanel state={state} />
+          <AppearancePanel api={appearance} />
           <LogPanel state={state} humanSeat={me} />
           <RulesPanel config={state.config} />
           <FaanPanel config={state.config} />
