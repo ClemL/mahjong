@@ -23,6 +23,7 @@ import {
   stepTable,
 } from "@/game/controller";
 import { type Rng, createRng } from "@/game/rng";
+import { type SoundName, playSound, primeAudio } from "@/game/sound";
 import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
 import { DEFAULT_RULES } from "@/game/rules";
@@ -65,6 +66,8 @@ export interface MahjongApi {
   /** Table faan minimum, and a setter that applies mid-hand. */
   minFaan: number;
   setMinFaan: (value: number) => void;
+  muted: boolean;
+  setMuted: (value: boolean) => void;
 }
 
 export function useMahjong(humanSeat: Seat = 0): MahjongApi {
@@ -72,7 +75,10 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const [speed, setSpeed] = useState<Speed>("normal");
   const [paused, setPaused] = useState(false);
   const [showHints, setShowHints] = useState(true);
+  const [muted, setMutedState] = useState(false);
   const rngRef = useRef<Rng>(createRng(1));
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
 
   const start = useCallback(() => {
     const seed = Math.floor(Math.random() * 0xffffffff);
@@ -84,6 +90,50 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   useEffect(() => {
     start();
   }, [start]);
+
+  // Cues are derived by comparing each state to the one before it, so the
+  // engine stays free of presentation concerns.
+  const previousRef = useRef<GameState | null>(null);
+  useEffect(() => {
+    const previous = previousRef.current;
+    previousRef.current = state;
+    if (!state || !previous || mutedRef.current) return;
+    if (state.handNumber !== previous.handNumber) return;
+
+    const cues: SoundName[] = [];
+    const meldsBefore = previous.players.reduce((n, p) => n + p.melds.length, 0);
+    const meldsAfter = state.players.reduce((n, p) => n + p.melds.length, 0);
+    const kongsBefore = previous.players.reduce(
+      (n, p) => n + p.melds.filter((m) => m.type === "kong").length,
+      0,
+    );
+    const kongsAfter = state.players.reduce(
+      (n, p) => n + p.melds.filter((m) => m.type === "kong").length,
+      0,
+    );
+
+    if (state.phase === "handOver" && previous.phase !== "handOver") {
+      cues.push(state.result?.type === "win" ? "win" : "washout");
+    } else if (kongsAfter > kongsBefore) {
+      cues.push("kong");
+    } else if (meldsAfter > meldsBefore) {
+      cues.push("claim");
+    } else if (state.lastDiscard && state.lastDiscard.tile.id !== previous.lastDiscard?.tile.id) {
+      cues.push("discard");
+    } else if (
+      state.drawnTileId &&
+      state.drawnTileId !== previous.drawnTileId &&
+      state.players[state.turn]?.isHuman
+    ) {
+      cues.push("draw");
+    }
+    for (const cue of cues) playSound(cue);
+  }, [state]);
+
+  const setMuted = useCallback((value: boolean) => {
+    setMutedState(value);
+    if (!value) primeAudio();
+  }, []);
 
   const awaitingClaim = state ? awaitingHumanClaim(state) : false;
 
@@ -124,6 +174,7 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
 
   const discard = useCallback(
     (tileId: string) => {
+      primeAudio();
       setState((current) =>
         current && turnActions(current, humanSeat).canDiscard
           ? discardTile(current, humanSeat, tileId)
@@ -193,5 +244,7 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     newGame: start,
     minFaan: state?.config.minFaan ?? DEFAULT_RULES.minFaan,
     setMinFaan,
+    muted,
+    setMuted,
   };
 }

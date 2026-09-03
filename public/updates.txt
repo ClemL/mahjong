@@ -1,0 +1,12 @@
+2026-09-03T04:35:00Z - Hong Kong mahjong rules engine: 144 tiles, chow/pung/kong claims, faan scoring
+2026-09-03T04:45:00Z - Playable table with AI opponents that draw and discard at random
+2026-09-03T13:10:00Z - Patched Next.js, vitest, postcss and sharp security advisories
+2026-09-03T14:55:00Z - Faan minimum is now a table setting (0/1/3/5) and defaults to 0, so chicken hands can win
+2026-09-03T14:55:00Z - Suit colors set further apart: blue Characters, burnt-orange Dots, green Bamboo, purple bonus tiles
+2026-09-03T14:55:00Z - Hover any tile to zoom it, on the table or in your hand
+2026-09-03T14:55:00Z - Tiles animate as they are discarded, claimed and drawn
+2026-09-03T18:20:00Z - Table sounds for discards, claims, kongs and wins, with a mute toggle
+2026-09-03T18:20:00Z - Discards stack six to a row in front of each seat, as at a real table
+2026-09-03T18:20:00Z - Dots and Bamboo are drawn with real pip artwork instead of numerals
+2026-09-03T18:20:00Z - Score history panel and an end-of-round summary with a cumulative score chart
+2026-09-03T18:30:00Z - Footer shows the build version and latest change; click it for the full changelog

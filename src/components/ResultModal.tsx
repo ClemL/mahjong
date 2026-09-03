@@ -4,6 +4,7 @@ import type { GameState } from "@/game/engine";
 import { SEAT_NAMES, type Seat } from "@/game/tiles";
 import { TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
+import { SERIES_COLORS, ScoreChart } from "./ScoreChart";
 
 interface Props {
   state: GameState;
@@ -31,12 +32,56 @@ function Standings({ scores }: { scores: number[] }) {
 
 export function ResultModal({ state, onNextHand, onNewGame }: Props) {
   if (state.phase === "gameOver") {
+    const wins = state.history.filter((h) => h.type === "win").length;
     return (
       <div className="modal__backdrop">
-        <div className="modal" role="dialog" aria-modal="true" aria-label="Round complete">
+        <div className="modal modal--wide" role="dialog" aria-modal="true" aria-label="Round complete">
           <h2 className="modal__title">East round complete</h2>
-          <p className="modal__subtitle">Four dealerships played.</p>
+          <p className="modal__subtitle">
+            {state.history.length} hands played — {wins} won, {state.history.length - wins}{" "}
+            washed out.
+          </p>
+
           <Standings scores={state.scores} />
+
+          {state.history.length > 0 ? <ScoreChart history={state.history} /> : null}
+
+          <h3 className="modal__section">Hand by hand</h3>
+          <table className="faan-table">
+            <thead>
+              <tr>
+                <th>Hand</th>
+                <th>Result</th>
+                {([0, 1, 2, 3] as Seat[]).map((seat) => (
+                  <th key={`h-${seat}`}>
+                    <span
+                      className="chart__swatch"
+                      style={{ background: SERIES_COLORS[seat], marginRight: 4 }}
+                    />
+                    {SEAT_NAMES[seat].slice(0, 1)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {state.history.map((h) => (
+                <tr key={`row-${h.handNumber}`}>
+                  <td>{h.handNumber}</td>
+                  <td>
+                    {h.type === "washout"
+                      ? "Washed out"
+                      : `${SEAT_NAMES[h.winner!]} · ${h.faan} faan${
+                          h.from === null ? " 自摸" : ""
+                        }`}
+                  </td>
+                  {h.scores.map((v, seat) => (
+                    <td key={`c-${h.handNumber}-${seat}`}>{v}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
           <div className="actions" style={{ marginTop: 16 }}>
             <button type="button" className="btn btn--primary" onClick={onNewGame}>
               New game

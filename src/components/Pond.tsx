@@ -33,7 +33,11 @@ export function Pond({
             {SEAT_NAMES[seat]}
             {state.players[seat].isHuman ? " (you)" : ""}
           </span>
-          <div className="pond__row">
+          <div
+            className={`pond__row${
+              state.players[seat].discards.length === 0 ? " pond__row--empty" : ""
+            }`}
+          >
             {state.players[seat].discards.length === 0 ? (
               <span className="seat__meta">—</span>
             ) : (

@@ -9,6 +9,7 @@ import {
   tileName,
   tileSuitGlyph,
 } from "@/game/tiles";
+import { TilePips, hasPips } from "./TilePips";
 
 export type TileSize = "sm" | "md" | "lg";
 
@@ -29,6 +30,18 @@ function entryClass(entry: TileEntry, from: TossFrom): string {
     default:
       return "";
   }
+}
+
+/** The face itself — pip artwork for Dots and Bamboo, a glyph for the rest. */
+function TileArt({ code }: { code: TileCode }) {
+  if (hasPips(code)) return <TilePips code={code} />;
+  const suit = tileSuitGlyph(code);
+  return (
+    <>
+      <span className="tile__glyph">{tileGlyph(code)}</span>
+      {suit ? <span className="tile__suit">{suit}</span> : null}
+    </>
+  );
 }
 
 function colorClass(code: TileCode): string {
@@ -64,7 +77,6 @@ export function TileFace({
   tossFrom = "bottom",
   className = "",
 }: FaceProps) {
-  const suit = tileSuitGlyph(code);
   return (
     <span
       className={[
@@ -84,8 +96,7 @@ export function TileFace({
       <span className="tile__label" aria-hidden>
         {tileLabel(code)}
       </span>
-      <span className="tile__glyph">{tileGlyph(code)}</span>
-      {suit ? <span className="tile__suit">{suit}</span> : null}
+      <TileArt code={code} />
       {ready ? <span className="tile__ready" aria-hidden /> : null}
       <span className="sr-only">{tileName(code)}</span>
     </span>
@@ -120,10 +131,7 @@ export function TileButton({ onClick, disabled, ariaLabel, ...face }: ButtonProp
       <span className="tile__label" aria-hidden>
         {tileLabel(face.code)}
       </span>
-      <span className="tile__glyph">{tileGlyph(face.code)}</span>
-      {tileSuitGlyph(face.code) ? (
-        <span className="tile__suit">{tileSuitGlyph(face.code)}</span>
-      ) : null}
+      <TileArt code={face.code} />
       {face.ready ? <span className="tile__ready" aria-hidden /> : null}
     </button>
   );
