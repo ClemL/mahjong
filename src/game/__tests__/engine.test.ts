@@ -10,7 +10,7 @@ import {
 } from "../engine";
 import { autoPlayHand } from "../controller";
 import { createRng } from "../rng";
-import { isFlower } from "../tiles";
+import { compareCodes, isFlower, rankOf } from "../tiles";
 import type { Seat, Tile } from "../tiles";
 
 function allAiGame(seed: number): GameState {
@@ -155,6 +155,20 @@ describe("turn actions", () => {
     expect(actions.kongs).toEqual([{ kind: "concealed", code: "s3", tileIds: ["k1", "k2", "k3", "k4"] }]);
   });
 
+  it("refuses a second discard before the turn has passed on", () => {
+    let state = createGame({ seed: 21 });
+    for (const p of state.players) p.isHuman = false;
+    const seat = state.dealer;
+    const first = state.players[seat].hand[0];
+    const second = state.players[seat].hand[1];
+    state = discard(state, seat, first.id);
+    // Everyone passes is not resolved yet, so the seat must not act again.
+    expect(turnActions(state, seat).canDiscard).toBe(false);
+    const after = discard(state, seat, second.id);
+    expect(after.players[seat].discards).toHaveLength(1);
+    expect(after.players[seat].hand.map((t) => t.id)).toContain(second.id);
+  });
+
   it("does not allow a win below the faan minimum", () => {
     const state = createGame({ seed: 11 });
     const seat = state.dealer;
@@ -187,6 +201,14 @@ describe("full hands", () => {
         expect(p.hand.some((t) => isFlower(t.code))).toBe(false);
         for (const m of p.melds) {
           expect(m.tiles).toHaveLength(m.type === "kong" ? 4 : 3);
+          const codes = m.tiles.map((t) => t.code).sort(compareCodes);
+          if (m.type === "chow") {
+            expect(new Set(codes.map((c) => c[0])).size, `chow spans suits: ${codes}`).toBe(1);
+            expect(rankOf(codes[1]) - rankOf(codes[0]), `chow not consecutive: ${codes}`).toBe(1);
+            expect(rankOf(codes[2]) - rankOf(codes[1]), `chow not consecutive: ${codes}`).toBe(1);
+          } else {
+            expect(new Set(codes).size, `triplet not identical: ${codes}`).toBe(1);
+          }
         }
       }
 

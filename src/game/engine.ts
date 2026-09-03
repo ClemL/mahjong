@@ -363,7 +363,9 @@ export function selfDrawScore(state: GameState, seat: Seat): ScoreResult | null 
 }
 
 export function turnActions(state: GameState, seat: Seat): TurnActions {
-  if (state.phase !== "action" || state.turn !== seat) {
+  // A settled discard still sitting on the table means this seat has already
+  // acted and the turn has yet to pass on.
+  if (state.phase !== "action" || state.turn !== seat || state.lastDiscard !== null) {
     return { canDiscard: false, kongs: [], canWin: false, winScore: null, waits: [] };
   }
   const p = player(state, seat);
@@ -393,7 +395,8 @@ export function waitsAfterDiscard(state: GameState, seat: Seat, tileId: string):
 
 export function discard(previous: GameState, seat: Seat, tileId: string): GameState {
   const state = clone(previous);
-  if (state.phase !== "action" || state.turn !== seat) return state;
+  if (state.phase !== "action" || state.turn !== seat || state.lastDiscard !== null)
+    return state;
   const p = player(state, seat);
   const tile = p.hand.find((t) => t.id === tileId);
   if (!tile) return state;
@@ -413,7 +416,8 @@ export function discard(previous: GameState, seat: Seat, tileId: string): GameSt
 
 export function declareConcealedKong(previous: GameState, seat: Seat, code: TileCode): GameState {
   const state = clone(previous);
-  if (state.phase !== "action" || state.turn !== seat) return state;
+  if (state.phase !== "action" || state.turn !== seat || state.lastDiscard !== null)
+    return state;
   const p = player(state, seat);
   const tiles = takeTiles(p.hand, code, 4);
   if (!tiles) return state;
@@ -426,7 +430,8 @@ export function declareConcealedKong(previous: GameState, seat: Seat, code: Tile
 
 export function declareAddedKong(previous: GameState, seat: Seat, code: TileCode): GameState {
   const state = clone(previous);
-  if (state.phase !== "action" || state.turn !== seat) return state;
+  if (state.phase !== "action" || state.turn !== seat || state.lastDiscard !== null)
+    return state;
   const p = player(state, seat);
   const pung = p.melds.find((m) => m.type === "pung" && m.tiles[0].code === code);
   const tiles = takeTiles(p.hand, code, 1);
@@ -661,7 +666,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
   claimer.hand = removeTiles(claimer.hand, fromHand);
   const meld: Meld = {
     type: winner.option.type as "chow" | "pung" | "kong",
-    tiles: [...fromHand, tile],
+    tiles: sortTiles([...fromHand, tile]),
     concealed: false,
     claimedFrom: discarder,
   };
