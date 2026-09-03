@@ -129,3 +129,54 @@ export function FaanPanel({ config }: { config: RuleConfig }) {
     </section>
   );
 }
+
+/** Per-hand results so far, newest first. */
+export function HistoryPanel({ state }: { state: GameState }) {
+  if (state.history.length === 0) {
+    return (
+      <section className="panel">
+        <h2 className="panel__title">Score history</h2>
+        <p className="seat__meta">No hands finished yet.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="panel">
+      <h2 className="panel__title">Score history</h2>
+      <ol className="history">
+        {[...state.history].reverse().map((h) => (
+          <li className="history__row" key={h.handNumber}>
+            <span className="history__hand">#{h.handNumber}</span>
+            <span className="history__what">
+              {h.type === "washout" ? (
+                <span className="history__washout">Washed out</span>
+              ) : (
+                <>
+                  {SEAT_NAMES[h.winner!]}
+                  <span className="history__faan">
+                    {" "}
+                    {h.faan} faan · {h.value}
+                  </span>
+                  <span className="history__from">
+                    {h.from === null ? " 自摸" : ` off ${SEAT_NAMES[h.from]}`}
+                  </span>
+                </>
+              )}
+            </span>
+            <span className="history__deltas">
+              {h.payments.map((d, seat) => (
+                <span
+                  key={`d-${h.handNumber}-${seat}`}
+                  className={`history__delta${d > 0 ? " history__delta--pos" : d < 0 ? " history__delta--neg" : ""}`}
+                  title={SEAT_NAMES[seat as Seat]}
+                >
+                  {d > 0 ? `+${d}` : d}
+                </span>
+              ))}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}

@@ -61,6 +61,21 @@ export interface HandResult {
   dealerKeeps: boolean;
 }
 
+/** One completed hand, kept for the score history and end-of-round summary. */
+export interface HandRecord {
+  handNumber: number;
+  roundWind: TileCode;
+  dealer: Seat;
+  type: "win" | "washout";
+  winner: Seat | null;
+  from: Seat | null;
+  faan: number | null;
+  value: number | null;
+  payments: number[];
+  /** Cumulative scores once this hand was settled. */
+  scores: number[];
+}
+
 export interface LogEntry {
   id: number;
   seat: Seat | null;
@@ -91,6 +106,8 @@ export interface GameState {
   robbingKongTile: Tile | null;
   scores: number[];
   result: HandResult | null;
+  /** Completed hands, oldest first. */
+  history: HandRecord[];
   log: LogEntry[];
   logSeq: number;
 }
@@ -188,6 +205,7 @@ export function createGame(options: GameOptions = {}): GameState {
     robbingKongTile: null,
     scores: [0, 0, 0, 0],
     result: null,
+    history: [],
     log: [],
     logSeq: 0,
   };
@@ -740,6 +758,7 @@ function settleWin(
     payments,
     dealerKeeps: winner === state.dealer,
   };
+  recordHand(state, score.faan, score.value);
   state.phase = "handOver";
   state.pendingClaims = [];
   state.robbingKongTile = null;
@@ -748,6 +767,24 @@ function settleWin(
     winner,
     `${SEAT_NAMES[winner]} wins ${score.faan} faan (${value} points) ${selfDrawn ? "self-drawn" : `off ${SEAT_NAMES[from!]}`}`,
   );
+}
+
+/** Append the settled hand to the history. */
+function recordHand(state: GameState, faan: number | null, value: number | null): void {
+  const result = state.result;
+  if (!result) return;
+  state.history.push({
+    handNumber: state.handNumber,
+    roundWind: state.roundWind,
+    dealer: state.dealer,
+    type: result.type,
+    winner: result.winner,
+    from: result.from,
+    faan,
+    value,
+    payments: [...result.payments],
+    scores: [...state.scores],
+  });
 }
 
 function endInWashout(state: GameState): void {
@@ -759,6 +796,7 @@ function endInWashout(state: GameState): void {
     payments: [0, 0, 0, 0],
     dealerKeeps: state.config.dealerKeepsOnWashout,
   };
+  recordHand(state, null, null);
   state.phase = "handOver";
   state.pendingClaims = [];
   state.robbingKongTile = null;

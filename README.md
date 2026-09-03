@@ -5,7 +5,7 @@ other three seats are played by the computer. Built as a Next.js app that
 deploys to Vercel as a fully static site — the whole game runs client-side, with
 no backend, database or API keys.
 
-![Status](https://img.shields.io/badge/tests-60%20passing-brightgreen)
+![Status](https://img.shields.io/badge/tests-61%20passing-brightgreen)
 
 ## What is implemented
 
@@ -93,7 +93,7 @@ Useful primitives already exist for a greedy or shanten-based opponent:
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 60 unit tests
+npm test           # 61 unit tests
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
 ```
@@ -132,7 +132,8 @@ src/game/          Rules engine — no React, no DOM
   controller.ts    Steps the table one beat at a time
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
 src/hooks/         React binding for the engine
-src/components/    Tiles, seats, pond, hand, result modal, side panels
+src/game/sound.ts  Web Audio cues, synthesised at runtime
+src/components/    Tiles, pip artwork, seats, pond, hand, result modal, chart
 src/app/           Next.js App Router entry and styles
 ```
 
@@ -152,17 +153,57 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 - A green dot on a tile means discarding it leaves you ready (聽牌). Toggle this
   with **Hints**.
 - **Min faan** sets the table minimum and applies immediately, mid-hand.
+- **Sound** mutes or unmutes the table cues.
 - **Speed** cycles the pace of the computer players; **Pause** stops the table.
 - A game runs one East round — four dealerships. The dealer keeps the deal
   after winning (連莊); a loss or a washout passes it on.
 
+### Table and tiles
+
+Dots (筒) and Bamboo (索) are drawn as **real pip artwork** — inline SVG in the
+traditional arrangements, including the slanted three across the top of the
+seven of Dots. Characters (萬) keep the numeral-over-萬 face and honors keep
+their glyphs, because that is already how those tiles look. Traditional sets
+color individual pips (a red five, a green one bamboo); we draw every pip in
+its suit color instead, since the suits have to stay apart at a glance and a
+red pip would read as a Red Dragon.
+
+Suits are set far apart in both hue and lightness — blue Characters,
+burnt-orange Dots, green Bamboo, purple bonus tiles — with a matching wash
+across the tile face, which also keeps them separable for red-green color
+vision deficiency.
+
+Discards stack **six to a row** in front of each seat, the way a pond is laid
+out at a real table, rather than in one long wrapping line.
+
 Tiles are animated so the table is readable at a glance: a discard flies in
 from the direction of the player who threw it, a tile retrieved from the pond
 pops into the meld that claimed it, and the tile you just drew slides into your
-hand. Suits are set far apart in both hue and lightness — blue Characters,
-burnt-orange Dots, green Bamboo, purple bonus tiles — with a matching wash
-across the tile face, which also keeps them separable for red-green color
-vision deficiency. All motion respects `prefers-reduced-motion`.
+hand. All motion respects `prefers-reduced-motion`.
+
+### Sound
+
+Tile clacks and the claim, kong, win and washout cues are **synthesised at
+runtime with the Web Audio API** — a filtered noise burst for the clack, short
+triangle blips for the pitched cues. Nothing is loaded as an audio file, so the
+deployment stays a single static bundle with no media to fetch. Cues are derived
+by diffing consecutive game states, which keeps the engine free of presentation
+concerns. Audio is created lazily on your first action, since browsers refuse to
+start it before a gesture, and every call is wrapped so a failed cue can never
+interrupt play. Toggle it with **Sound**.
+
+### Score history
+
+Every settled hand is recorded — winner, faan, value, per-seat payments and the
+cumulative scores after it. The **Score history** panel lists them as they
+happen, and the end-of-round summary shows final standings, a cumulative-score
+line chart, and the full hand-by-hand table.
+
+The chart's four series use categorical slots 1–4 of a reference palette,
+validated against the panel's dark-green surface: worst adjacent CVD ΔE 8.4,
+normal-vision ΔE 19.8, all four above 3:1 contrast. Identity is never carried by
+color alone — every series is direct-labeled, listed in the legend, and repeated
+in the table.
 
 ## Known limitations
 

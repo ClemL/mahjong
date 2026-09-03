@@ -345,6 +345,17 @@ button {
     linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
 }
 
+/* Pip artwork fills the tile face, leaving room for the corner label. */
+.tile__pips {
+  /* The artwork is square and the tile is not, so width is the binding
+     dimension — keep it near the full tile so pips stay legible when small. */
+  width: 94%;
+  height: 94%;
+  display: block;
+  color: inherit;
+  overflow: visible;
+}
+
 /* The suit mark carries the suit color at full strength; combined with the
    tinted face it keeps suits apart down to the 22px pond size. */
 .tile__suit {
@@ -475,12 +486,17 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+/* Discards stack six to a row, the way a pond is laid out at a real table. */
 .pond__row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, auto);
   gap: 2px;
   justify-content: center;
   max-width: 100%;
+}
+
+.pond__row--empty {
+  display: block;
 }
 
 .pond__group {
@@ -930,4 +946,193 @@ details[open] > summary::after {
 .meld,
 .modal__tiles {
   overflow: visible;
+}
+
+/* ------------------------------------------------------- score history */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.history__row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 4px 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  align-items: baseline;
+}
+
+.history__hand {
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.history__what {
+  min-width: 0;
+}
+
+.history__faan,
+.history__from {
+  color: var(--ink-dim);
+}
+
+.history__washout {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+.history__deltas {
+  grid-column: 2;
+  display: flex;
+  gap: 4px;
+}
+
+.history__delta {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--ink-dim);
+  min-width: 30px;
+}
+
+.history__delta--pos { color: #9ae6b4; }
+.history__delta--neg { color: #f4a3a0; }
+
+/* --------------------------------------------------------------- chart */
+
+.chart {
+  --chart-surface: #0e3428;
+  margin: 16px 0 4px;
+  padding: 10px 12px 6px;
+  background: var(--chart-surface);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.chart__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+}
+
+.chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.chart__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+
+.chart__plot {
+  position: relative;
+}
+
+.chart__plot svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: rgba(255, 255, 255, 0.09);
+  stroke-width: 1;
+}
+
+.chart__zero {
+  stroke: rgba(255, 255, 255, 0.26);
+  stroke-width: 1;
+}
+
+.chart__crosshair {
+  stroke: rgba(255, 255, 255, 0.34);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart__axis {
+  fill: var(--ink-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__tooltip {
+  position: absolute;
+  top: 4px;
+  pointer-events: none;
+  background: rgba(4, 24, 18, 0.96);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  min-width: 128px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  z-index: 5;
+}
+
+.chart__tooltip-title {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-bottom: 4px;
+}
+
+.chart__tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.chart__tooltip-name {
+  flex: 1;
+  color: var(--ink);
+}
+
+.chart__tooltip-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.modal--wide {
+  width: min(680px, 100%);
+}
+
+.modal__section {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-dim);
 }

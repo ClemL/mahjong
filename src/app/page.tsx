@@ -6,7 +6,13 @@ import { SeatPanel } from "@/components/SeatPanel";
 import { Pond } from "@/components/Pond";
 import { PlayerHand } from "@/components/PlayerHand";
 import { ResultModal } from "@/components/ResultModal";
-import { FaanPanel, LogPanel, RulesPanel, ScorePanel } from "@/components/SidePanels";
+import {
+  FaanPanel,
+  HistoryPanel,
+  LogPanel,
+  RulesPanel,
+  ScorePanel,
+} from "@/components/SidePanels";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 
 const SPEEDS: Speed[] = ["slow", "normal", "fast"];
@@ -87,6 +93,15 @@ export default function Page() {
           <button
             type="button"
             className="btn btn--sm btn--ghost"
+            onClick={() => api.setMuted(!api.muted)}
+            aria-pressed={!api.muted}
+            aria-label={api.muted ? "Unmute sound" : "Mute sound"}
+          >
+            {api.muted ? "Sound off" : "Sound on"}
+          </button>
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
             onClick={() => api.setPaused(!api.paused)}
             aria-pressed={api.paused}
           >
@@ -126,6 +141,7 @@ export default function Page() {
 
         <aside className="side">
           <ScorePanel state={state} />
+          <HistoryPanel state={state} />
           <LogPanel state={state} humanSeat={me} />
           <RulesPanel config={state.config} />
           <FaanPanel config={state.config} />

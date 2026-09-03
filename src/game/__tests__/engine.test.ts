@@ -261,6 +261,37 @@ describe("full hands", () => {
     }
   });
 
+  it("records every settled hand in the history", () => {
+    const rng = createRng(2025);
+    let state = allAiGame(808);
+    for (let i = 0; i < 3; i++) {
+      const played = autoPlayHand(state, rng);
+      state = played.state;
+      const record = state.history[state.history.length - 1];
+      expect(record.handNumber).toBe(state.handNumber);
+      expect(record.type).toBe(state.result!.type);
+      expect(record.payments).toEqual(state.result!.payments);
+      expect(record.scores).toEqual(state.scores);
+      if (record.type === "win") {
+        expect(record.faan).toBe(state.result!.score!.faan);
+        expect(record.winner).not.toBeNull();
+      } else {
+        expect(record.faan).toBeNull();
+      }
+      const next = nextHand(state);
+      if (next.phase === "gameOver") break;
+      state = next;
+      for (const p of state.players) p.isHuman = false;
+      // History survives the deal of the next hand.
+      expect(state.history).toHaveLength(i + 1);
+    }
+    expect(state.history.length).toBeGreaterThan(0);
+    // Cumulative scores in the history stay zero-sum.
+    for (const record of state.history) {
+      expect(record.scores.reduce((a, b) => a + b, 0)).toBe(0);
+    }
+  });
+
   it("completes a whole East round", () => {
     const rng = createRng(2024);
     let state = allAiGame(4242);
