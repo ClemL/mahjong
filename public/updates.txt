@@ -14,3 +14,5 @@
 2026-09-03T19:35:00Z - Opponents now play to finish their hands instead of discarding at random — washouts fall from 97% to almost none
 2026-09-03T19:35:00Z - The table only stops to ask about a claim when it would actually improve your hand
 2026-09-03T23:45:00Z - Tiles redrawn: bevelled bone faces with carved glyphs, ringed dots, segmented bamboo and a bird for one bamboo
+2026-09-04T01:15:00Z - Play together: open a room, claim a seat with the table password, and join from your phone
+2026-09-04T01:15:00Z - A tablet can take the Table seat and show the pond, scores, melds and seating for everyone

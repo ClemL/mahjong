@@ -47,8 +47,11 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   sound.ts         Web Audio cues, synthesised at runtime
+  room.ts          Multiplayer room: seating, draining, redaction (pure)
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
-src/hooks/         React binding for the engine
+src/server/        Room store (Upstash + memory) and room service — server only
+src/app/api/       Room endpoints
+src/hooks/         React bindings for the engine and for a room
 src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, footer
 src/app/           Next.js entry and all styles
 public/updates.txt Changelog, oldest first
@@ -75,6 +78,11 @@ public/updates.txt Changelog, oldest first
 * **Before writing chart code, load the `dataviz` skill and run its palette validator** against the
   surface the chart actually sits on. The existing chart's colors are validated; do not add series
   colors by eye.
+* **Never send a client tiles it is not entitled to.** Redaction lives in
+  `viewFor` in `room.ts`, and the tests assert on the wire format, not the UI: a
+  player sees only their own hand, the table device sees no concealed tiles, and
+  the wall is never serialized. Add a test there before changing what a view
+  carries.
 * **Opponent changes need a measured before/after.** The AI is judged on the
   washout rate over a few hundred simulated hands, not on how the code reads. State
   the numbers in the PR.
