@@ -6,6 +6,7 @@ import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { TileBack, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
+import { useWakeLock } from "@/hooks/useWakeLock";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, string> = {
@@ -111,6 +112,9 @@ export function TableView({
 }) {
   const lastId = view.lastDiscard?.tile.id;
   const seats: Seat[] = [0, 1, 2, 3];
+  // Only the shared table holds the screen awake; a phone in a pocket should
+  // be allowed to sleep.
+  const wakeLock = useWakeLock(view.you.role === "table");
 
   return (
     <div className="tableview">
@@ -127,6 +131,15 @@ export function TableView({
               ? "Round complete"
               : `${SEAT_NAMES[view.turn]} to play`}
         </span>
+        {view.you.role === "table" && wakeLock !== "held" ? (
+          <span className="tableview__wake" title="This device may sleep during a hand">
+            {wakeLock === "unsupported"
+              ? "Screen may sleep — this browser cannot keep it awake"
+              : wakeLock === "denied"
+                ? "Screen may sleep — the browser refused to keep it awake"
+                : "Screen lock pending…"}
+          </span>
+        ) : null}
         <span className="topbar__spacer" />
         <div className="actions">
           <label className="field">

@@ -6,13 +6,28 @@ export const metadata: Metadata = {
   title: "Hong Kong Mahjong",
   description:
     "Play Hong Kong old-style mahjong against three computer opponents — full 144-tile set, chow/pung/kong claims and faan scoring.",
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/icon-192.png",
+  },
+  // iOS reads this rather than the manifest when added to the home screen.
+  appleWebApp: {
+    capable: true,
+    title: "Mahjong",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: "#0d3b2e",
+  // Lets the page paint under the notch and home indicator; the layout then
+  // keeps its own controls clear of them with env(safe-area-inset-*).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

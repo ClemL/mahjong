@@ -19,3 +19,6 @@
 2026-09-04T04:50:00Z - The shared table and phones now play tile sounds, with a mute toggle on each
 2026-09-04T04:50:00Z - A player who goes quiet is marked away and the computer plays their seat until they come back
 2026-09-04T05:30:00Z - The multiplayer lobby now reports which deployment and settings it sees, instead of always blaming a missing password
+2026-09-04T12:10:00Z - The table device now keeps the tablet screen awake during a hand
+2026-09-04T12:10:00Z - Bigger touch targets, and a discard on a phone now takes a tap to arm and a tap to throw
+2026-09-04T12:10:00Z - Controls stay clear of the notch and home indicator, and the app can be installed to a home screen
