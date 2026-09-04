@@ -11,6 +11,11 @@
   --tile-md: 34px;
   --tile-lg: 48px;
 
+  /* Animation timings, so a shared screen can slow them in one place. */
+  --anim-toss: 340ms;
+  --anim-claim: 380ms;
+  --anim-draw: 260ms;
+
   --tile-face: #fbf8ef;
   --tile-face-2: #ece5d2;
   --tile-edge: #c2b795;
@@ -967,12 +972,12 @@ details[open] > summary::after {
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 
-.tile--toss-bottom { animation: toss-from-bottom 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-bottom { animation: toss-from-bottom var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
 .tile--toss-top    { animation: toss-from-top 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
 .tile--toss-left   { animation: toss-from-left 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
 .tile--toss-right  { animation: toss-from-right 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
-.tile--claimed     { animation: claim-pop 380ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
-.tile--drew        { animation: draw-in 260ms ease-out both; }
+.tile--claimed     { animation: claim-pop var(--anim-claim) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--drew        { animation: draw-in var(--anim-draw) ease-out both; }
 
 /* Hovering must win over an in-flight animation. */
 @media (hover: hover) and (pointer: fine) {
@@ -1642,7 +1647,7 @@ details[open] > summary::after {
 .tseat--left { grid-area: left; }
 .tseat--right { grid-area: right; }
 .tseat--bottom { grid-area: bottom; }
-.tableview__pond { grid-area: pond; }
+.tableview__middle { grid-area: pond; }
 
 .tseat {
   display: flex;
@@ -1964,4 +1969,76 @@ a.btn {
   border-radius: 999px;
   background: var(--chip-neg);
   color: var(--ink);
+}
+
+/* ==================================== multiplayer pacing & seat ponds ==== */
+
+/*
+ * Around a shared table nobody is watching the exact moment a tile is thrown,
+ * and a poll can deliver the move up to a second after it happened. Slower,
+ * longer-settling motion lets four people see what just changed.
+ */
+.app--paced {
+  --anim-toss: 900ms;
+  --anim-claim: 950ms;
+  --anim-draw: 650ms;
+}
+
+/* The newest discard keeps a ring so it stays findable after it lands. */
+.app--paced .tile--just-discarded {
+  outline-width: 3px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--claim-outline) 35%, transparent),
+    0 calc(var(--tile-w) * 0.06) 0 var(--tile-shadow),
+    0 calc(var(--tile-w) * 0.1) calc(var(--tile-w) * 0.16) rgba(0, 0, 0, 0.4);
+}
+
+/* Each player's pond sits on the edge of their block facing the middle. */
+.tpond {
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--shade-1);
+  justify-content: center;
+  align-content: start;
+  min-height: 40px;
+}
+
+/* Six to a row across the top and bottom, as a pond is laid out by hand. */
+.tpond--top,
+.tpond--bottom {
+  grid-template-columns: repeat(6, auto);
+}
+
+/* The side seats get a narrower, taller block so it reads as theirs. */
+.tpond--left,
+.tpond--right {
+  grid-template-columns: repeat(4, auto);
+}
+
+/* Order within each seat block puts the pond towards the centre of the table. */
+.tseat--top { flex-direction: column; }
+.tseat--bottom { flex-direction: column-reverse; }
+
+.tseat--bottom .tseat__head { order: 0; }
+
+.tableview__middle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--shade-1);
+  border: 1px solid var(--panel-border);
+  min-height: 140px;
+}
+
+@media (max-width: 900px) {
+  .tpond--left,
+  .tpond--right {
+    grid-template-columns: repeat(6, auto);
+  }
 }

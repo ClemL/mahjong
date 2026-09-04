@@ -6,7 +6,7 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 
 interface Props {
   view: RoomView;
-  onClaim: (seat: Seat | "table", password: string, name: string) => Promise<void>;
+  onClaim: (seat: Seat | "table", name: string) => Promise<void>;
   busy: boolean;
   error: string | null;
 }
@@ -14,18 +14,16 @@ interface Props {
 /** Pick a seat, then prove you belong at the table. */
 export function SeatPicker({ view, onClaim, busy, error }: Props) {
   const [choice, setChoice] = useState<Seat | "table" | null>(null);
-  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
 
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
 
   return (
     <div className="lobby">
-      <h1 className="lobby__title">
-        Room <span className="lobby__code">{view.roomId}</span>
-      </h1>
+      <h1 className="lobby__title">Take a seat</h1>
       <p className="lobby__lead">
-        Take a seat. Any seat still open when play starts is filled by the computer.
+        Everyone plays at the same table. Any seat still open when play starts is filled by the
+        computer, and the tablet in the middle takes the Table seat.
       </p>
 
       <div className="lobby__seats">
@@ -68,7 +66,7 @@ export function SeatPicker({ view, onClaim, busy, error }: Props) {
         className="lobby__form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (choice !== null) void onClaim(choice, password, name);
+          if (choice !== null) void onClaim(choice, name);
         }}
       >
         {choice !== null && choice !== "table" ? (
@@ -83,16 +81,6 @@ export function SeatPicker({ view, onClaim, busy, error }: Props) {
             />
           </label>
         ) : null}
-        <label className="field">
-          <span className="field__label">Table password</span>
-          <input
-            className="field__input"
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
         <button type="submit" className="btn btn--primary" disabled={choice === null || busy}>
           {choice === "table" ? "Open the table" : "Sit down"}
         </button>

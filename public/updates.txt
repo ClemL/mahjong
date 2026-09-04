@@ -22,3 +22,6 @@
 2026-09-04T12:10:00Z - The table device now keeps the tablet screen awake during a hand
 2026-09-04T12:10:00Z - Bigger touch targets, and a discard on a phone now takes a tap to arm and a tap to throw
 2026-09-04T12:10:00Z - Controls stay clear of the notch and home indicator, and the app can be installed to a home screen
+2026-09-04T15:05:00Z - One shared table, no password — open the link and take a seat
+2026-09-04T15:05:00Z - Each player's discards now sit in front of them instead of stacked in the middle
+2026-09-04T15:05:00Z - Multiplayer animations play slower so everyone can see what just happened

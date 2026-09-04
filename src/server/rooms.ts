@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import {
   type Room,
   type RoomView,
@@ -26,16 +26,22 @@ import type { Seat } from "@/game/tiles";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
-/** Ambiguous characters are left out so a code can be read off a screen aloud. */
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/**
+ * One table, no password.
+ *
+ * There is a single room rather than a code per game: everyone goes to the
+ * same place and takes a seat. Anyone who can reach the URL can sit down, so
+ * this suits a group who already share the link and not much else — the rate
+ * limiter is what stops seat-grabbing, not authentication.
+ */
+export const FIXED_ROOM_ID = "TABLE";
 
-export function newRoomCode(length = 4): string {
-  const bytes = randomBytes(length);
-  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
-}
+/** Flip to true, and set MAHJONG_ROOM_PASSWORD, to ask for a password again. */
+const REQUIRE_PASSWORD = false;
 
 /** Constant-time comparison, so the shared password cannot be probed by timing. */
 function passwordMatches(supplied: string): boolean {
+  if (!REQUIRE_PASSWORD) return true;
   const expected = process.env.MAHJONG_ROOM_PASSWORD ?? "";
   if (!expected) throw new RoomError("Multiplayer is not configured on this deployment", 503);
   const a = Buffer.from(supplied.padEnd(64).slice(0, 64));
@@ -43,13 +49,27 @@ function passwordMatches(supplied: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-export function multiplayerEnabled(): boolean {
-  return Boolean(process.env.MAHJONG_ROOM_PASSWORD);
+/** Whether a seat still has to be unlocked with the shared password. */
+export function passwordRequired(): boolean {
+  return REQUIRE_PASSWORD;
 }
 
+export function multiplayerEnabled(): boolean {
+  return !REQUIRE_PASSWORD || Boolean(process.env.MAHJONG_ROOM_PASSWORD);
+}
+
+/**
+ * Load the one room, dealing a fresh table the first time anyone arrives.
+ * `create` is NX, so two people opening the page together cannot both win —
+ * the loser simply reads what the winner wrote.
+ */
 async function load(id: string): Promise<Room> {
-  const room = await roomStore().get(id.toUpperCase());
-  if (!room) throw new RoomError("No such room", 404);
+  if (id.toUpperCase() !== FIXED_ROOM_ID) throw new RoomError("No such room", 404);
+  const existing = await roomStore().get(FIXED_ROOM_ID);
+  if (existing) return existing;
+  await roomStore().create(newRoom(FIXED_ROOM_ID));
+  const room = await roomStore().get(FIXED_ROOM_ID);
+  if (!room) throw new RoomError("Could not open the table", 500);
   return room;
 }
 
@@ -73,15 +93,6 @@ async function mutate(
     if (await roomStore().compareAndSet(room, expected)) return room;
   }
   throw new RoomError("The room changed while you were acting — try again", 409);
-}
-
-export async function createRoom(password: string): Promise<{ id: string }> {
-  if (!passwordMatches(password)) throw new RoomError("Wrong password", 401);
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const id = newRoomCode();
-    if (await roomStore().create(newRoom(id))) return { id };
-  }
-  throw new RoomError("Could not allocate a room code", 500);
 }
 
 export async function readRoom(id: string, token: string | null): Promise<RoomView> {

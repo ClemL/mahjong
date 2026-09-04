@@ -109,22 +109,30 @@ A win is always offered, whatever the setting.
 
 ## Playing together
 
-Single player needs nothing. Multiplayer adds a small server: one shared room,
-a tablet acting as the table, and everyone else on their phone.
+Single player needs nothing. Multiplayer adds a small server: **one shared
+table**, a tablet acting as the table, and everyone else on their phone.
 
-1. Someone opens **Play together**, enters the table password, and gets a
-   four-character room code.
-2. The tablet opens the room and takes the **Table** seat.
-3. Everyone else opens the room on their phone, taps the seat they want, types
-   the same password, and sits down.
+1. Everyone opens the same link — there is one table, dealt the first time
+   somebody arrives, so there are no room codes to pass around.
+2. The tablet takes the **Table** seat.
+3. Everyone else taps the seat they want and sits down.
 4. **Seats nobody takes are played by the computer**, so three friends and one
    empty chair still works.
 
+There is no password: anyone who can reach the URL can take a seat. That suits a
+group who already share the link and not much else — the rate limiter is what
+stops seat-grabbing, not authentication. `REQUIRE_PASSWORD` in
+[`src/server/rooms.ts`](src/server/rooms.ts) turns the shared password back on
+in one line.
+
 ### What each screen shows
 
-**The table** (a tablet in the middle) carries everything shared: the pond laid
-out per seat, each player's score, melds, flowers and how many tiles they hold,
-whose turn it is, and who is still deciding on a claim. It also prints the
+**The table** (a tablet in the middle) carries everything shared. Each player's
+discards sit **in front of them**, on the edge of their own block facing the
+middle — where the tiles would land at a real table — rather than stacked in one
+central pile. The middle keeps only the round, the wall count and whose turn it
+is. Alongside the pond each seat shows its score, melds, flowers, how many tiles
+it holds, and whether it is still deciding on a claim. It also prints the
 seating — *Seat 1 East · bottom edge · Kris* — so people know where to sit. It
 never receives anyone's concealed tiles.
 
@@ -188,6 +196,11 @@ view so the pond is visible somewhere.
   10 minutes, and 120 actions a minute. The claim endpoint is the only one that
   checks the password, so that limit is what stands between a four-character
   secret and a brute-force script.
+- **Pacing.** Around a shared table nobody is watching the exact instant a tile
+  is thrown, and a poll can deliver the move up to a second after it happened,
+  so multiplayer runs its animations about 2.5× slower than single player and
+  keeps a ring on the newest discard. All of it still respects
+  `prefers-reduced-motion`.
 - **Sound.** The tablet and the phones derive cues by diffing consecutive polled
   views, the same way single player diffs engine states — a clack on a discard,
   a distinct cue for a claim or kong, a run of notes on a win. Each device has
@@ -196,10 +209,11 @@ view so the pond is visible somewhere.
 ### Configuration
 
 ```bash
-MAHJONG_ROOM_PASSWORD=...     # required; multiplayer is off without it
 UPSTASH_REDIS_REST_URL=...    # required in production
 UPSTASH_REDIS_REST_TOKEN=...
 ```
+
+Multiplayer needs no password variable while `REQUIRE_PASSWORD` is false.
 
 See [`.env.example`](.env.example). The single-player table at `/` stays fully
 static and needs none of this.
