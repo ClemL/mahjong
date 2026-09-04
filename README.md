@@ -5,7 +5,7 @@ other three seats are played by the computer. Built as a Next.js app that
 deploys to Vercel as a fully static site — the whole game runs client-side, with
 no backend, database or API keys.
 
-![Status](https://img.shields.io/badge/tests-86%20passing-brightgreen)
+![Status](https://img.shields.io/badge/tests-114%20passing-brightgreen)
 
 ## What is implemented
 
@@ -107,12 +107,75 @@ mahjong UI. **Ask me about claims** has three settings:
 
 A win is always offered, whatever the setting.
 
+## Playing together
+
+Single player needs nothing. Multiplayer adds a small server: one shared room,
+a tablet acting as the table, and everyone else on their phone.
+
+1. Someone opens **Play together**, enters the table password, and gets a
+   four-character room code.
+2. The tablet opens the room and takes the **Table** seat.
+3. Everyone else opens the room on their phone, taps the seat they want, types
+   the same password, and sits down.
+4. **Seats nobody takes are played by the computer**, so three friends and one
+   empty chair still works.
+
+### What each screen shows
+
+**The table** (a tablet in the middle) carries everything shared: the pond laid
+out per seat, each player's score, melds, flowers and how many tiles they hold,
+whose turn it is, and who is still deciding on a claim. It also prints the
+seating — *Seat 1 East · bottom edge · Kris* — so people know where to sit. It
+never receives anyone's concealed tiles.
+
+It also drives the game: next hand, redeal, restart and reset scores, change the
+faan minimum, free a seat, and skip a player who is not answering a claim.
+
+**A phone** shows only that player's own hand and the decisions that are theirs
+— discard, chow/pung/kong/win, pass — because the tablet is already showing
+everything else. With no table device in the room, phones fall back to the full
+view so the pond is visible somewhere.
+
+### How it works
+
+- **Room store.** Rooms live in Upstash Redis, written with a compare-and-set on
+  the room version so two people acting at the same instant cannot clobber each
+  other. Without Upstash credentials the store falls back to process memory,
+  which runs and tests the whole flow locally but is not safe in production —
+  the lobby says so.
+- **Seat tokens.** Claiming a seat with the right password returns an opaque
+  token, kept in `localStorage`. Every action carries it, and the server maps
+  token → seat. Nobody can play a seat that is not theirs.
+- **Version polling.** Clients poll the room version about once a second; when
+  nothing has changed the server replies with a bare marker instead of the
+  table, so the idle cost is a few dozen bytes a second. No sockets, which keeps
+  the whole thing on Vercel's serverless runtime.
+- **Redaction happens on the server.** A player's view carries their own tiles
+  and opaque stand-ins for everyone else's; the table's view carries no
+  concealed tiles at all; the wall is never serialized to anyone. This is
+  covered by tests that assert on the wire format rather than the UI.
+- **Claims are windowed.** A discard opens a 20-second window. Computer seats
+  answer at once, people get the window, and an unanswered seat is treated as a
+  pass — so one person putting their phone down does not stall the table. The
+  table can skip the wait early.
+
+### Configuration
+
+```bash
+MAHJONG_ROOM_PASSWORD=...     # required; multiplayer is off without it
+UPSTASH_REDIS_REST_URL=...    # required in production
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+See [`.env.example`](.env.example). The single-player table at `/` stays fully
+static and needs none of this.
+
 ## Running it
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 86 unit tests
+npm test           # 114 unit tests
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
 ```
@@ -177,7 +240,10 @@ src/game/          Rules engine — no React, no DOM
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
-src/hooks/         React binding for the engine
+src/game/room.ts   Multiplayer room model: seating, draining, redaction
+src/server/        Room store (Upstash + memory) and the room service
+src/app/api/       Room, claim, action and control endpoints
+src/hooks/         React bindings for the engine and for a room
 src/game/sound.ts  Web Audio cues, synthesised at runtime
 src/components/    Tiles, pip artwork, seats, pond, hand, result modal, chart
 src/app/           Next.js App Router entry and styles

@@ -123,6 +123,9 @@ export default function Page() {
           <button type="button" className="btn btn--sm" onClick={api.newGame}>
             New game
           </button>
+          <a className="btn btn--sm btn--ghost" href="/multiplayer">
+            Play together
+          </a>
         </div>
       </header>
 

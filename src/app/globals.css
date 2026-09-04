@@ -1481,3 +1481,364 @@ details[open] > summary::after {
   color: var(--ink-dim);
   line-height: 1.35;
 }
+
+/* ==================================================== multiplayer lobby == */
+
+.lobby {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lobby__title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.lobby__code {
+  color: var(--gold);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+}
+
+.lobby__lead {
+  margin: 0;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.lobby__error,
+.lobby__warn {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lobby__error {
+  background: var(--chip-neg);
+  color: var(--ink);
+}
+
+.lobby__warn {
+  background: var(--accent-wash-2);
+  color: var(--ink);
+}
+
+.lobby__seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.seat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  color: var(--ink);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.seat-card:hover:not(:disabled) {
+  background: var(--raise-2);
+}
+
+.seat-card--on {
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.seat-card:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.seat-card__wind {
+  font-size: 26px;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.seat-card__name {
+  font-weight: 700;
+}
+
+.seat-card__state {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.lobby__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.field__input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--raise-1);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-width: 160px;
+}
+
+.lobby__link {
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
+/* ======================================================== the table view == */
+
+.app--table {
+  max-width: none;
+}
+
+.tableview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tableview__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+.tableview__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.tableview__grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 260px) minmax(0, 1fr) minmax(150px, 260px);
+  grid-template-areas:
+    ".    top    ."
+    "left pond right"
+    ".    bottom .";
+  gap: 10px;
+}
+
+.tseat--top { grid-area: top; }
+.tseat--left { grid-area: left; }
+.tseat--right { grid-area: right; }
+.tseat--bottom { grid-area: bottom; }
+.tableview__pond { grid-area: pond; }
+
+.tseat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--shade-2);
+  border: 1px solid transparent;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.tseat--active {
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.tseat--deciding {
+  border-color: var(--claim-outline);
+}
+
+.tseat__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tseat__wind {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.tseat__name {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.tseat__seatno {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.tseat__score {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tseat__hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+
+.tseat__count {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+
+.tseat__deciding {
+  font-size: 11px;
+  color: var(--claim-outline);
+}
+
+.tableview__pond {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--shade-1);
+  border: 1px solid var(--panel-border);
+}
+
+.tableview__result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--accent-wash-2);
+}
+
+.tableview__seating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.tableview__seatinfo b {
+  color: var(--ink);
+}
+
+/* ========================================================== phone view == */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phone__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.phone__seat {
+  font-weight: 700;
+}
+
+.phone__score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.phone__wall {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone__prompt {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-dim);
+}
+
+.phone__prompt--live {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.phone__discard {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.phone__hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-end;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--shade-3);
+  border: 1px solid var(--panel-border);
+  min-height: 78px;
+}
+
+.phone__actions {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: linear-gradient(180deg, transparent, var(--felt) 40%);
+}
+
+.fullroom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .tableview__grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "pond"
+      "bottom";
+  }
+}
+
+a.btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
