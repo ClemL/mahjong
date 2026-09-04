@@ -10,6 +10,7 @@ import {
   newRoom,
   openClaimWindow,
   syncSeats,
+  touch,
   viewFor,
 } from "@/game/room";
 import {
@@ -22,16 +23,8 @@ import {
   startHand,
 } from "@/game/engine";
 import type { Seat } from "@/game/tiles";
+import { RoomError } from "./errors";
 import { roomStore } from "./store";
-
-export class RoomError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-  }
-}
 
 /** Ambiguous characters are left out so a code can be read off a screen aloud. */
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -93,12 +86,18 @@ export async function createRoom(password: string): Promise<{ id: string }> {
 
 export async function readRoom(id: string, token: string | null): Promise<RoomView> {
   const room = await load(id);
-  // Reading is also when a lapsed claim window gets noticed, so a table nobody
-  // is touching still moves on.
   const now = Date.now();
-  if (drain(room, now)) {
+  // A poll is also a heartbeat, and the moment a lapsed claim window gets
+  // noticed — so a table nobody is touching still moves on. The heartbeat is
+  // only written when it has gone stale, so polling once a second does not
+  // turn into a write once a second.
+  const beat = touch(room, token, now);
+  const advanced = drain(room, now);
+  if (advanced || beat) {
     const expected = room.version;
-    room.version = expected + 1;
+    // A bare heartbeat must not bump the version, or every client would think
+    // the table changed and re-render on someone else's poll.
+    if (advanced) room.version = expected + 1;
     room.updatedAt = now;
     await roomStore().compareAndSet(room, expected);
   }
@@ -234,3 +233,5 @@ export async function control(
   });
   return viewFor(room, token);
 }
+
+export { RoomError };

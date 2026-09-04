@@ -1842,3 +1842,13 @@ a.btn {
   display: inline-flex;
   align-items: center;
 }
+
+.tseat__away {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--chip-neg);
+  color: var(--ink);
+}

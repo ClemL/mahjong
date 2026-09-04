@@ -16,3 +16,5 @@
 2026-09-03T23:45:00Z - Tiles redrawn: bevelled bone faces with carved glyphs, ringed dots, segmented bamboo and a bird for one bamboo
 2026-09-04T01:15:00Z - Play together: open a room, claim a seat with the table password, and join from your phone
 2026-09-04T01:15:00Z - A tablet can take the Table seat and show the pond, scores, melds and seating for everyone
+2026-09-04T04:50:00Z - The shared table and phones now play tile sounds, with a mute toggle on each
+2026-09-04T04:50:00Z - A player who goes quiet is marked away and the computer plays their seat until they come back

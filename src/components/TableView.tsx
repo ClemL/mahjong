@@ -48,6 +48,11 @@ function SeatBlock({
               ? "Computer"
               : "Open"}
         </span>
+        {player.occupant.away ? (
+          <span className="tseat__away" title="No response — the computer is playing this seat">
+            away
+          </span>
+        ) : null}
         <span className="tseat__seatno">Seat {seat + 1} · {SEAT_NAMES[seat]}</span>
         {view.dealer === seat ? <span className="seat__badge">Dealer</span> : null}
         <span
@@ -90,7 +95,20 @@ function SeatBlock({
  * and which seat belongs on which edge — never anyone's concealed tiles, which
  * the server does not send here at all.
  */
-export function TableView({ api, view }: { api: RoomApi; view: RoomView }) {
+export interface SoundToggle {
+  muted: boolean;
+  setMuted: (value: boolean) => void;
+}
+
+export function TableView({
+  api,
+  view,
+  sound,
+}: {
+  api: RoomApi;
+  view: RoomView;
+  sound?: SoundToggle;
+}) {
   const lastId = view.lastDiscard?.tile.id;
   const seats: Seat[] = [0, 1, 2, 3];
 
@@ -143,6 +161,16 @@ export function TableView({ api, view }: { api: RoomApi; view: RoomView }) {
               onClick={() => void api.control({ type: "forcePass" })}
             >
               Skip waiting ({view.awaitingClaimSeats.length})
+            </button>
+          ) : null}
+          {sound ? (
+            <button
+              type="button"
+              className="btn btn--ghost"
+              aria-pressed={!sound.muted}
+              onClick={() => sound.setMuted(!sound.muted)}
+            >
+              {sound.muted ? "Sound off" : "Sound on"}
             </button>
           ) : null}
           <button

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { RoomError, claimSeat } from "@/server/rooms";
+import { enforceLimit } from "@/server/ratelimit";
 import type { Seat } from "@/game/tiles";
 
 export const dynamic = "force-dynamic";
@@ -7,6 +8,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   try {
+    // The only endpoint that checks the password, so this is the gate.
+    await enforceLimit("claim", request);
     const body = (await request.json()) as {
       seat?: number | "table";
       password?: string;
