@@ -1852,3 +1852,18 @@ a.btn {
   background: var(--chip-neg);
   color: var(--ink);
 }
+
+.lobby__diag {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.lobby__diaglist {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.lobby__diaglist code {
+  font-size: 11px;
+}

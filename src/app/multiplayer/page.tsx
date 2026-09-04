@@ -3,19 +3,36 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+interface Status {
+  enabled: boolean;
+  persistent: boolean;
+  deployment: { environment: string; commit: string; branch: string };
+  variables: Record<string, boolean>;
+}
+
 export default function MultiplayerPage() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<{ enabled: boolean; persistent: boolean } | null>(null);
+  const [status, setStatus] = useState<Status | null>(null);
+  // A failed status check is its own problem and must not be reported as
+  // "multiplayer is switched off" — that sends you looking at env vars when
+  // the server is what is broken.
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/rooms")
-      .then((r) => r.json())
-      .then(setStatus)
-      .catch(() => setStatus({ enabled: false, persistent: false }));
+    fetch("/api/rooms", { cache: "no-store" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`the server answered ${r.status}`);
+        return (await r.json()) as Status;
+      })
+      .then((s) => {
+        setStatus(s);
+        setStatusError(null);
+      })
+      .catch((e: Error) => setStatusError(e.message));
   }, []);
 
   const create = async () => {
@@ -46,12 +63,43 @@ export default function MultiplayerPage() {
           Seats nobody takes are played by the computer.
         </p>
 
-        {status && !status.enabled ? (
+        {statusError ? (
           <p className="lobby__error">
-            Multiplayer is switched off on this deployment — set <code>MAHJONG_ROOM_PASSWORD</code>{" "}
-            to enable it.
+            Could not reach the multiplayer service — {statusError}. This is a server problem, not
+            a missing setting.
           </p>
         ) : null}
+
+        {status && !status.enabled ? (
+          <div className="lobby__error">
+            <p style={{ margin: "0 0 6px" }}>
+              This deployment has no <code>MAHJONG_ROOM_PASSWORD</code>, so multiplayer is off.
+            </p>
+            <p style={{ margin: 0 }}>
+              It is answering from <b>{status.deployment.environment}</b>, branch{" "}
+              <b>{status.deployment.branch}</b>, commit <b>{status.deployment.commit}</b>. Vercel
+              fixes environment variables at deploy time, so if you added the variable after that
+              commit was built, redeploy and it will be picked up.
+            </p>
+          </div>
+        ) : null}
+        {status ? (
+          <details className="lobby__diag">
+            <summary>Deployment status</summary>
+            <ul className="lobby__diaglist">
+              <li>
+                Environment: <b>{status.deployment.environment}</b> · branch{" "}
+                <b>{status.deployment.branch}</b> · commit <b>{status.deployment.commit}</b>
+              </li>
+              {Object.entries(status.variables).map(([name, present]) => (
+                <li key={name}>
+                  <code>{name}</code>: <b>{present ? "set" : "missing"}</b>
+                </li>
+              ))}
+            </ul>
+          </details>
+        ) : null}
+
         {status?.enabled && !status.persistent ? (
           <p className="lobby__warn">
             No Upstash credentials are configured, so rooms live in server memory. Fine locally;
