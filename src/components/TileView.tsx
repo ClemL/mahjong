@@ -130,6 +130,7 @@ export function TileButton({ onClick, disabled, ariaLabel, ...face }: ButtonProp
         colorClass(face.code),
         face.drawn ? "tile--drawn" : "",
         entryClass(face.entry ?? null, face.tossFrom ?? "bottom"),
+        face.className ?? "",
       ]
         .filter(Boolean)
         .join(" ")}

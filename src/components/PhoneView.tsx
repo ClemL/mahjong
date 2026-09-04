@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
+import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import type { SoundToggle } from "./TableView";
@@ -27,6 +29,28 @@ export function PhoneView({
 }) {
   const seat = view.you.seat!;
   const me = view.players[seat];
+  const coarse = useCoarsePointer();
+  // On touch a tile is armed by the first tap and thrown by the second; with a
+  // mouse the click discards directly.
+  const [armed, setArmed] = useState<string | null>(null);
+  useEffect(() => {
+    // Never leave a tile armed across a turn or a new deal.
+    setArmed(null);
+  }, [view.turn, view.handNumber, view.phase]);
+
+  const tapTile = (tileId: string) => {
+    if (!coarse) {
+      void api.act({ type: "discard", tileId });
+      return;
+    }
+    if (armed === tileId) {
+      setArmed(null);
+      void api.act({ type: "discard", tileId });
+    } else {
+      setArmed(tileId);
+    }
+  };
+  const armedTile = me.hand.find((t) => t.id === armed);
   const yourTurn = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
   const drawn = me.hand.find((t) => t.id === view.drawnTileId);
   const rest = me.hand.filter((t) => t.id !== view.drawnTileId);
@@ -91,8 +115,9 @@ export function PhoneView({
             key={t.id}
             code={t.code}
             size="lg"
+            className={armed === t.id ? "tile--armed" : ""}
             disabled={!yourTurn || api.busy}
-            onClick={() => void api.act({ type: "discard", tileId: t.id })}
+            onClick={() => tapTile(t.id)}
           />
         ))}
         {drawn ? (
@@ -103,12 +128,33 @@ export function PhoneView({
               size="lg"
               drawn
               entry="draw"
+              className={armed === drawn.id ? "tile--armed" : ""}
               disabled={!yourTurn || api.busy}
-              onClick={() => void api.act({ type: "discard", tileId: drawn.id })}
+              onClick={() => tapTile(drawn.id)}
             />
           </>
         ) : null}
       </div>
+
+      {armedTile && yourTurn ? (
+        <div className="confirm-bar" role="status">
+          <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>
+          <button
+            type="button"
+            className="btn btn--win"
+            disabled={api.busy}
+            onClick={() => {
+              setArmed(null);
+              void api.act({ type: "discard", tileId: armedTile.id });
+            }}
+          >
+            Discard
+          </button>
+          <button type="button" className="btn btn--ghost" onClick={() => setArmed(null)}>
+            Keep
+          </button>
+        </div>
+      ) : null}
 
       <div className="actions phone__actions">
         {view.claim ? (

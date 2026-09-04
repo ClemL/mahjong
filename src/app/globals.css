@@ -4,6 +4,13 @@
   --felt-edge: #072a20;
   --ink: #f4f1e8;
   --ink-dim: #a9bdb4;
+  /* Tile sizes are custom properties so a media query can restate them
+     without fighting source order — the class rules below are the only place
+     that sets --tile-w, and they read these. */
+  --tile-sm: 26px;
+  --tile-md: 34px;
+  --tile-lg: 48px;
+
   --tile-face: #fbf8ef;
   --tile-face-2: #ece5d2;
   --tile-edge: #c2b795;
@@ -203,9 +210,6 @@ button {
     min-height: 0;
   }
 
-  .tile--lg { --tile-w: 38px; }
-  .tile--md { --tile-w: 30px; }
-
   .pond {
     height: auto;
   }
@@ -213,11 +217,6 @@ button {
   .app {
     padding: 10px 10px 16px;
   }
-}
-
-@media (max-width: 420px) {
-  .tile--lg { --tile-w: 32px; }
-  .tile--sm { --tile-w: 22px; }
 }
 
 /* ------------------------------------------------------------ seat panel */
@@ -330,9 +329,9 @@ button {
   transform-origin: center center;
 }
 
-.tile--sm { --tile-w: 26px; }
-.tile--md { --tile-w: 34px; }
-.tile--lg { --tile-w: 48px; }
+.tile--sm { --tile-w: var(--tile-sm); }
+.tile--md { --tile-w: var(--tile-md); }
+.tile--lg { --tile-w: var(--tile-lg); }
 
 .tile__glyph {
   font-size: calc(var(--tile-w) * 0.52);
@@ -1866,4 +1865,103 @@ a.btn {
 
 .lobby__diaglist code {
   font-size: 11px;
+}
+
+/* ============================================== device fit & touch ====== */
+
+/* The viewport is set to cover, so the layout keeps its own controls clear of
+   the notch and the home indicator rather than letting the OS overlap them. */
+.app {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
+
+.phone__actions {
+  /* Pass and Win live here; without this they sit under the home indicator. */
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.tableview__bar {
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* Touch input: 44px is Apple's minimum and 48px Material's. Buttons were 31px
+   tall, and Pass sits next to Win with a claim timer running — the cost of a
+   mis-tap here is losing a hand. */
+@media (pointer: coarse) {
+  .btn,
+  .btn--sm,
+  .choice__btn,
+  .field__select,
+  .seat-card {
+    min-height: 44px;
+  }
+
+  .btn,
+  .btn--sm {
+    padding-inline: 16px;
+    font-size: 14px;
+  }
+
+  .actions {
+    gap: 10px;
+  }
+
+  /* A destructive or irreversible choice gets extra room from its neighbours. */
+  .phone__actions .btn--ghost {
+    margin-left: auto;
+  }
+
+  .phone__actions {
+    gap: 12px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --tile-lg: 40px;
+    --tile-md: 30px;
+  }
+}
+
+@media (max-width: 420px) {
+  :root {
+    --tile-lg: 38px;
+    --tile-sm: 24px;
+  }
+}
+
+/* --------------------------------------------------- discard confirmation */
+
+/* A tile is armed by the first tap and thrown by the second, so a stray touch
+   while holding the phone cannot discard a tile you needed. */
+.tile--armed {
+  outline: 3px solid var(--danger);
+  outline-offset: 2px;
+  transform: translateY(-10px);
+  z-index: 30;
+}
+
+.confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-wash-2);
+  border: 1px solid var(--gold);
+}
+
+.confirm-bar__text {
+  font-weight: 700;
+}
+
+.tableview__wake {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--chip-neg);
+  color: var(--ink);
 }

@@ -131,6 +131,25 @@ never receives anyone's concealed tiles.
 It also drives the game: next hand, redeal, restart and reset scores, change the
 faan minimum, free a seat, and skip a player who is not answering a claim.
 
+### On the devices themselves
+
+- **The table keeps the screen awake.** A tablet acting as the table would
+  otherwise sleep mid-hand. The lock is re-taken whenever the page becomes
+  visible again, since browsers drop it on hide, and the table says so when the
+  browser cannot hold one (Safari only gained it in 16.4).
+- **Discarding takes two taps on touch.** The first arms the tile and offers
+  *Discard* / *Keep*; the second throws it. With a mouse a click still discards
+  directly — a mis-click is cheap, a stray touch on a phone you are holding is
+  not.
+- **Touch targets meet the platform minimum.** Buttons were 31px tall against
+  Apple's 44px and Material's 48px, with Pass sitting beside Win under a claim
+  timer. Everything interactive is at least 44px on a coarse pointer.
+- **The layout respects safe areas.** The viewport covers the display and the
+  layout keeps its own controls clear of the notch and the home indicator —
+  the action row with Pass and Win previously sat under it.
+- **Installable.** A web app manifest with maskable icons, so the tablet can run
+  standalone: no browser chrome to tap by accident, no back gesture mid-hand.
+
 **A phone** shows only that player's own hand and the decisions that are theirs
 — discard, chow/pung/kong/win, pass — because the tablet is already showing
 everything else. With no table device in the room, phones fall back to the full
