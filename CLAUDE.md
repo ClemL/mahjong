@@ -43,7 +43,8 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
   scoring.ts       Faan patterns, exclusions, payout
   rules.ts         House ruleset — every tunable number lives here
   engine.ts        State machine: deal, draw, discard, claims, settlement, history
-  ai.ts            AiStrategy interface + the random opponent
+  shanten.ts       Distance-to-ready; drives both the AI and the claim prompts
+  ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   sound.ts         Web Audio cues, synthesised at runtime
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
@@ -74,6 +75,9 @@ public/updates.txt Changelog, oldest first
 * **Before writing chart code, load the `dataviz` skill and run its palette validator** against the
   surface the chart actually sits on. The existing chart's colors are validated; do not add series
   colors by eye.
+* **Opponent changes need a measured before/after.** The AI is judged on the
+  washout rate over a few hundred simulated hands, not on how the code reads. State
+  the numbers in the PR.
 * **Motion and color are accessibility surfaces.** Animations must respect `prefers-reduced-motion`,
   hover-only affordances must be gated behind `(hover: hover) and (pointer: fine)`, and identity must
   never rest on color alone.

@@ -293,15 +293,29 @@ button {
 
 /* ------------------------------------------------------------------ tile */
 
+/* A tile is a bone face set into a rounded body: the outer shell carries the
+   edge and the drop shadow, the inset ring is the bevel catching the light,
+   and the face artwork sits in the well. */
 .tile {
   --tile-w: 34px;
+  --tile-bevel: max(calc(var(--tile-w) * 0.055), 1px);
   position: relative;
   width: var(--tile-w);
   height: calc(var(--tile-w) * 1.38);
-  border-radius: 5px;
+  border-radius: calc(var(--tile-w) * 0.16);
   border: 1px solid var(--tile-edge);
-  background: linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
-  box-shadow: 0 2px 0 var(--tile-shadow), 0 3px 5px rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(120% 90% at 30% 12%, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+  box-shadow:
+    /* bevel: light from above, shade below */
+    inset 0 var(--tile-bevel) 0 rgba(255, 255, 255, 0.9),
+    inset 0 calc(var(--tile-bevel) * -1) 0 rgba(0, 0, 0, 0.1),
+    inset var(--tile-bevel) 0 0 rgba(255, 255, 255, 0.45),
+    inset calc(var(--tile-bevel) * -1) 0 0 rgba(0, 0, 0, 0.07),
+    /* the tile's thickness, then its shadow on the table */
+    0 calc(var(--tile-w) * 0.06) 0 var(--tile-shadow),
+    0 calc(var(--tile-w) * 0.1) calc(var(--tile-w) * 0.16) rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -324,6 +338,10 @@ button {
   font-size: calc(var(--tile-w) * 0.52);
   font-weight: 700;
   line-height: 1;
+  /* Carved rather than printed: a light lip below the stroke, shade above. */
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.75),
+    0 -1px 1px rgba(0, 0, 0, 0.18);
   font-family: "Noto Sans CJK SC", "Noto Sans SC", "PingFang SC", "Microsoft YaHei",
     "Hiragino Sans", ui-sans-serif, sans-serif;
 }
@@ -381,6 +399,7 @@ button {
 
 /* Pip artwork fills the tile face, leaving room for the corner label. */
 .tile__pips {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.6));
   /* The artwork is square and the tile is not, so width is the binding
      dimension — keep it near the full tile so pips stay legible when small. */
   width: 94%;
@@ -425,17 +444,25 @@ button {
 }
 
 .tile--back {
-  background: linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
-  border-color: #0b3b2c;
-  box-shadow: 0 2px 0 #0a3527, 0 3px 5px rgba(0, 0, 0, 0.35);
+  background:
+    radial-gradient(120% 90% at 30% 12%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
+  border-color: rgba(0, 0, 0, 0.45);
+  box-shadow:
+    inset 0 var(--tile-bevel) 0 rgba(255, 255, 255, 0.28),
+    inset 0 calc(var(--tile-bevel) * -1) 0 rgba(0, 0, 0, 0.3),
+    0 calc(var(--tile-w) * 0.06) 0 rgba(0, 0, 0, 0.35),
+    0 calc(var(--tile-w) * 0.1) calc(var(--tile-w) * 0.16) rgba(0, 0, 0, 0.4);
 }
 
+/* The recessed panel a tile back is moulded with. */
 .tile--back::after {
   content: "";
   position: absolute;
-  inset: 4px;
-  border-radius: 3px;
-  border: 1px solid var(--line);
+  inset: 13%;
+  border-radius: calc(var(--tile-w) * 0.09);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .tile--button {

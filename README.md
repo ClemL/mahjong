@@ -5,7 +5,7 @@ other three seats are played by the computer. Built as a Next.js app that
 deploys to Vercel as a fully static site — the whole game runs client-side, with
 no backend, database or API keys.
 
-![Status](https://img.shields.io/badge/tests-61%20passing-brightgreen)
+![Status](https://img.shields.io/badge/tests-86%20passing-brightgreen)
 
 ## What is implemented
 
@@ -50,30 +50,40 @@ house-rules affair, so every number is in one file and is easy to change.
 
 ## The computer opponents
 
-Iteration 1, as specified: **the AI plays randomly.** It draws, and unless it
-can declare a legal win it discards a uniformly random tile. On a discard it
-picks uniformly from `{pass, ...legal claims}`, except that a winning claim is
-always taken. Kongs on its own turn are taken half the time.
+Two strategies, switchable from the **Play** panel.
 
-One consequence worth knowing before you play: random discarding rarely
-completes a hand at all. Over 300 simulated all-AI hands at each table minimum:
+**Skilled (default).** Counts *shanten* — how many tile changes a hand is from
+completion — and discards whatever leaves the hand closest to ready, breaking
+ties on how many useful tiles are still unseen, then on letting go of terminals
+and honors first. It claims a discard only when the meld genuinely brings the
+hand closer, takes a concealed kong only when it costs the hand nothing, and
+always declares a win it is entitled to. It does **not** read the discards for
+danger or steer toward scoring patterns — a competent beginner, not a strong
+player.
 
-| Table minimum | Hands won | Washed out (流局) | Avg. faan when won |
-| --- | --- | --- | --- |
-| 0 faan (default) | 5.0% | 95.0% | 2.5 |
-| 3 faan (HK standard) | 2.7% | 97.3% | 4.3 |
+**Random.** Draws and discards uniformly at random, claiming at random too.
+Kept because it is the honest baseline, and because it makes the difference
+visible.
 
-Dropping the minimum to 0 roughly doubles how often the machines go out, but
-washouts still dominate — the binding constraint is that a random agent seldom
-assembles four sets and a pair, not the faan gate at the finish line. The
-setting helps a deliberate human far more, since it stops a well-shaped hand
-being unwinnable for want of a scoring pattern.
+Over 120 simulated all-AI hands per cell:
 
-You will win far more often than the machines do. That is the expected
-behaviour of a random agent, not a bug — but it is the first thing a smarter
-strategy should fix.
+| Opponents | Table minimum | Hands won | Washed out | Avg. faan |
+| --- | --- | --- | --- | --- |
+| Random | 0 faan | 2.5% | 97.5% | 1.67 |
+| Random | 3 faan | 0.8% | 99.2% | 3.00 |
+| **Skilled** | **0 faan** | **100%** | **0%** | 1.48 |
+| **Skilled** | **3 faan** | **65%** | **35%** | 3.17 |
 
-Adding one is a single file: implement the `AiStrategy` interface in
+At the default 0-faan minimum every hand now finishes. At the Hong Kong
+standard of 3 faan a third still wash out, which is roughly what a table of
+beginners produces. Average faan falls with skilled play because the opponents
+go out quickly with cheap hands rather than sitting on the wall.
+
+The shanten calculator decomposes each suit independently and caches per suit,
+since a candidate discard changes only one of the four groups. That took a
+greedy turn from 13.2 ms to 2.2 ms.
+
+Adding another strategy is a single file: implement `AiStrategy` in
 [`src/game/ai.ts`](src/game/ai.ts) and register it in `STRATEGIES`.
 
 ```ts
@@ -84,16 +94,25 @@ export interface AiStrategy {
 }
 ```
 
-Useful primitives already exist for a greedy or shanten-based opponent:
-`waitingTiles()` and `analyzeShape()` in `src/game/winning.ts`, and
-`scoreHand()` in `src/game/scoring.ts`.
+## Claim prompts
+
+Being asked about every claimable discard is the main source of friction in a
+mahjong UI. **Ask me about claims** has three settings:
+
+- **Useful only** (default) — interrupts when a claim would actually reduce
+  your shanten, using the same judgment the skilled opponent applies to its own
+  hand. About 35% fewer interruptions than asking every time.
+- **Every claim** — the traditional behavior.
+- **Wins only** — never interrupts except to declare a win.
+
+A win is always offered, whatever the setting.
 
 ## Running it
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 61 unit tests
+npm test           # 86 unit tests
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
 ```
@@ -154,7 +173,8 @@ src/game/          Rules engine — no React, no DOM
   scoring.ts       Faan patterns, exclusions, payout
   rules.ts         House ruleset — every tunable number
   engine.ts        The state machine: deal, draw, discard, claims, settlement
-  ai.ts            AiStrategy interface + the random opponent
+  shanten.ts       Distance-to-ready, hand acceptance, visible-tile counting
+  ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
 src/hooks/         React binding for the engine
@@ -187,13 +207,32 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 
 ### Table and tiles
 
-Dots (筒) and Bamboo (索) are drawn as **real pip artwork** — inline SVG in the
-traditional arrangements, including the slanted three across the top of the
-seven of Dots. Characters (萬) keep the numeral-over-萬 face and honors keep
-their glyphs, because that is already how those tiles look. Traditional sets
-color individual pips (a red five, a green one bamboo); we draw every pip in
-its suit color instead, since the suits have to stay apart at a glance and a
-red pip would read as a Red Dragon.
+A tile is a bone face set into a rounded body: the shell carries the edge and
+the drop shadow, an inset ring is the bevel catching the light from above, and
+a radial sheen sits over the top-left. Glyphs are given a light lip below the
+stroke and shade above, so they read as carved rather than printed. Tile backs
+get the same treatment with a moulded recessed panel.
+
+Dots (筒) and Bamboo (索) are drawn as **original SVG artwork**, sized on a
+0–100 square and stroked in `currentColor` so they stay crisp from the 22px
+pond to the zoomed hand and recolor with the chosen palette:
+
+- **Dots** are concentric rings around a solid centre, the way the pips are
+  carved. The one of Dots takes an extra ring.
+- **Bamboo** canes are stalks broken by node gaps, narrow enough that each
+  segment stays taller than it is wide — split any further and they read as a
+  stack of beads.
+- **One Bamboo is a bird**, as on every traditional set, drawn as a perched
+  sparrow with a fanned tail. A faithful peacock would be mud at 22px.
+
+Nothing is filled with the tile's face color: rings are strokes and canes are
+separate segments, so the suit's faint wash shows through the gaps rather than
+being covered by a near-match.
+
+Characters (萬) and honors keep their glyph faces, which is already how those
+tiles look. Traditional sets color individual pips (a red five, a green one
+bamboo); we draw every pip in its suit color instead, since the suits have to
+stay apart at a glance and a red pip would read as a Red Dragon.
 
 Suits are set far apart in both hue and lightness — blue Characters,
 burnt-orange Dots, green Bamboo, purple bonus tiles — with a matching wash

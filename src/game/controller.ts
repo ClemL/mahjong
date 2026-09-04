@@ -13,7 +13,7 @@ import {
   discard,
   resolveClaims,
 } from "./engine";
-import { type AiStrategy, randomAi } from "./ai";
+import { type AiStrategy, bestImprovingClaim, greedyAi } from "./ai";
 import type { Rng } from "./rng";
 
 /** True when the discard is settled and the next player still has to draw. */
@@ -31,6 +31,30 @@ export function humanSeat(state: GameState): Seat | null {
   return state.players.find((p) => p.isHuman)?.seat ?? null;
 }
 
+/**
+ * How often the table stops to ask the player about a claim.
+ * `useful` only interrupts when a claim would actually improve the hand.
+ */
+export type ClaimPrompt = "always" | "useful" | "wins";
+
+/**
+ * Whether a pending claim is worth interrupting the player for. A winning
+ * claim always is; otherwise `useful` applies the same judgment the greedy
+ * opponent uses on its own hand.
+ */
+export function shouldPromptClaim(
+  state: GameState,
+  seat: Seat,
+  mode: ClaimPrompt,
+): boolean {
+  const options = state.pendingClaims.find((c) => c.seat === seat)?.options ?? [];
+  if (options.length === 0) return false;
+  if (options.some((o) => o.type === "win")) return true;
+  if (mode === "always") return true;
+  if (mode === "wins") return false;
+  return bestImprovingClaim(state, seat, options) !== null;
+}
+
 /** True when the human is being asked to claim a discard. */
 export function awaitingHumanClaim(state: GameState): boolean {
   const seat = humanSeat(state);
@@ -41,7 +65,7 @@ export function awaitingHumanClaim(state: GameState): boolean {
 export function stepAiTurn(
   state: GameState,
   rng: Rng,
-  strategy: AiStrategy = randomAi,
+  strategy: AiStrategy = greedyAi,
 ): GameState {
   if (state.phase !== "action") return state;
   const seat = state.turn;
@@ -65,7 +89,7 @@ export function stepAiTurn(
 export function aiClaimDecisions(
   state: GameState,
   rng: Rng,
-  strategy: AiStrategy = randomAi,
+  strategy: AiStrategy = greedyAi,
 ): ClaimDecision[] {
   return state.pendingClaims
     .filter((c) => !state.players[c.seat].isHuman)
@@ -80,7 +104,7 @@ export function resolveWithAi(
   state: GameState,
   rng: Rng,
   humanDecision?: ClaimDecision,
-  strategy: AiStrategy = randomAi,
+  strategy: AiStrategy = greedyAi,
 ): GameState {
   const decisions = aiClaimDecisions(state, rng, strategy);
   if (humanDecision) decisions.push(humanDecision);
@@ -91,7 +115,7 @@ export function resolveWithAi(
  * Advance the table by one observable beat. Returns the same state when the
  * game is waiting on the human (or the hand is over).
  */
-export function stepTable(state: GameState, rng: Rng, strategy: AiStrategy = randomAi): GameState {
+export function stepTable(state: GameState, rng: Rng, strategy: AiStrategy = greedyAi): GameState {
   if (state.phase === "handOver" || state.phase === "gameOver") return state;
 
   if (state.phase === "claiming") {
@@ -110,7 +134,7 @@ export function stepTable(state: GameState, rng: Rng, strategy: AiStrategy = ran
 export function autoPlayHand(
   initial: GameState,
   rng: Rng,
-  strategy: AiStrategy = randomAi,
+  strategy: AiStrategy = greedyAi,
   maxSteps = 4000,
 ): { state: GameState; steps: number } {
   let state = initial;

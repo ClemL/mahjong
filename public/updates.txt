@@ -11,3 +11,6 @@
 2026-09-03T18:20:00Z - Score history panel and an end-of-round summary with a cumulative score chart
 2026-09-03T18:30:00Z - Footer shows the build version and latest change; click it for the full changelog
 2026-09-03T18:40:00Z - Table & tiles panel: five table themes, two tile face styles and three suit palettes, remembered between visits
+2026-09-03T19:35:00Z - Opponents now play to finish their hands instead of discarding at random — washouts fall from 97% to almost none
+2026-09-03T19:35:00Z - The table only stops to ask about a claim when it would actually improve your hand
+2026-09-03T23:45:00Z - Tiles redrawn: bevelled bone faces with carved glyphs, ringed dots, segmented bamboo and a bird for one bamboo
