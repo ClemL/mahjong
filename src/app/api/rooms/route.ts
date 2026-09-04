@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { RoomError, createRoom, multiplayerEnabled } from "@/server/rooms";
+import { enforceLimit } from "@/server/ratelimit";
 import { roomStore } from "@/server/store";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await enforceLimit("create", request);
     const body = (await request.json()) as { password?: string };
     const room = await createRoom(body.password ?? "");
     return NextResponse.json(room, { status: 201 });

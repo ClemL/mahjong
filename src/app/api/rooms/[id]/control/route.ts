@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { RoomError, type TableCommand, control } from "@/server/rooms";
+import { enforceLimit } from "@/server/ratelimit";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   try {
+    await enforceLimit("act", request);
     const body = (await request.json()) as { token?: string; command?: TableCommand };
     if (!body.token || !body.command) {
       return NextResponse.json({ error: "Missing token or command" }, { status: 400 });

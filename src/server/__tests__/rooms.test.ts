@@ -36,7 +36,7 @@ describe("claiming seats", () => {
     const { token, view } = await claimSeat(id, { seat: 2, password: "lotus", name: "Teja" });
     expect(token).toBeTruthy();
     expect(view.you).toEqual({ role: "player", seat: 2 });
-    expect(view.players[2].occupant).toEqual({ kind: "human", name: "Teja" });
+    expect(view.players[2].occupant).toEqual({ kind: "human", name: "Teja", away: false });
   });
 
   it("refuses a seat that is already taken", async () => {

@@ -30,6 +30,17 @@ import { createRng } from "./rng";
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
 
+/**
+ * Silence after which a seated player is treated as away and the computer
+ * plays for them. Their seat is kept — acting or polling again takes it back —
+ * because losing a chair for putting a phone down would be worse than the AI
+ * playing a turn.
+ */
+export const SEAT_IDLE_MS = 90_000;
+
+/** How stale a heartbeat must be before a poll bothers to write one. */
+export const HEARTBEAT_WRITE_MS = 25_000;
+
 /** A seat is empty, played by the computer, or held by a person. */
 export type Occupant =
   | { kind: "open" }
@@ -67,7 +78,7 @@ export interface PublicPlayer {
   melds: Meld[];
   flowers: Tile[];
   discards: Tile[];
-  occupant: { kind: Occupant["kind"]; name: string | null };
+  occupant: { kind: Occupant["kind"]; name: string | null; away: boolean };
 }
 
 export interface RoomView {
@@ -118,16 +129,50 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
   };
 }
 
-/** A seat a person is sitting in; open seats are played by the computer. */
-export function isHumanSeat(room: Room, seat: Seat): boolean {
-  return room.seats[seat].kind === "human";
+/** True when a seated player has gone quiet for long enough to be counted away. */
+export function isAway(occupant: Occupant, now: number): boolean {
+  return occupant.kind === "human" && now - occupant.lastSeen > SEAT_IDLE_MS;
+}
+
+/** A seat the table should actually wait for: taken, and someone is there. */
+export function isHumanSeat(room: Room, seat: Seat, now = Date.now()): boolean {
+  const occupant = room.seats[seat];
+  return occupant.kind === "human" && !isAway(occupant, now);
+}
+
+/** True once anybody has taken a seat, whether or not they are still present. */
+export function hasAnyPlayer(room: Room): boolean {
+  return room.seats.some((occupant) => occupant.kind === "human");
 }
 
 /** Mirror seat occupancy onto the engine, which decides who it may step. */
-export function syncSeats(room: Room): void {
+export function syncSeats(room: Room, now = Date.now()): void {
   for (let seat = 0; seat < 4; seat++) {
-    room.state.players[seat].isHuman = isHumanSeat(room, seat as Seat);
+    room.state.players[seat].isHuman = isHumanSeat(room, seat as Seat, now);
   }
+}
+
+/**
+ * Record that a token's owner is still there. Returns true when the stamp was
+ * old enough to be worth persisting, so a poll every second does not become a
+ * write every second.
+ */
+export function touch(room: Room, token: string | null, now = Date.now()): boolean {
+  if (!token) return false;
+  if (room.table && room.table.token === token) {
+    if (now - room.table.lastSeen < HEARTBEAT_WRITE_MS) return false;
+    room.table.lastSeen = now;
+    return true;
+  }
+  for (const occupant of room.seats) {
+    if (occupant.kind === "human" && occupant.token === token) {
+      const wasAway = isAway(occupant, now);
+      if (!wasAway && now - occupant.lastSeen < HEARTBEAT_WRITE_MS) return false;
+      occupant.lastSeen = now;
+      return true;
+    }
+  }
+  return false;
 }
 
 export function identify(room: Room, token: string | null): { role: Role; seat: Seat | null } {
@@ -143,11 +188,11 @@ export function identify(room: Room, token: string | null): { role: Role; seat: 
 }
 
 /** Seats that still owe an answer on the discard currently on the table. */
-export function pendingHumanClaimants(room: Room): Seat[] {
+export function pendingHumanClaimants(room: Room, now = Date.now()): Seat[] {
   if (room.state.phase !== "claiming") return [];
   return room.state.pendingClaims
     .map((c: PendingClaim) => c.seat)
-    .filter((seat) => isHumanSeat(room, seat) && !(String(seat) in room.claimResponses));
+    .filter((seat) => isHumanSeat(room, seat, now) && !(String(seat) in room.claimResponses));
 }
 
 /**
@@ -156,11 +201,12 @@ export function pendingHumanClaimants(room: Room): Seat[] {
  * turn on, and play any computer seats.
  */
 export function drain(room: Room, now = Date.now()): boolean {
-  syncSeats(room);
+  syncSeats(room, now);
   // Nobody has sat down yet, so there is no game to advance. Without this a
   // room plays itself out between being created and anyone joining, and the
-  // first person to arrive finds a finished hand.
-  if (!room.seats.some((s) => s.kind === "human")) return false;
+  // first person to arrive finds a finished hand. A table where everyone has
+  // wandered off still plays on — only an unstarted one waits.
+  if (!hasAnyPlayer(room)) return false;
   const rng = createRng(room.rngSeed);
   for (let i = 0; i < room.rngCalls; i++) rng.next();
 
@@ -170,14 +216,14 @@ export function drain(room: Room, now = Date.now()): boolean {
     if (state.phase === "handOver" || state.phase === "gameOver") break;
 
     if (state.phase === "claiming") {
-      const waiting = pendingHumanClaimants(room);
+      const waiting = pendingHumanClaimants(room, now);
       const expired = room.claimDeadline !== null && now >= room.claimDeadline;
       if (waiting.length > 0 && !expired) break;
 
       const decisions = state.pendingClaims.map((c) => {
         const recorded = room.claimResponses[String(c.seat)];
         if (recorded !== undefined) return { seat: c.seat, optionId: recorded };
-        if (isHumanSeat(room, c.seat)) return { seat: c.seat, optionId: null };
+        if (isHumanSeat(room, c.seat, now)) return { seat: c.seat, optionId: null };
         const choice = greedyAi.chooseClaim(state, c.seat, c.options, rng);
         return { seat: c.seat, optionId: choice?.id ?? null };
       });
@@ -194,7 +240,7 @@ export function drain(room: Room, now = Date.now()): boolean {
       continue;
     }
 
-    if (isHumanSeat(room, state.turn)) break;
+    if (isHumanSeat(room, state.turn, now)) break;
 
     const next = stepAiTurn(state, rng, greedyAi);
     if (next === state) break;
@@ -202,7 +248,7 @@ export function drain(room: Room, now = Date.now()): boolean {
     changed = true;
 
     // A fresh discard opens a new claim window for the people at the table.
-    if (room.state.phase === "claiming" && pendingHumanClaimants(room).length > 0) {
+    if (room.state.phase === "claiming" && pendingHumanClaimants(room, now).length > 0) {
       room.claimDeadline = now + CLAIM_WINDOW_MS;
     }
   }
@@ -213,7 +259,7 @@ export function drain(room: Room, now = Date.now()): boolean {
 
 /** Open a claim window if the current discard needs one. */
 export function openClaimWindow(room: Room, now = Date.now()): void {
-  if (room.state.phase === "claiming" && pendingHumanClaimants(room).length > 0) {
+  if (room.state.phase === "claiming" && pendingHumanClaimants(room, now).length > 0) {
     room.claimDeadline = now + CLAIM_WINDOW_MS;
   }
 }
@@ -223,9 +269,15 @@ export function openClaimWindow(room: Room, now = Date.now()): void {
  * because that is what it is — but it stays claimable, so a latecomer can sit
  * down and take it over.
  */
-function occupantSummary(occupant: Occupant, playing: boolean): PublicPlayer["occupant"] {
-  if (occupant.kind === "human") return { kind: "human", name: occupant.name };
-  return { kind: playing ? "ai" : "open", name: null };
+function occupantSummary(
+  occupant: Occupant,
+  playing: boolean,
+  now: number,
+): PublicPlayer["occupant"] {
+  if (occupant.kind === "human") {
+    return { kind: "human", name: occupant.name, away: isAway(occupant, now) };
+  }
+  return { kind: playing ? "ai" : "open", name: null, away: false };
 }
 
 /** Opaque stand-ins for tiles the viewer is not entitled to see. */
@@ -252,7 +304,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       melds: p.melds,
       flowers: p.flowers,
       discards: p.discards,
-      occupant: occupantSummary(room.seats[p.seat], playing),
+      occupant: occupantSummary(room.seats[p.seat], playing, now),
     };
   });
 
@@ -291,7 +343,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     config: state.config,
     you,
     tablePresent: room.table !== null,
-    awaitingClaimSeats: pendingHumanClaimants(room),
+    awaitingClaimSeats: pendingHumanClaimants(room, now),
     claim,
     actions,
   };

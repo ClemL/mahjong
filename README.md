@@ -5,7 +5,7 @@ other three seats are played by the computer. Built as a Next.js app that
 deploys to Vercel as a fully static site — the whole game runs client-side, with
 no backend, database or API keys.
 
-![Status](https://img.shields.io/badge/tests-114%20passing-brightgreen)
+![Status](https://img.shields.io/badge/tests-120%20passing-brightgreen)
 
 ## What is implemented
 
@@ -158,6 +158,21 @@ view so the pond is visible somewhere.
   answer at once, people get the window, and an unanswered seat is treated as a
   pass — so one person putting their phone down does not stall the table. The
   table can skip the wait early.
+- **Presence.** Every poll doubles as a heartbeat, written only once it has gone
+  stale so polling once a second does not become a write once a second — and it
+  never bumps the room version, or one person's poll would look like a table
+  change to everyone else. After 90 seconds of silence a seat is marked *away*
+  on the table and the computer plays it; the seat is kept, so acting or even
+  just reopening the page takes it straight back.
+- **Rate limiting.** Room creation and seat claims are throttled per IP through
+  Upstash, shared across serverless instances: 5 rooms and 10 claim attempts per
+  10 minutes, and 120 actions a minute. The claim endpoint is the only one that
+  checks the password, so that limit is what stands between a four-character
+  secret and a brute-force script.
+- **Sound.** The tablet and the phones derive cues by diffing consecutive polled
+  views, the same way single player diffs engine states — a clack on a discard,
+  a distinct cue for a claim or kong, a run of notes on a win. Each device has
+  its own mute toggle, remembered between visits.
 
 ### Configuration
 
@@ -175,7 +190,7 @@ static and needs none of this.
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 114 unit tests
+npm test           # 120 unit tests
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
 ```

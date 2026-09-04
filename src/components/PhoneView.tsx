@@ -5,6 +5,7 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
 import { TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
+import type { SoundToggle } from "./TableView";
 
 function claimLabel(type: string): string {
   return type === "chow" ? "Chow 上" : type === "pung" ? "Pung 碰" : type === "kong" ? "Kong 槓" : "Win 糊";
@@ -15,7 +16,15 @@ function claimLabel(type: string): string {
  * shows — your hand and the decisions that are yours — because the shared
  * screen is already carrying the pond, the scores and everyone's melds.
  */
-export function PhoneView({ api, view }: { api: RoomApi; view: RoomView }) {
+export function PhoneView({
+  api,
+  view,
+  sound,
+}: {
+  api: RoomApi;
+  view: RoomView;
+  sound?: SoundToggle;
+}) {
   const seat = view.you.seat!;
   const me = view.players[seat];
   const yourTurn = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
@@ -41,6 +50,17 @@ export function PhoneView({ api, view }: { api: RoomApi; view: RoomView }) {
           {view.scores[seat] > 0 ? `+${view.scores[seat]}` : view.scores[seat]}
         </span>
         <span className="phone__wall">{view.wallCount} left</span>
+        {sound ? (
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            aria-label={sound.muted ? "Unmute" : "Mute"}
+            aria-pressed={!sound.muted}
+            onClick={() => sound.setMuted(!sound.muted)}
+          >
+            {sound.muted ? "🔇" : "🔊"}
+          </button>
+        ) : null}
       </header>
 
       <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>

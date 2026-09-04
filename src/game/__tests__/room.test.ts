@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CLAIM_WINDOW_MS,
+  HEARTBEAT_WRITE_MS,
+  SEAT_IDLE_MS,
   type Room,
   drain,
   identify,
@@ -8,6 +10,7 @@ import {
   newRoom,
   pendingHumanClaimants,
   syncSeats,
+  touch,
   viewFor,
 } from "../room";
 import { discard } from "../engine";
@@ -170,5 +173,64 @@ describe("draining", () => {
     }
     drain(room);
     expect(room.state.phase).not.toBe("claiming");
+  });
+});
+
+describe("presence", () => {
+  it("treats a quiet seat as away and lets the computer play it", () => {
+    const room = newRoom("TEST", undefined, 4);
+    seat(room, 0, "tok-east");
+    const now = Date.now();
+    expect(isHumanSeat(room, 0, now)).toBe(true);
+    // Long enough without a word and the table stops waiting.
+    const later = now + SEAT_IDLE_MS + 1;
+    expect(isHumanSeat(room, 0, later)).toBe(false);
+    expect(viewFor(room, "tok-east", later).players[0].occupant.away).toBe(true);
+  });
+
+  it("keeps the seat, so coming back reclaims it", () => {
+    const room = newRoom("TEST", undefined, 4);
+    seat(room, 0, "tok-east", "Kris");
+    const later = Date.now() + SEAT_IDLE_MS + 1;
+    expect(room.seats[0].kind).toBe("human");
+    expect(touch(room, "tok-east", later)).toBe(true);
+    expect(isHumanSeat(room, 0, later)).toBe(true);
+    expect(viewFor(room, "tok-east", later).players[0].occupant.name).toBe("Kris");
+  });
+
+  it("only writes a heartbeat once it has gone stale", () => {
+    const room = newRoom("TEST", undefined, 4);
+    const now = Date.now();
+    room.seats[0] = { kind: "human", name: "Kris", token: "tok", lastSeen: now };
+    // A poll a second later is not worth a write.
+    expect(touch(room, "tok", now + 1000)).toBe(false);
+    expect(touch(room, "tok", now + HEARTBEAT_WRITE_MS + 1)).toBe(true);
+  });
+
+  it("ignores an unknown token", () => {
+    const room = newRoom("TEST", undefined, 4);
+    seat(room, 0, "tok-east");
+    expect(touch(room, "someone-else", Date.now())).toBe(false);
+    expect(touch(room, null, Date.now())).toBe(false);
+  });
+
+  it("plays on when everyone has wandered off", () => {
+    const room = newRoom("TEST", undefined, 12);
+    seat(room, 0, "tok-east");
+    const later = Date.now() + SEAT_IDLE_MS + 1;
+    // Nobody is present, but the game has started, so it does not freeze.
+    expect(drain(room, later)).toBe(true);
+    expect(["handOver", "gameOver"]).toContain(room.state.phase);
+  });
+
+  it("does not wait on an absent seat's claim", () => {
+    const room = newRoom("TEST", undefined, 21);
+    for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    drain(room);
+    const dealer = room.state.dealer;
+    room.state = discard(room.state, dealer, room.state.players[dealer].hand[0].id);
+    if (room.state.phase !== "claiming") return;
+    const later = Date.now() + SEAT_IDLE_MS + 1;
+    expect(pendingHumanClaimants(room, later)).toEqual([]);
   });
 });
