@@ -8,8 +8,11 @@ import {
   identify,
   isHumanSeat,
   mayDeal,
+  mayRegroup,
   newRoom,
   pendingHumanClaimants,
+  returnToLobby,
+  shouldRegroup,
   startPlay,
   syncSeats,
   touch,
@@ -184,6 +187,57 @@ describe("lobby", () => {
     seat(room, 0, "tok-0");
     startPlay(room);
     expect(mayDeal(room, "tok-table")).toBe(false);
+  });
+
+  it("marks a hand dealt to one person as a warm-up, and a real table not", () => {
+    const solo = newRoom("TEST", undefined, 5, "k");
+    seat(solo, 0, "tok-0");
+    startPlay(solo);
+    expect(solo.warmup).toBe(true);
+
+    const full = dealt("TEST", 5, [0, 1]);
+    expect(full.warmup).toBe(false);
+  });
+
+  it("offers to regroup once somebody joins the warm-up, and not before", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    seat(room, 0, "tok-0");
+    startPlay(room);
+    expect(shouldRegroup(room)).toBe(false);
+    expect(viewFor(room, "tok-0").canRegroup).toBe(false);
+
+    seat(room, 2, "tok-2");
+    expect(shouldRegroup(room)).toBe(true);
+    expect(viewFor(room, "tok-0").canRegroup).toBe(true);
+    // The newcomer sees the offer too — either of them can take it.
+    expect(viewFor(room, "tok-2").canRegroup).toBe(true);
+  });
+
+  it("never lets a player regroup a real four-person game", () => {
+    const room = dealt("TEST", 5, [0, 1, 2, 3]);
+    expect(room.warmup).toBe(false);
+    expect(mayRegroup(room, "tok-0")).toBe(false);
+    expect(shouldRegroup(room)).toBe(false);
+  });
+
+  it("gives the regroup to the table when there is one", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    seat(room, 0, "tok-0");
+    room.table = { token: "tok-table", lastSeen: Date.now() };
+    startPlay(room);
+    seat(room, 1, "tok-1");
+    expect(mayRegroup(room, "tok-table")).toBe(true);
+    expect(mayRegroup(room, "tok-0")).toBe(false);
+  });
+
+  it("clears the warm-up on the way back to the lobby", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    seat(room, 0, "tok-0");
+    startPlay(room);
+    returnToLobby(room, newRoom("TEST", undefined, 9, "k").state);
+    expect(room.warmup).toBe(false);
+    expect(room.started).toBe(false);
+    expect(mayRegroup(room, "tok-0")).toBe(false);
   });
 
   it("reports open seats as open until the deal, and computer-played after", () => {

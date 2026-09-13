@@ -9,6 +9,7 @@ import {
   identify,
   isHumanSeat,
   mayDeal,
+  mayRegroup,
   newRoom,
   openClaimWindow,
   returnToLobby,
@@ -45,10 +46,23 @@ function secretMatches(supplied: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+/**
+ * The word that opens a room when the deployment has not set one.
+ *
+ * Three letters, said aloud across a table, and public by definition — a speed
+ * bump against a passer-by opening rooms on the deployment, not a secret. Set
+ * MAHJONG_ROOM_PASSWORD to replace it; a configured word is never echoed back
+ * to the browser, only this default is.
+ */
+export const DEFAULT_ROOM_PASSWORD = "mah";
+
+/** The default is safe to show on screen; a word the deployment chose is not. */
+export function suggestedPassword(): string | null {
+  return process.env.MAHJONG_ROOM_PASSWORD ? null : DEFAULT_ROOM_PASSWORD;
+}
+
 function passwordMatches(supplied: string): boolean {
-  const expected = process.env.MAHJONG_ROOM_PASSWORD ?? "";
-  if (!expected) throw new RoomError("Multiplayer is not configured on this deployment", 503);
-  return secretMatches(supplied, expected);
+  return secretMatches(supplied, process.env.MAHJONG_ROOM_PASSWORD || DEFAULT_ROOM_PASSWORD);
 }
 
 /**
@@ -61,8 +75,9 @@ function newJoinKey(): string {
   return randomBytes(18).toString("base64url");
 }
 
+/** Always on now that a room opens with a built-in word when none is set. */
 export function multiplayerEnabled(): boolean {
-  return Boolean(process.env.MAHJONG_ROOM_PASSWORD);
+  return true;
 }
 
 async function load(id: string): Promise<Room> {
@@ -214,6 +229,7 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
 
 export type TableCommand =
   | { type: "deal" }
+  | { type: "regroup" }
   | { type: "nextHand" }
   | { type: "restart" }
   | { type: "redeal" }
@@ -234,7 +250,10 @@ export async function control(
   const room = await mutate(id, (r, now) => {
     const isTable = r.table !== null && r.table.token === token;
     if (isTable) r.table!.lastSeen = now;
-    else if (!(command.type === "deal" && mayDeal(r, token))) {
+    else if (
+      !(command.type === "deal" && mayDeal(r, token)) &&
+      !(command.type === "regroup" && mayRegroup(r, token))
+    ) {
       throw new RoomError("Not the table", 403);
     }
     switch (command.type) {
@@ -243,6 +262,15 @@ export async function control(
         if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
         startPlay(r, now);
         break;
+      // Abandon a solo warm-up now that somebody has turned up: everyone back
+      // to the seating screen, and the practice scores do not count.
+      case "regroup": {
+        if (!r.warmup) throw new RoomError("This is not a warm-up game", 409);
+        const fresh = newRoom(r.id, r.state.config, Date.now(), r.joinKey);
+        returnToLobby(r, fresh.state);
+        syncSeats(r);
+        break;
+      }
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
         r.state = nextHand(r.state);

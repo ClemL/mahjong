@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 interface Status {
   enabled: boolean;
   persistent: boolean;
+  /** The built-in word, when this deployment has not set one of its own. */
+  suggestedPassword: string | null;
   deployment: { environment: string; commit: string; branch: string };
   variables: Record<string, boolean>;
 }
@@ -31,6 +33,8 @@ export default function MultiplayerPage() {
       .then((s) => {
         setStatus(s);
         setStatusError(null);
+        // Nothing to look up or type when the deployment uses the built-in word.
+        if (s.suggestedPassword) setPassword(s.suggestedPassword);
       })
       .catch((e: Error) => setStatusError(e.message));
   }, []);
@@ -69,6 +73,14 @@ export default function MultiplayerPage() {
           <p className="lobby__error">
             Could not reach the multiplayer service — {statusError}. This is a server problem, not
             a missing setting.
+          </p>
+        ) : null}
+
+        {status?.suggestedPassword ? (
+          <p className="lobby__warn">
+            This deployment has no <code>MAHJONG_ROOM_PASSWORD</code>, so rooms open with the
+            built-in word <b>{status.suggestedPassword}</b> — filled in below. Set the variable to
+            pick your own.
           </p>
         ) : null}
 
@@ -113,11 +125,15 @@ export default function MultiplayerPage() {
         <div className="lobby__form">
           <label className="field">
             <span className="field__label">Table password</span>
+            {/* Said out loud around a table, not typed in private — masking it
+                only produces typos nobody can see. */}
             <input
               className="field__input"
-              type="password"
+              type="text"
               value={password}
-              autoComplete="current-password"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>

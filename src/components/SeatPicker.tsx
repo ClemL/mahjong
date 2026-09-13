@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { RoomView } from "@/game/room";
+import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 
 interface Props {
@@ -17,9 +18,20 @@ interface Props {
 export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
   const [choice, setChoice] = useState<Seat | "table" | null>(null);
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
 
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
+  const namesInUse = view.players
+    .map((p) => p.occupant.name)
+    .filter((n): n is string => n !== null);
+
+  // Arrive with a name already in the box, so sitting down is one tap. It is
+  // seeded once per visit rather than per render, or every keystroke elsewhere
+  // in the form would deal a new one.
+  const [name, setName] = useState(() => suggestName(namesInUse));
+  const reroll = useMemo(
+    () => () => setName(suggestName([...namesInUse, name])),
+    [namesInUse, name],
+  );
 
   return (
     <div className="lobby">
@@ -78,13 +90,24 @@ export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
         {choice !== null && choice !== "table" ? (
           <label className="field">
             <span className="field__label">Your name</span>
-            <input
-              className="field__input"
-              value={name}
-              maxLength={16}
-              placeholder={`Seat ${(choice as number) + 1}`}
-              onChange={(e) => setName(e.target.value)}
-            />
+            <span className="field__row">
+              <input
+                className="field__input"
+                value={name}
+                maxLength={16}
+                placeholder={`Seat ${(choice as number) + 1}`}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                title="Suggest another name"
+                aria-label="Suggest another name"
+                onClick={reroll}
+              >
+                ↻
+              </button>
+            </span>
           </label>
         ) : null}
         {scanned ? null : (
@@ -92,9 +115,11 @@ export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
             <span className="field__label">Table password</span>
             <input
               className="field__input"
-              type="password"
+              type="text"
               value={password}
-              autoComplete="current-password"
+              autoComplete="off"
+              autoCapitalize="none"
+              spellCheck={false}
               onChange={(e) => setPassword(e.target.value)}
             />
           </label>
