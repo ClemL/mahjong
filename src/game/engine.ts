@@ -117,6 +117,11 @@ export interface GameOptions {
   config?: RuleConfig;
   /** Seat controlled by the player. Defaults to East. */
   humanSeat?: Seat;
+  /**
+   * Deal the first hand straight away. A multiplayer room opens undealt and
+   * waits in its lobby until everyone has sat down, so it passes `false`.
+   */
+  deal?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +214,7 @@ export function createGame(options: GameOptions = {}): GameState {
     log: [],
     logSeq: 0,
   };
-  return startHand(state);
+  return options.deal === false ? state : startHand(state);
 }
 
 /** Deal a fresh hand with the current dealer and round wind. */

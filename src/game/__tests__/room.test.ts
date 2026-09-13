@@ -7,8 +7,10 @@ import {
   drain,
   identify,
   isHumanSeat,
+  mayDeal,
   newRoom,
   pendingHumanClaimants,
+  startPlay,
   syncSeats,
   touch,
   viewFor,
@@ -19,6 +21,14 @@ import type { Seat } from "../tiles";
 function seat(room: Room, index: Seat, token: string, name = "Someone"): void {
   room.seats[index] = { kind: "human", name, token, lastSeen: Date.now() };
   syncSeats(room);
+}
+
+/** A room past its lobby, which is where most of these tests start. */
+function dealt(id: string, seed: number, seats: Seat[]): Room {
+  const room = newRoom(id, undefined, seed, "join-key");
+  for (const s of seats) seat(room, s, `tok-${s}`);
+  startPlay(room);
+  return room;
 }
 
 describe("seating", () => {
@@ -55,14 +65,15 @@ describe("seating", () => {
 describe("redaction", () => {
   let room: Room;
   beforeEach(() => {
-    room = newRoom("TEST", undefined, 7);
-    seat(room, 0, "tok-east", "Kris");
+    room = newRoom("TEST", undefined, 7, "join-key");
+    seat(room, 0, "tok-0", "Kris");
     seat(room, 1, "tok-south", "Srini");
     room.table = { token: "tok-table", lastSeen: Date.now() };
+    startPlay(room);
   });
 
   it("shows a player their own tiles and nobody else's", () => {
-    const view = viewFor(room, "tok-east");
+    const view = viewFor(room, "tok-0");
     expect(view.you).toEqual({ role: "player", seat: 0 });
     const mine = view.players[0];
     expect(mine.hand.map((t) => t.code)).toEqual(room.state.players[0].hand.map((t) => t.code));
@@ -85,7 +96,7 @@ describe("redaction", () => {
   });
 
   it("never sends the wall", () => {
-    for (const token of ["tok-east", "tok-table", null]) {
+    for (const token of ["tok-0", "tok-table", null]) {
       const view = viewFor(room, token);
       expect(view.wallCount).toBeGreaterThan(0);
       expect(JSON.stringify(view)).not.toContain('"wall"');
@@ -100,29 +111,102 @@ describe("redaction", () => {
     expect(view.players.every((p) => p.hand.every((t) => t.code === "back"))).toBe(true);
   });
 
+  it("gives the join link to the table and the players, never a spectator", () => {
+    expect(viewFor(room, "tok-table").joinKey).toBe("join-key");
+    expect(viewFor(room, "tok-0").joinKey).toBe("join-key");
+    // Anyone at all can open a room URL, so a spectator must not be handed the
+    // secret that lets them sit down.
+    expect(viewFor(room, null).joinKey).toBeNull();
+    expect(JSON.stringify(viewFor(room, null))).not.toContain("join-key");
+  });
+
   it("only reveals the drawn tile to the seat holding it", () => {
     const dealer = room.state.dealer;
     room.state.turn = dealer;
-    expect(viewFor(room, dealer === 0 ? "tok-east" : "tok-south").drawnTileId).toBe(
+    expect(viewFor(room, dealer === 0 ? "tok-0" : "tok-south").drawnTileId).toBe(
       dealer === 0 || dealer === 1 ? room.state.drawnTileId : null,
     );
     expect(viewFor(room, "tok-table").drawnTileId).toBeNull();
   });
 });
 
+describe("lobby", () => {
+  it("deals nothing until somebody deals", () => {
+    const room = newRoom("TEST", undefined, 3, "k");
+    expect(room.started).toBe(false);
+    expect(room.state.players.every((p) => p.hand.length === 0)).toBe(true);
+    expect(room.state.wall).toHaveLength(0);
+  });
+
+  it("does not start play while people are still arriving", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    // The whole point: whoever connects first must not kick off a hand that
+    // the computer then plays on everyone else's behalf while they join.
+    seat(room, 2, "tok-west");
+    expect(drain(room)).toBe(false);
+    expect(room.state.players.every((p) => p.discards.length === 0)).toBe(true);
+
+    for (const s of [0, 1, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    expect(room.state.players.every((p) => p.hand.length === 0)).toBe(true);
+  });
+
+  it("deals everyone a full hand when play starts", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    startPlay(room);
+    expect(room.started).toBe(true);
+    expect(room.state.handNumber).toBe(1);
+    // The dealer draws first, so one seat is holding fourteen.
+    expect(room.state.players.map((p) => p.hand.length + p.melds.length * 3).sort()).toEqual([
+      13, 13, 13, 14,
+    ]);
+    expect(room.state.players.every((p) => p.discards.length === 0)).toBe(true);
+  });
+
+  it("lets the table deal, and a player only when there is no table", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    seat(room, 0, "tok-0");
+    expect(mayDeal(room, "tok-0")).toBe(true);
+    expect(mayDeal(room, "nobody")).toBe(false);
+
+    room.table = { token: "tok-table", lastSeen: Date.now() };
+    expect(mayDeal(room, "tok-table")).toBe(true);
+    // With a tablet on the table the button lives there, not in four pockets.
+    expect(mayDeal(room, "tok-0")).toBe(false);
+  });
+
+  it("gives the tablet the deal before anyone sits, and takes it back after", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    room.table = { token: "tok-table", lastSeen: Date.now() };
+    // Holding the deal is a role, so the empty table still shows the button —
+    // greyed out, with the seat count saying why.
+    expect(mayDeal(room, "tok-table")).toBe(true);
+    seat(room, 0, "tok-0");
+    startPlay(room);
+    expect(mayDeal(room, "tok-table")).toBe(false);
+  });
+
+  it("reports open seats as open until the deal, and computer-played after", () => {
+    const room = newRoom("TEST", undefined, 5, "k");
+    seat(room, 0, "tok-0");
+    expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("open");
+    startPlay(room);
+    expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("ai");
+  });
+});
+
 describe("draining", () => {
   it("does not start play until somebody sits down", () => {
-    const room = newRoom("TEST", undefined, 3);
+    const room = newRoom("TEST", undefined, 3, "k");
+    startPlay(room);
     const before = JSON.stringify(room.state);
-    // Otherwise a room plays itself out between being opened and anyone
-    // joining, and the first to arrive finds a finished hand.
+    // A dealt room with every chair freed has nobody left to play for.
     expect(drain(room)).toBe(false);
     expect(JSON.stringify(room.state)).toBe(before);
   });
 
   it("plays the computer seats up to the first person's turn", () => {
-    const room = newRoom("TEST", undefined, 5);
-    seat(room, 2, "tok-west");
+    const room = dealt("TEST", 5, [2]);
     drain(room);
     if (room.state.phase === "action") {
       expect(room.state.turn).toBe(2);
@@ -131,7 +215,9 @@ describe("draining", () => {
   });
 
   it("stops when it reaches a person's turn", () => {
-    const room = newRoom("TEST", undefined, 11);
+    const room = newRoom("TEST", undefined, 11, "k");
+    seat(room, 0, "tok");
+    startPlay(room);
     seat(room, room.state.dealer, "tok");
     drain(room);
     expect(room.state.phase).not.toBe("handOver");
@@ -139,9 +225,8 @@ describe("draining", () => {
   });
 
   it("waits for a person to answer a claim, then moves on when the window closes", () => {
-    const room = newRoom("TEST", undefined, 21);
     // Seat everyone so a discard always needs answers from people.
-    for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    const room = dealt("TEST", 21, [0, 1, 2, 3]);
     drain(room);
 
     // Drive to a discard by hand so a claim window opens.
@@ -162,8 +247,7 @@ describe("draining", () => {
   });
 
   it("records a claim answer and resolves once everyone has replied", () => {
-    const room = newRoom("TEST", undefined, 33);
-    for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    const room = dealt("TEST", 33, [0, 1, 2, 3]);
     drain(room);
     const dealer = room.state.dealer;
     room.state = discard(room.state, dealer, room.state.players[dealer].hand[0].id);
@@ -178,28 +262,27 @@ describe("draining", () => {
 
 describe("presence", () => {
   it("treats a quiet seat as away and lets the computer play it", () => {
-    const room = newRoom("TEST", undefined, 4);
-    seat(room, 0, "tok-east");
+    const room = dealt("TEST", 4, [0]);
     const now = Date.now();
     expect(isHumanSeat(room, 0, now)).toBe(true);
     // Long enough without a word and the table stops waiting.
     const later = now + SEAT_IDLE_MS + 1;
     expect(isHumanSeat(room, 0, later)).toBe(false);
-    expect(viewFor(room, "tok-east", later).players[0].occupant.away).toBe(true);
+    expect(viewFor(room, "tok-0", later).players[0].occupant.away).toBe(true);
   });
 
   it("keeps the seat, so coming back reclaims it", () => {
-    const room = newRoom("TEST", undefined, 4);
-    seat(room, 0, "tok-east", "Kris");
+    const room = dealt("TEST", 4, [0]);
+    (room.seats[0] as { name: string }).name = "Kris";
     const later = Date.now() + SEAT_IDLE_MS + 1;
     expect(room.seats[0].kind).toBe("human");
-    expect(touch(room, "tok-east", later)).toBe(true);
+    expect(touch(room, "tok-0", later)).toBe(true);
     expect(isHumanSeat(room, 0, later)).toBe(true);
-    expect(viewFor(room, "tok-east", later).players[0].occupant.name).toBe("Kris");
+    expect(viewFor(room, "tok-0", later).players[0].occupant.name).toBe("Kris");
   });
 
   it("only writes a heartbeat once it has gone stale", () => {
-    const room = newRoom("TEST", undefined, 4);
+    const room = newRoom("TEST", undefined, 4, "k");
     const now = Date.now();
     room.seats[0] = { kind: "human", name: "Kris", token: "tok", lastSeen: now };
     // A poll a second later is not worth a write.
@@ -208,15 +291,13 @@ describe("presence", () => {
   });
 
   it("ignores an unknown token", () => {
-    const room = newRoom("TEST", undefined, 4);
-    seat(room, 0, "tok-east");
+    const room = dealt("TEST", 4, [0]);
     expect(touch(room, "someone-else", Date.now())).toBe(false);
     expect(touch(room, null, Date.now())).toBe(false);
   });
 
   it("plays on when everyone has wandered off", () => {
-    const room = newRoom("TEST", undefined, 12);
-    seat(room, 0, "tok-east");
+    const room = dealt("TEST", 12, [0]);
     const later = Date.now() + SEAT_IDLE_MS + 1;
     // Nobody is present, but the game has started, so it does not freeze.
     expect(drain(room, later)).toBe(true);
@@ -224,8 +305,7 @@ describe("presence", () => {
   });
 
   it("does not wait on an absent seat's claim", () => {
-    const room = newRoom("TEST", undefined, 21);
-    for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
+    const room = dealt("TEST", 21, [0, 1, 2, 3]);
     drain(room);
     const dealer = room.state.dealer;
     room.state = discard(room.state, dealer, room.state.players[dealer].hand[0].id);

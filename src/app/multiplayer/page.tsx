@@ -44,9 +44,11 @@ export default function MultiplayerPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ password }),
       });
-      const body = (await response.json()) as { id?: string; error?: string };
+      const body = (await response.json()) as { id?: string; joinKey?: string; error?: string };
       if (!response.ok || !body.id) setError(body.error ?? "Could not open a room");
-      else router.push(`/room/${body.id}`);
+      // Carry the room's own join key through, so whoever opened the room can
+      // take the Table seat without typing the deployment password again.
+      else router.push(`/room/${body.id}${body.joinKey ? `?k=${encodeURIComponent(body.joinKey)}` : ""}`);
     } catch {
       setError("Could not reach the server");
     } finally {

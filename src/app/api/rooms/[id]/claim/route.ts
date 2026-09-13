@@ -13,13 +13,19 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const body = (await request.json()) as {
       seat?: number | "table";
       password?: string;
+      key?: string;
       name?: string;
     };
     const seat = body.seat === "table" ? "table" : ((body.seat ?? -1) as Seat);
     if (seat !== "table" && ![0, 1, 2, 3].includes(seat)) {
       return NextResponse.json({ error: "Pick a seat" }, { status: 400 });
     }
-    const result = await claimSeat(id, { seat, password: body.password ?? "", name: body.name });
+    const result = await claimSeat(id, {
+      seat,
+      password: body.password,
+      key: body.key,
+      name: body.name,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RoomError) {
