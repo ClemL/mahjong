@@ -5,10 +5,14 @@ import {
   type Room,
   type RoomView,
   drain,
+  hasAnyPlayer,
   identify,
   isHumanSeat,
+  mayDeal,
   newRoom,
   openClaimWindow,
+  returnToLobby,
+  startPlay,
   syncSeats,
   touch,
   viewFor,
@@ -34,13 +38,27 @@ export function newRoomCode(length = 4): string {
   return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
 }
 
-/** Constant-time comparison, so the shared password cannot be probed by timing. */
-function passwordMatches(supplied: string): boolean {
-  const expected = process.env.MAHJONG_ROOM_PASSWORD ?? "";
-  if (!expected) throw new RoomError("Multiplayer is not configured on this deployment", 503);
+/** Constant-time comparison, so a shared secret cannot be probed by timing. */
+function secretMatches(supplied: string, expected: string): boolean {
   const a = Buffer.from(supplied.padEnd(64).slice(0, 64));
   const b = Buffer.from(expected.padEnd(64).slice(0, 64));
   return timingSafeEqual(a, b);
+}
+
+function passwordMatches(supplied: string): boolean {
+  const expected = process.env.MAHJONG_ROOM_PASSWORD ?? "";
+  if (!expected) throw new RoomError("Multiplayer is not configured on this deployment", 503);
+  return secretMatches(supplied, expected);
+}
+
+/**
+ * The secret a scanned join link carries. It is per room and disposable, which
+ * the deployment password is not — putting that in a URL would leave it in
+ * browser history, in a screenshot, and readable by anyone who photographs the
+ * tablet, for every room that deployment will ever host.
+ */
+function newJoinKey(): string {
+  return randomBytes(18).toString("base64url");
 }
 
 export function multiplayerEnabled(): boolean {
@@ -75,11 +93,14 @@ async function mutate(
   throw new RoomError("The room changed while you were acting — try again", 409);
 }
 
-export async function createRoom(password: string): Promise<{ id: string }> {
+export async function createRoom(password: string): Promise<{ id: string; joinKey: string }> {
   if (!passwordMatches(password)) throw new RoomError("Wrong password", 401);
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const id = newRoomCode();
-    if (await roomStore().create(newRoom(id))) return { id };
+    const joinKey = newJoinKey();
+    if (await roomStore().create(newRoom(id, undefined, Date.now(), joinKey))) {
+      return { id, joinKey };
+    }
   }
   throw new RoomError("Could not allocate a room code", 500);
 }
@@ -104,11 +125,24 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
   return viewFor(room, token, now);
 }
 
+/**
+ * Prove you belong at this table: either the scanned join link's key, or the
+ * deployment password typed by hand for anyone who could not scan it.
+ */
+async function admitted(id: string, input: { password?: string; key?: string }): Promise<void> {
+  if (input.key) {
+    const room = await load(id);
+    if (room.joinKey && secretMatches(input.key, room.joinKey)) return;
+    throw new RoomError("That join link is no longer good for this room", 401);
+  }
+  if (!passwordMatches(input.password ?? "")) throw new RoomError("Wrong password", 401);
+}
+
 export async function claimSeat(
   id: string,
-  input: { seat: Seat | "table"; password: string; name?: string },
+  input: { seat: Seat | "table"; password?: string; key?: string; name?: string },
 ): Promise<{ token: string; view: RoomView }> {
-  if (!passwordMatches(input.password)) throw new RoomError("Wrong password", 401);
+  await admitted(id, input);
   const token = randomUUID();
   const room = await mutate(id, (r, now) => {
     if (input.seat === "table") {
@@ -179,6 +213,7 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
 }
 
 export type TableCommand =
+  | { type: "deal" }
   | { type: "nextHand" }
   | { type: "restart" }
   | { type: "redeal" }
@@ -186,16 +221,28 @@ export type TableCommand =
   | { type: "freeSeat"; seat: Seat }
   | { type: "forcePass" };
 
-/** Commands only the table device may issue. */
+/**
+ * Commands the table device issues. The one exception is the opening deal,
+ * which a seated player may press when there is no tablet in the room —
+ * otherwise a group playing on phones alone could never start.
+ */
 export async function control(
   id: string,
   token: string,
   command: TableCommand,
 ): Promise<RoomView> {
   const room = await mutate(id, (r, now) => {
-    if (!r.table || r.table.token !== token) throw new RoomError("Not the table", 403);
-    r.table.lastSeen = now;
+    const isTable = r.table !== null && r.table.token === token;
+    if (isTable) r.table!.lastSeen = now;
+    else if (!(command.type === "deal" && mayDeal(r, token))) {
+      throw new RoomError("Not the table", 403);
+    }
     switch (command.type) {
+      case "deal":
+        if (r.started) throw new RoomError("The hand is already dealt", 409);
+        if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
+        startPlay(r, now);
+        break;
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
         r.state = nextHand(r.state);
@@ -204,14 +251,11 @@ export async function control(
         r.state = startHand({ ...r.state, phase: "handOver" });
         break;
       case "restart": {
-        const seats = r.seats;
-        const table = r.table;
-        const fresh = newRoom(r.id, r.state.config);
-        r.state = fresh.state;
-        r.seats = seats;
-        r.table = table;
-        r.claimResponses = {};
-        r.claimDeadline = null;
+        // Everyone keeps their chair and the scores go back to zero, but the
+        // tiles are not thrown again until somebody deals — the same gathering
+        // screen the room opened on.
+        const fresh = newRoom(r.id, r.state.config, Date.now(), r.joinKey);
+        returnToLobby(r, fresh.state);
         syncSeats(r);
         break;
       }

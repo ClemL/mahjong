@@ -9,10 +9,12 @@ interface Props {
   onClaim: (seat: Seat | "table", password: string, name: string) => Promise<void>;
   busy: boolean;
   error: string | null;
+  /** Set when we arrived by scanning the table's QR code. */
+  scanned: boolean;
 }
 
 /** Pick a seat, then prove you belong at the table. */
-export function SeatPicker({ view, onClaim, busy, error }: Props) {
+export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
   const [choice, setChoice] = useState<Seat | "table" | null>(null);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -25,7 +27,9 @@ export function SeatPicker({ view, onClaim, busy, error }: Props) {
         Room <span className="lobby__code">{view.roomId}</span>
       </h1>
       <p className="lobby__lead">
-        Take a seat. Any seat still open when play starts is filled by the computer.
+        {scanned
+          ? "Take a seat. The table deals once everyone is down."
+          : "Take a seat. Any seat still open when the table deals is played by the computer."}
       </p>
 
       <div className="lobby__seats">
@@ -83,16 +87,18 @@ export function SeatPicker({ view, onClaim, busy, error }: Props) {
             />
           </label>
         ) : null}
-        <label className="field">
-          <span className="field__label">Table password</span>
-          <input
-            className="field__input"
-            type="password"
-            value={password}
-            autoComplete="current-password"
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+        {scanned ? null : (
+          <label className="field">
+            <span className="field__label">Table password</span>
+            <input
+              className="field__input"
+              type="password"
+              value={password}
+              autoComplete="current-password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+        )}
         <button type="submit" className="btn btn--primary" disabled={choice === null || busy}>
           {choice === "table" ? "Open the table" : "Sit down"}
         </button>

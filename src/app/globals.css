@@ -1965,3 +1965,255 @@ a.btn {
   background: var(--chip-neg);
   color: var(--ink);
 }
+
+/* ------------------------------------------------------- gathering screen */
+
+/* The tablet before a hand exists. Two jobs only: how to join, and who has. */
+.gather {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2.5vh, 28px);
+  width: 100%;
+  /* Fills the tablet: this is read from across a table, not from arm's length,
+     so the code and the seats get all the room the screen has. .app already
+     supplies the side and bottom insets. */
+  flex: 1;
+  padding-top: env(safe-area-inset-top);
+}
+
+.gather__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.gather__label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.gather__code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: clamp(40px, 9vw, 76px);
+  line-height: 1;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+}
+
+.gather__lead {
+  margin: 0;
+  flex: 1 1 240px;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.gather__body {
+  display: grid;
+  grid-template-columns: minmax(220px, 26%) 1fr;
+  gap: clamp(14px, 2vw, 26px);
+  align-items: stretch;
+  flex: 1;
+  min-height: 0;
+}
+
+.gather__join {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: clamp(12px, 2vh, 22px);
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+}
+
+.qr {
+  width: 100%;
+  max-width: min(300px, 34vh);
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+
+.gather__url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  text-align: center;
+}
+
+.gather__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+.gather__seats {
+  display: grid;
+  /* Two by two, so each card is big enough to read at table distance rather
+     than four thin columns strung across the top of the screen. */
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
+  gap: clamp(10px, 1.6vw, 18px);
+}
+
+.gather__seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: clamp(12px, 2vh, 24px) 10px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  text-align: center;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.gather__seat--here {
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.gather__wind {
+  font-size: clamp(30px, 5vh, 52px);
+  line-height: 1;
+  color: var(--gold);
+}
+
+.gather__seatname {
+  font-weight: 700;
+  font-size: clamp(16px, 2.6vh, 26px);
+}
+
+.gather__seatmeta {
+  font-size: clamp(11px, 1.4vh, 13px);
+  color: var(--ink-dim);
+}
+
+/* Arrival is marked by a word as well as a colour, so it reads the same to
+   anyone who cannot tell the two card treatments apart. */
+.gather__state {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--raise-1);
+  color: var(--ink-dim);
+}
+
+.gather__seat--here .gather__state {
+  background: var(--chip-pos);
+  color: var(--ink);
+}
+
+.gather__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.gather__count {
+  flex: 1 1 auto;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.btn--deal {
+  font-size: 17px;
+  padding: 12px 34px;
+  border-radius: 10px;
+}
+
+/* On a phone the seats matter more than the QR — you are already in. */
+@media (max-width: 760px) {
+  .gather__body {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .gather__join {
+    order: 2;
+  }
+
+  .qr {
+    max-width: 200px;
+  }
+
+  .gather__seats {
+    grid-auto-rows: auto;
+  }
+}
+
+/* ------------------------------------------------------------ resume gate */
+
+.resume {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--backdrop);
+}
+
+.resume__card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: 380px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--gold);
+  background: var(--modal-bg);
+}
+
+.resume__title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.resume__body {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gather__seat {
+    transition: none;
+  }
+}
+
+/* A phone belongs to someone already seated: the seats get the screen, and the
+   join code folds away until they actually want to invite somebody. */
+.gather__body--seats {
+  grid-template-columns: 1fr;
+}
+
+.gather__invite > summary {
+  cursor: pointer;
+  padding: 8px 2px;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.gather__invite[open] > summary {
+  margin-bottom: 8px;
+}

@@ -25,7 +25,10 @@ const LIMITS: Record<LimitKind, { tokens: number; window: `${number} ${"s" | "m"
   // Opening rooms is rare and each one costs storage.
   create: { tokens: 5, window: "10 m" },
   // The only endpoint that checks the password, so this is the brute-force gate.
-  claim: { tokens: 10, window: "10 m" },
+  // Roomy enough for a table and four phones sharing one WiFi address — they
+  // all arrive from the same IP — while still far too tight to guess a room
+  // code and password by hand.
+  claim: { tokens: 20, window: "10 m" },
   // Generous: a fast player plus polling should never reach it.
   act: { tokens: 120, window: "1 m" },
 };

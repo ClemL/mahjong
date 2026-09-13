@@ -1,12 +1,14 @@
 "use client";
 
-import { use, useCallback } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { useRoom } from "@/hooks/useRoom";
 import { useRoomSound } from "@/hooks/useRoomSound";
 import { SeatPicker } from "@/components/SeatPicker";
 import { PhoneView } from "@/components/PhoneView";
 import { TableView } from "@/components/TableView";
+import { TableLobby } from "@/components/TableLobby";
 import { FullRoomView } from "@/components/FullRoomView";
+import { ResumeGate } from "@/components/ResumeGate";
 import { primeAudio } from "@/game/sound";
 import type { Seat } from "@/game/tiles";
 
@@ -17,12 +19,25 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const { view } = api;
   const sound = useRoomSound(view);
 
+  // The key a scanned join link carries. It is read once and then stripped from
+  // the address bar, so it does not sit in history or get shared by accident
+  // when somebody passes the URL along.
+  const [joinKey, setJoinKey] = useState<string | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const key = url.searchParams.get("k");
+    if (!key) return;
+    setJoinKey(key);
+    url.searchParams.delete("k");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, []);
+
   const claim = useCallback(
     async (seat: Seat | "table", password: string, name: string) => {
       const response = await fetch(`/api/rooms/${roomId}/claim`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ seat, password, name }),
+        body: JSON.stringify({ seat, password, key: joinKey, name }),
       });
       const body = (await response.json()) as { token?: string; error?: string };
       if (response.ok && body.token) {
@@ -31,7 +46,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       }
       else throw new Error(body.error ?? "Could not take that seat");
     },
-    [roomId, api],
+    [roomId, api, joinKey],
   );
 
   if (!view) {
@@ -49,6 +64,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           view={view}
           busy={api.busy}
           error={api.error}
+          scanned={joinKey !== null}
           onClaim={async (seat, password, name) => {
             try {
               await claim(seat, password, name);
@@ -58,6 +74,17 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
             }
           }}
         />
+      </main>
+    );
+  }
+
+  // Nothing is dealt yet: everyone sees the gathering screen, and whoever holds
+  // the deal — the tablet, or a player when there is no tablet — sees the button.
+  if (!view.started) {
+    return (
+      <main className={view.you.role === "table" ? "app app--table" : "app"}>
+        <TableLobby api={api} view={view} />
+        {api.error ? <p className="lobby__error">{api.error}</p> : null}
       </main>
     );
   }
@@ -80,6 +107,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       ) : (
         <FullRoomView api={api} view={view} sound={sound} />
       )}
+      {api.stale ? (
+        <ResumeGate
+          seat={view.you.seat}
+          onResume={() => {
+            primeAudio();
+            api.resume();
+          }}
+        />
+      ) : null}
       {api.error ? <p className="lobby__error">{api.error}</p> : null}
     </main>
   );
