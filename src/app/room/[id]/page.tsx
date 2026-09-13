@@ -9,6 +9,7 @@ import { TableView } from "@/components/TableView";
 import { TableLobby } from "@/components/TableLobby";
 import { FullRoomView } from "@/components/FullRoomView";
 import { ResumeGate } from "@/components/ResumeGate";
+import { RegroupBanner } from "@/components/RegroupBanner";
 import { primeAudio } from "@/game/sound";
 import type { Seat } from "@/game/tiles";
 
@@ -92,6 +93,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   if (view.you.role === "table") {
     return (
       <main className="app app--table">
+        {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
         <TableView api={api} view={view} sound={sound} />
         {api.error ? <p className="lobby__error">{api.error}</p> : null}
       </main>
@@ -102,6 +104,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // their own hand; without one it has to show the whole table.
   return (
     <main className="app">
+      {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
       {view.tablePresent ? (
         <PhoneView api={api} view={view} sound={sound} />
       ) : (

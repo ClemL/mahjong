@@ -63,6 +63,12 @@ export interface Room {
    * rather than starting the moment the first phone connects.
    */
   started: boolean;
+  /**
+   * True when the hand was dealt with only one person at the table — a game
+   * against the computer while waiting for someone to show up. It is a real
+   * game, but the table offers to regroup once a second person sits down.
+   */
+  warmup: boolean;
   seats: Occupant[];
   table: TableDevice | null;
   state: GameState;
@@ -99,6 +105,12 @@ export interface RoomView {
   joinKey: string | null;
   /** Whether this viewer may deal: the table, or any player with no tablet. */
   canDeal: boolean;
+  /** True while a solo game against the computer is running. */
+  warmup: boolean;
+  /** Somebody new has sat down mid-warm-up, and this viewer can deal them in. */
+  canRegroup: boolean;
+  /** People with a name on a chair, however many of them are looking. */
+  seatedCount: number;
   phase: Phase;
   turn: Seat;
   dealer: Seat;
@@ -144,6 +156,7 @@ export function newRoom(
     updatedAt: Date.now(),
     joinKey,
     started: false,
+    warmup: false,
     seats: [{ kind: "open" }, { kind: "open" }, { kind: "open" }, { kind: "open" }],
     table: null,
     state,
@@ -160,6 +173,7 @@ export function newRoom(
  */
 export function startPlay(room: Room, now = Date.now()): void {
   room.started = true;
+  room.warmup = seatedCount(room) < 2;
   room.claimResponses = {};
   room.claimDeadline = null;
   room.state = startHand(room.state);
@@ -169,6 +183,7 @@ export function startPlay(room: Room, now = Date.now()): void {
 /** Back to the gathering screen with the same people, ready to deal again. */
 export function returnToLobby(room: Room, state: GameState): void {
   room.started = false;
+  room.warmup = false;
   room.state = state;
   room.claimResponses = {};
   room.claimDeadline = null;
@@ -185,9 +200,34 @@ export function isHumanSeat(room: Room, seat: Seat, now = Date.now()): boolean {
   return occupant.kind === "human" && !isAway(occupant, now);
 }
 
+/** How many chairs have a person's name on them, present or not. */
+export function seatedCount(room: Room): number {
+  return room.seats.filter((occupant) => occupant.kind === "human").length;
+}
+
 /** True once anybody has taken a seat, whether or not they are still present. */
 export function hasAnyPlayer(room: Room): boolean {
-  return room.seats.some((occupant) => occupant.kind === "human");
+  return seatedCount(room) > 0;
+}
+
+/**
+ * Somebody turned up while a solo game was running. The table offers to deal
+ * everyone in rather than leaving them to watch the computer play.
+ */
+export function shouldRegroup(room: Room): boolean {
+  return room.started && room.warmup && seatedCount(room) > 1;
+}
+
+/**
+ * Who may abandon a warm-up and go back to the seating screen. The table
+ * always may; a lone player may too, because a solo game usually has no tablet
+ * in it — but only while it is still the warm-up they started, so this can
+ * never reset a real four-person game.
+ */
+export function mayRegroup(room: Room, token: string | null): boolean {
+  if (!room.started || !room.warmup) return false;
+  const who = identify(room, token);
+  return who.role === "table" || (room.table === null && who.role === "player");
 }
 
 /** Mirror seat occupancy onto the engine, which decides who it may step. */
@@ -399,6 +439,9 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     started: room.started,
     joinKey: atTheTable ? room.joinKey : null,
     canDeal: mayDeal(room, token),
+    warmup: room.warmup,
+    canRegroup: shouldRegroup(room) && mayRegroup(room, token),
+    seatedCount: seatedCount(room),
     phase: state.phase,
     turn: state.turn,
     dealer: state.dealer,

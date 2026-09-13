@@ -4,7 +4,8 @@ process.env.MAHJONG_ROOM_PASSWORD = "lotus";
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const { RoomError, act, claimSeat, control, createRoom, readRoom } = await import("../rooms");
+const { DEFAULT_ROOM_PASSWORD, RoomError, act, claimSeat, control, createRoom, readRoom, suggestedPassword } =
+  await import("../rooms");
 
 async function room(): Promise<string> {
   return (await createRoom("lotus")).id;
@@ -191,6 +192,57 @@ describe("table control", () => {
     expect(restarted.started).toBe(false);
     expect(restarted.players.every((p) => p.handCount === 0)).toBe(true);
     expect((await control(id, table, { type: "deal" })).handNumber).toBe(1);
+  });
+});
+
+describe("the table password", () => {
+  it("keeps a configured word to itself", () => {
+    expect(suggestedPassword()).toBeNull();
+  });
+
+  it("falls back to a short word anyone can say aloud", async () => {
+    // Three letters, and public by design — there is nothing to look up.
+    expect(DEFAULT_ROOM_PASSWORD).toHaveLength(3);
+    delete process.env.MAHJONG_ROOM_PASSWORD;
+    try {
+      expect(suggestedPassword()).toBe(DEFAULT_ROOM_PASSWORD);
+      // Multiplayer works out of the box rather than answering 503.
+      const { id } = await createRoom(DEFAULT_ROOM_PASSWORD);
+      expect(id).toMatch(/^[A-Z2-9]{4}$/);
+      await expect(createRoom("lotus")).rejects.toMatchObject({ status: 401 });
+    } finally {
+      process.env.MAHJONG_ROOM_PASSWORD = "lotus";
+    }
+  });
+});
+
+describe("playing the computer while you wait", () => {
+  it("marks a solo deal as a warm-up and offers to regroup when someone joins", async () => {
+    const id = await room();
+    const { token } = await claimSeat(id, { seat: 0, password: "lotus", name: "Kris" });
+    const solo = await control(id, token, { type: "deal" });
+    expect(solo.warmup).toBe(true);
+    expect(solo.seatedCount).toBe(1);
+    expect(solo.canRegroup).toBe(false);
+
+    await claimSeat(id, { seat: 2, password: "lotus", name: "Srini" });
+    const joined = await readRoom(id, token);
+    expect(joined.canRegroup).toBe(true);
+
+    const back = await control(id, token, { type: "regroup" });
+    expect(back.started).toBe(false);
+    expect(back.warmup).toBe(false);
+    // Both chairs survive the regroup; only the practice hand is dropped.
+    expect(back.players[0].occupant.name).toBe("Kris");
+    expect(back.players[2].occupant.name).toBe("Srini");
+    expect(back.players.every((p) => p.handCount === 0)).toBe(true);
+  });
+
+  it("refuses to regroup a real game", async () => {
+    const { id, tokens, table } = await dealtRoom([0, 1, 2, 3]);
+    expect((await readRoom(id, tokens[0])).warmup).toBe(false);
+    await expect(control(id, table, { type: "regroup" })).rejects.toMatchObject({ status: 409 });
+    await expect(control(id, tokens[1], { type: "regroup" })).rejects.toMatchObject({ status: 403 });
   });
 });
 

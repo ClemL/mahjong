@@ -2217,3 +2217,28 @@ a.btn {
 .gather__invite[open] > summary {
   margin-bottom: 8px;
 }
+
+/* An input with a small action beside it — the name box and its re-roll. */
+.field__row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* ---------------------------------------------------------------- regroup */
+
+.regroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--gold);
+  background: var(--accent-wash-2);
+}
+
+.regroup__text {
+  flex: 1 1 220px;
+  line-height: 1.45;
+}

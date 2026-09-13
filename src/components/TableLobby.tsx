@@ -132,6 +132,12 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
           {seated.length > 0 && open > 0
             ? ` · ${open} ${open === 1 ? "seat" : "seats"} will be played by the computer`
             : ""}
+          {/* Nobody should have to sit and watch a seating screen because a
+              friend is running late. Start a game now; it is dropped the moment
+              they arrive. */}
+          {view.canDeal && seated.length === 1
+            ? " · start one now and the table regroups when somebody joins"
+            : ""}
         </span>
 
         {view.canDeal ? (
@@ -141,7 +147,8 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
             disabled={api.busy || seated.length === 0}
             onClick={() => void api.control({ type: "deal" })}
           >
-            Deal
+            {/* Waiting alone, the honest label for dealing is what it does. */}
+            {seated.length === 1 ? "Play the computer" : "Deal"}
           </button>
         ) : (
           <span className="gather__hint">

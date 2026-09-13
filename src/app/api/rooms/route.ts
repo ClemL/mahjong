@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { RoomError, createRoom, multiplayerEnabled } from "@/server/rooms";
+import { RoomError, createRoom, multiplayerEnabled, suggestedPassword } from "@/server/rooms";
 import { enforceLimit } from "@/server/ratelimit";
 import { roomStore } from "@/server/store";
 
@@ -10,18 +10,18 @@ export const runtime = "nodejs";
 /**
  * Status and self-diagnosis.
  *
- * This reports which deployment is answering and which variables it can see,
- * because "multiplayer is off" has two very different causes that look
- * identical from the browser: the variable really is unset, or the running
- * deployment predates it being added. Vercel snapshots environment variables
- * at deploy time, so adding one and not redeploying changes nothing.
+ * This reports which deployment is answering and which variables it can see.
+ * Vercel snapshots environment variables at deploy time, so adding one and not
+ * redeploying changes nothing, and the running commit is the only way to tell.
  *
- * No secret values are returned — only whether each name is present.
+ * The only password value ever returned is the built-in default, which is
+ * public by design. A word the deployment chose stays on the server.
  */
 export async function GET() {
   return NextResponse.json({
     enabled: multiplayerEnabled(),
     persistent: roomStore().isPersistent(),
+    suggestedPassword: suggestedPassword(),
     deployment: {
       environment: process.env.VERCEL_ENV ?? "self-hosted",
       commit: (process.env.VERCEL_GIT_COMMIT_SHA ?? "unknown").slice(0, 7),

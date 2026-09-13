@@ -28,3 +28,6 @@
 2026-09-13T01:20:00Z - A phone has five minutes, not ninety seconds, before the computer takes over its seat — enough to look up at the table
 2026-09-13T01:20:00Z - Coming back to a sleeping phone now asks you to tap in, and says the computer has been playing your seat
 2026-09-13T01:20:00Z - Restart returns the table to the seating screen instead of dealing straight away
+2026-09-13T03:25:00Z - The table password is no longer masked, and a deployment without one now opens rooms with the word "mah" instead of switching multiplayer off
+2026-09-13T03:25:00Z - The seat picker arrives with a name already filled in — a first-generation Pokemon, with a button to try another
+2026-09-13T03:25:00Z - Waiting alone? Play the computer in the meantime; the table offers to deal everyone in as soon as somebody joins
