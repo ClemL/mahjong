@@ -152,16 +152,33 @@ describe("playing", () => {
   });
 
   it("fills unclaimed seats with the computer and keeps play moving", async () => {
-    const id = await room();
-    const { token } = await claimSeat(id, { seat: 0, password: "lotus" });
-    let view = await control(id, token, { type: "deal" });
-    // Seat 0 is the dealer on the opening hand, so the turn is already here.
-    expect(view.turn).toBe(0);
-    const before = view.players.reduce((n, p) => n + p.discards.length, 0);
-    await act(id, token, { type: "discard", tileId: view.players[0].hand[0].id });
-    view = await readRoom(id, token);
-    const discards = view.players.reduce((n, p) => n + p.discards.length, 0);
-    expect(discards).toBeGreaterThan(before + 1);
+    // Rooms are seeded from the clock, so one deal proves very little. Twenty
+    // of them cover the openings where a computer seat claims the first
+    // discard, or wins off it outright.
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const id = await room();
+      const { token } = await claimSeat(id, { seat: 0, password: "lotus" });
+      let view = await control(id, token, { type: "deal" });
+      // Seat 0 is the dealer on the opening hand, so the turn is already here.
+      expect(view.turn).toBe(0);
+      const wallBefore = view.wallCount;
+      await act(id, token, { type: "discard", tileId: view.players[0].hand[0].id });
+      view = await readRoom(id, token);
+
+      // The property that matters: the table never parks on a chair nobody is
+      // sitting in. It comes back round to the one person here, stops to ask
+      // them something, or the hand is already over.
+      //
+      // There is no scalar that also proves "and the computers took their
+      // turns", because a claim chain is a legitimate way round the table that
+      // moves none of them. A claimed tile leaves the discarder's pond for the
+      // claimer's meld, so the discard total can be unchanged after a full
+      // circuit; and a pung draws nothing, so the wall can be unchanged too.
+      // Getting back to seat 0 at all is the proof.
+      const over = view.phase === "handOver" || view.phase === "gameOver";
+      if (!over) expect(view.turn === 0 || view.awaitingClaimSeats.includes(0)).toBe(true);
+      expect(view.wallCount).toBeLessThanOrEqual(wallBefore);
+    }
   });
 });
 
