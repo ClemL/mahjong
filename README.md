@@ -112,11 +112,16 @@ A win is always offered, whatever the setting.
 Single player needs nothing. Multiplayer adds a small server: **one shared
 table**, a tablet acting as the table, and everyone else on their phone.
 
-1. Everyone opens the same link — there is one table, dealt the first time
-   somebody arrives, so there are no room codes to pass around.
+1. Everyone opens the same link — there is one table, opened the first time
+   somebody arrives, so there are no room codes to pass around. The tablet puts
+   that address on screen as a QR code for anyone who would rather scan it.
 2. The tablet takes the **Table** seat.
-3. Everyone else taps the seat they want and sits down.
-4. **Seats nobody takes are played by the computer**, so three friends and one
+3. Everyone else taps the seat they want and sits down. A name is already in the
+   box, so sitting down is one tap.
+4. **Nothing is dealt until somebody deals**, so four people arriving one at a
+   time all start the same hand. Waiting alone, you can play the computer in the
+   meantime; the table offers to deal everyone in the moment a friend sits down.
+5. **Seats nobody takes are played by the computer**, so three friends and one
    empty chair still works.
 
 There is no password: anyone who can reach the URL can take a seat. That suits a
@@ -170,7 +175,7 @@ view so the pond is visible somewhere.
   other. Without Upstash credentials the store falls back to process memory,
   which runs and tests the whole flow locally but is not safe in production —
   the lobby says so.
-- **Seat tokens.** Claiming a seat with the right password returns an opaque
+- **Seat tokens.** Claiming a seat returns an opaque
   token, kept in `localStorage`. Every action carries it, and the server maps
   token → seat. Nobody can play a seat that is not theirs.
 - **Version polling.** Clients poll the room version about once a second; when
@@ -188,14 +193,14 @@ view so the pond is visible somewhere.
 - **Presence.** Every poll doubles as a heartbeat, written only once it has gone
   stale so polling once a second does not become a write once a second — and it
   never bumps the room version, or one person's poll would look like a table
-  change to everyone else. After 90 seconds of silence a seat is marked *away*
+  change to everyone else. After five minutes of silence a seat is marked *away*
   on the table and the computer plays it; the seat is kept, so acting or even
-  just reopening the page takes it straight back.
-- **Rate limiting.** Room creation and seat claims are throttled per IP through
-  Upstash, shared across serverless instances: 5 rooms and 10 claim attempts per
-  10 minutes, and 120 actions a minute. The claim endpoint is the only one that
-  checks the password, so that limit is what stands between a four-character
-  secret and a brute-force script.
+  just reopening the page takes it straight back. A phone that slept through the
+  threshold asks to be tapped back in rather than quietly catching up.
+- **Rate limiting.** Seat claims are throttled per IP through Upstash, shared
+  across serverless instances: 20 claim attempts per 10 minutes, and 120 actions
+  a minute. The table is open to anyone holding the link, so that limit is what
+  stands between a passer-by and all four chairs.
 - **Pacing.** Around a shared table nobody is watching the exact instant a tile
   is thrown, and a poll can deliver the move up to a second after it happened,
   so multiplayer runs its animations about 2.5× slower than single player and

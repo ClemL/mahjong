@@ -6,7 +6,10 @@ import { useRoomSound } from "@/hooks/useRoomSound";
 import { SeatPicker } from "@/components/SeatPicker";
 import { PhoneView } from "@/components/PhoneView";
 import { TableView } from "@/components/TableView";
+import { TableLobby } from "@/components/TableLobby";
 import { FullRoomView } from "@/components/FullRoomView";
+import { ResumeGate } from "@/components/ResumeGate";
+import { RegroupBanner } from "@/components/RegroupBanner";
 import { primeAudio } from "@/game/sound";
 import type { Seat } from "@/game/tiles";
 
@@ -62,9 +65,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     );
   }
 
+  // Nothing is dealt yet: everyone sees the gathering screen, and whoever holds
+  // the deal — the tablet, or a player when there is no tablet — sees the button.
+  if (!view.started) {
+    return (
+      <main className={view.you.role === "table" ? "app app--table" : "app"}>
+        <TableLobby api={api} view={view} />
+        {api.error ? <p className="lobby__error">{api.error}</p> : null}
+      </main>
+    );
+  }
+
   if (view.you.role === "table") {
     return (
       <main className="app app--table app--paced">
+        {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
         <TableView api={api} view={view} sound={sound} />
         {api.error ? <p className="lobby__error">{api.error}</p> : null}
       </main>
@@ -75,11 +90,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // their own hand; without one it has to show the whole table.
   return (
     <main className="app app--paced">
+      {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
       {view.tablePresent ? (
         <PhoneView api={api} view={view} sound={sound} />
       ) : (
         <FullRoomView api={api} view={view} sound={sound} />
       )}
+      {api.stale ? (
+        <ResumeGate
+          seat={view.you.seat}
+          onResume={() => {
+            primeAudio();
+            api.resume();
+          }}
+        />
+      ) : null}
       {api.error ? <p className="lobby__error">{api.error}</p> : null}
     </main>
   );

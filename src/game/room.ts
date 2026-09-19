@@ -18,6 +18,7 @@ import {
   advanceTurn,
   createGame,
   resolveClaims,
+  startHand,
   turnActions,
 } from "./engine";
 import { needsTurnAdvance, stepAiTurn } from "./controller";
@@ -26,20 +27,12 @@ import { SEAT_NAMES, type Seat, type Tile, type TileCode } from "./tiles";
 import type { Meld } from "./melds";
 import type { RuleConfig } from "./rules";
 import { createRng } from "./rng";
+import { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS } from "./presence";
 
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
 
-/**
- * Silence after which a seated player is treated as away and the computer
- * plays for them. Their seat is kept — acting or polling again takes it back —
- * because losing a chair for putting a phone down would be worse than the AI
- * playing a turn.
- */
-export const SEAT_IDLE_MS = 90_000;
-
-/** How stale a heartbeat must be before a poll bothers to write one. */
-export const HEARTBEAT_WRITE_MS = 25_000;
+export { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS };
 
 /** A seat is empty, played by the computer, or held by a person. */
 export type Occupant =
@@ -58,6 +51,17 @@ export interface Room {
   version: number;
   createdAt: number;
   updatedAt: number;
+  /**
+   * False until somebody deals. A room waits in its lobby while people arrive
+   * rather than starting the moment the first phone connects.
+   */
+  started: boolean;
+  /**
+   * True when the hand was dealt with only one person at the table — a game
+   * against the computer while waiting for someone to show up. It is a real
+   * game, but the table offers to regroup once a second person sits down.
+   */
+  warmup: boolean;
   seats: Occupant[];
   table: TableDevice | null;
   state: GameState;
@@ -84,6 +88,16 @@ export interface PublicPlayer {
 export interface RoomView {
   roomId: string;
   version: number;
+  /** False while the room is still gathering; no tiles have been dealt. */
+  started: boolean;
+  /** Whether this viewer may deal: the table, or any player with no tablet. */
+  canDeal: boolean;
+  /** True while a solo game against the computer is running. */
+  warmup: boolean;
+  /** Somebody new has sat down mid-warm-up, and this viewer can deal them in. */
+  canRegroup: boolean;
+  /** People with a name on a chair, however many of them are looking. */
+  seatedCount: number;
   phase: Phase;
   turn: Seat;
   dealer: Seat;
@@ -110,7 +124,10 @@ export interface RoomView {
 const HIDDEN: TileCode = "back";
 
 export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Room {
-  const state = createGame({ seed, config, humanSeat: 0 });
+  // No tiles yet. The room opens in its lobby and deals when someone says so,
+  // which is the only way four people arriving one at a time all start the
+  // same hand.
+  const state = createGame({ seed, config, humanSeat: 0, deal: false });
   // Every seat starts as a person's to claim; whatever is still open when play
   // runs is filled by the computer.
   for (const p of state.players) p.isHuman = false;
@@ -119,6 +136,8 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     version: 1,
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    started: false,
+    warmup: false,
     seats: [{ kind: "open" }, { kind: "open" }, { kind: "open" }, { kind: "open" }],
     table: null,
     state,
@@ -127,6 +146,28 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     rngSeed: seed ^ 0x5bf03635,
     rngCalls: 0,
   };
+}
+
+/**
+ * Deal the first hand and let the table run. Seats still open at this moment
+ * are played by the computer, and a latecomer can still sit into one.
+ */
+export function startPlay(room: Room, now = Date.now()): void {
+  room.started = true;
+  room.warmup = seatedCount(room) < 2;
+  room.claimResponses = {};
+  room.claimDeadline = null;
+  room.state = startHand(room.state);
+  syncSeats(room, now);
+}
+
+/** Back to the gathering screen with the same people, ready to deal again. */
+export function returnToLobby(room: Room, state: GameState): void {
+  room.started = false;
+  room.warmup = false;
+  room.state = state;
+  room.claimResponses = {};
+  room.claimDeadline = null;
 }
 
 /** True when a seated player has gone quiet for long enough to be counted away. */
@@ -140,9 +181,34 @@ export function isHumanSeat(room: Room, seat: Seat, now = Date.now()): boolean {
   return occupant.kind === "human" && !isAway(occupant, now);
 }
 
+/** How many chairs have a person's name on them, present or not. */
+export function seatedCount(room: Room): number {
+  return room.seats.filter((occupant) => occupant.kind === "human").length;
+}
+
 /** True once anybody has taken a seat, whether or not they are still present. */
 export function hasAnyPlayer(room: Room): boolean {
-  return room.seats.some((occupant) => occupant.kind === "human");
+  return seatedCount(room) > 0;
+}
+
+/**
+ * Somebody turned up while a solo game was running. The table offers to deal
+ * everyone in rather than leaving them to watch the computer play.
+ */
+export function shouldRegroup(room: Room): boolean {
+  return room.started && room.warmup && seatedCount(room) > 1;
+}
+
+/**
+ * Who may abandon a warm-up and go back to the seating screen. The table
+ * always may; a lone player may too, because a solo game usually has no tablet
+ * in it — but only while it is still the warm-up they started, so this can
+ * never reset a real four-person game.
+ */
+export function mayRegroup(room: Room, token: string | null): boolean {
+  if (!room.started || !room.warmup) return false;
+  const who = identify(room, token);
+  return who.role === "table" || (room.table === null && who.role === "player");
 }
 
 /** Mirror seat occupancy onto the engine, which decides who it may step. */
@@ -202,10 +268,13 @@ export function pendingHumanClaimants(room: Room, now = Date.now()): Seat[] {
  */
 export function drain(room: Room, now = Date.now()): boolean {
   syncSeats(room, now);
-  // Nobody has sat down yet, so there is no game to advance. Without this a
-  // room plays itself out between being created and anyone joining, and the
-  // first person to arrive finds a finished hand. A table where everyone has
-  // wandered off still plays on — only an unstarted one waits.
+  // Nothing is dealt until somebody deals, so there is nothing to advance.
+  // This is what lets four people arrive one at a time and still start the
+  // same hand together, instead of the first phone to connect kicking off a
+  // game the computer then plays on everyone else's behalf.
+  if (!room.started) return false;
+  // A table where everyone has wandered off still plays on; one whose seats
+  // have all been freed has nobody left to play for.
   if (!hasAnyPlayer(room)) return false;
   const rng = createRng(room.rngSeed);
   for (let i = 0; i < room.rngCalls; i++) rng.next();
@@ -257,6 +326,22 @@ export function drain(room: Room, now = Date.now()): boolean {
   return changed;
 }
 
+/**
+ * Who holds the deal. The tablet is the shared screen everyone is looking at,
+ * so it holds the button — but a group playing on phones alone still needs
+ * someone able to press it.
+ *
+ * This is a question of role, not of readiness: the tablet holds the deal from
+ * the moment it is set down, so it can show the button greyed out with the
+ * seat count beside it rather than nothing at all. Whether there is anybody to
+ * deal *to* is checked when the command actually arrives.
+ */
+export function mayDeal(room: Room, token: string | null): boolean {
+  if (room.started) return false;
+  const who = identify(room, token);
+  return who.role === "table" || (room.table === null && who.role === "player");
+}
+
 /** Open a claim window if the current discard needs one. */
 export function openClaimWindow(room: Room, now = Date.now()): void {
   if (room.state.phase === "claiming" && pendingHumanClaimants(room, now).length > 0) {
@@ -294,7 +379,9 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
   const you = identify(room, token);
   const state = room.state;
 
-  const playing = room.seats.some((occupant) => occupant.kind === "human");
+  // Before the deal an unclaimed seat is genuinely open; after it, it is the
+  // computer's, though still claimable by a latecomer.
+  const playing = room.started;
   const players: PublicPlayer[] = state.players.map((p) => {
     const own = you.role === "player" && you.seat === p.seat;
     return {
@@ -326,6 +413,11 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
   return {
     roomId: room.id,
     version: room.version,
+    started: room.started,
+    canDeal: mayDeal(room, token),
+    warmup: room.warmup,
+    canRegroup: shouldRegroup(room) && mayRegroup(room, token),
+    seatedCount: seatedCount(room),
     phase: state.phase,
     turn: state.turn,
     dealer: state.dealer,

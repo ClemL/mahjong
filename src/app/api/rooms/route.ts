@@ -11,10 +11,12 @@ export const runtime = "nodejs";
  *
  * Reports which deployment is answering and which variables it can see,
  * because a problem here looks identical from the browser whether the cause is
- * configuration or a stale build. No secret values are returned — only whether
- * each name is present.
+ * configuration or a stale build. Vercel snapshots environment variables at
+ * deploy time, so adding one and not redeploying changes nothing, and the
+ * running commit is the only way to tell. No secret values are returned — only
+ * whether each name is present.
  *
- * There is no POST: the deployment serves one fixed table, created on first
+ * There is no POST: the deployment serves one fixed table, opened on first
  * arrival, rather than a room per game.
  */
 export async function GET() {

@@ -7,10 +7,8 @@ import { RoomError } from "./errors";
 /**
  * Request throttling.
  *
- * The table password is one short shared secret and room codes are four
- * characters, so without a limiter both are guessable by brute force, and
- * `POST /api/rooms` is an open invitation to fill the room store. Limits are
- * keyed by client IP.
+ * The table is open to anyone holding the link, so nothing but this stands
+ * between a passer-by and all four chairs. Limits are keyed by client IP.
  *
  * With Upstash configured the counters are shared across serverless instances,
  * which is the only way this actually holds. Without it a per-process window is
@@ -18,14 +16,14 @@ import { RoomError } from "./errors";
  * is weaker in production, exactly like the memory room store.
  */
 
-export type LimitKind = "create" | "claim" | "act";
+export type LimitKind = "claim" | "act";
 
 /** Windows chosen for a table of friends, not a public service. */
 const LIMITS: Record<LimitKind, { tokens: number; window: `${number} ${"s" | "m" | "h"}` }> = {
-  // Opening rooms is rare and each one costs storage.
-  create: { tokens: 5, window: "10 m" },
-  // The only endpoint that checks the password, so this is the brute-force gate.
-  claim: { tokens: 10, window: "10 m" },
+  // Roomy enough for a table and four phones sharing one WiFi address — they
+  // all arrive from the same IP — while still tight enough that nobody can sit
+  // down repeatedly to squat the table.
+  claim: { tokens: 20, window: "10 m" },
   // Generous: a fast player plus polling should never reach it.
   act: { tokens: 120, window: "1 m" },
 };

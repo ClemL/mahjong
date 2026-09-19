@@ -5,10 +5,15 @@ import {
   type Room,
   type RoomView,
   drain,
+  hasAnyPlayer,
   identify,
   isHumanSeat,
+  mayDeal,
+  mayRegroup,
   newRoom,
   openClaimWindow,
+  returnToLobby,
+  startPlay,
   syncSeats,
   touch,
   viewFor,
@@ -59,7 +64,8 @@ export function multiplayerEnabled(): boolean {
 }
 
 /**
- * Load the one room, dealing a fresh table the first time anyone arrives.
+ * Load the one room, opening it the first time anyone arrives. It opens in its
+ * lobby with nothing dealt, so everybody who turns up starts the same hand.
  * `create` is NX, so two people opening the page together cannot both win —
  * the loser simply reads what the winner wrote.
  */
@@ -115,11 +121,20 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
   return viewFor(room, token, now);
 }
 
+/**
+ * Anyone who can reach the URL belongs at the table: there is one of them and
+ * it is shared by whoever has the link. The rate limiter is what stops a
+ * passer-by grabbing all four chairs, not authentication.
+ */
+async function admitted(input: { password?: string }): Promise<void> {
+  if (!passwordMatches(input.password ?? "")) throw new RoomError("Wrong password", 401);
+}
+
 export async function claimSeat(
   id: string,
-  input: { seat: Seat | "table"; password: string; name?: string },
+  input: { seat: Seat | "table"; password?: string; name?: string },
 ): Promise<{ token: string; view: RoomView }> {
-  if (!passwordMatches(input.password)) throw new RoomError("Wrong password", 401);
+  await admitted(input);
   const token = randomUUID();
   const room = await mutate(id, (r, now) => {
     if (input.seat === "table") {
@@ -190,6 +205,8 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
 }
 
 export type TableCommand =
+  | { type: "deal" }
+  | { type: "regroup" }
   | { type: "nextHand" }
   | { type: "restart" }
   | { type: "redeal" }
@@ -197,16 +214,40 @@ export type TableCommand =
   | { type: "freeSeat"; seat: Seat }
   | { type: "forcePass" };
 
-/** Commands only the table device may issue. */
+/**
+ * Commands the table device issues. The one exception is the opening deal,
+ * which a seated player may press when there is no tablet in the room —
+ * otherwise a group playing on phones alone could never start.
+ */
 export async function control(
   id: string,
   token: string,
   command: TableCommand,
 ): Promise<RoomView> {
   const room = await mutate(id, (r, now) => {
-    if (!r.table || r.table.token !== token) throw new RoomError("Not the table", 403);
-    r.table.lastSeen = now;
+    const isTable = r.table !== null && r.table.token === token;
+    if (isTable) r.table!.lastSeen = now;
+    else if (
+      !(command.type === "deal" && mayDeal(r, token)) &&
+      !(command.type === "regroup" && mayRegroup(r, token))
+    ) {
+      throw new RoomError("Not the table", 403);
+    }
     switch (command.type) {
+      case "deal":
+        if (r.started) throw new RoomError("The hand is already dealt", 409);
+        if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
+        startPlay(r, now);
+        break;
+      // Abandon a solo warm-up now that somebody has turned up: everyone back
+      // to the seating screen, and the practice scores do not count.
+      case "regroup": {
+        if (!r.warmup) throw new RoomError("This is not a warm-up game", 409);
+        const fresh = newRoom(r.id, r.state.config, Date.now());
+        returnToLobby(r, fresh.state);
+        syncSeats(r);
+        break;
+      }
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
         r.state = nextHand(r.state);
@@ -215,14 +256,11 @@ export async function control(
         r.state = startHand({ ...r.state, phase: "handOver" });
         break;
       case "restart": {
-        const seats = r.seats;
-        const table = r.table;
-        const fresh = newRoom(r.id, r.state.config);
-        r.state = fresh.state;
-        r.seats = seats;
-        r.table = table;
-        r.claimResponses = {};
-        r.claimDeadline = null;
+        // Everyone keeps their chair and the scores go back to zero, but the
+        // tiles are not thrown again until somebody deals — the same gathering
+        // screen the room opened on.
+        const fresh = newRoom(r.id, r.state.config, Date.now());
+        returnToLobby(r, fresh.state);
         syncSeats(r);
         break;
       }

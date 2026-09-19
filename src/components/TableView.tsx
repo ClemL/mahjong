@@ -219,7 +219,7 @@ export function TableView({
             className="btn btn--ghost"
             disabled={api.busy}
             onClick={() => {
-              if (confirm("Restart the game and reset all scores?")) {
+              if (confirm("Reset all scores and go back to the seating screen?")) {
                 void api.control({ type: "restart" });
               }
             }}

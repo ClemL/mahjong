@@ -22,6 +22,15 @@
 2026-09-04T12:10:00Z - The table device now keeps the tablet screen awake during a hand
 2026-09-04T12:10:00Z - Bigger touch targets, and a discard on a phone now takes a tap to arm and a tap to throw
 2026-09-04T12:10:00Z - Controls stay clear of the notch and home indicator, and the app can be installed to a home screen
-2026-09-04T15:05:00Z - One shared table, no password — open the link and take a seat
-2026-09-04T15:05:00Z - Each player's discards now sit in front of them instead of stacked in the middle
-2026-09-04T15:05:00Z - Multiplayer animations play slower so everyone can see what just happened
+2026-09-13T01:20:00Z - A room now waits on a seating screen: nothing is dealt until the table deals, so everyone starts the same hand
+2026-09-13T01:20:00Z - The tablet shows a QR code — scan it to take a seat, with no address to type and no password to share
+2026-09-13T01:20:00Z - The seating screen fills in live as people sit down, and says how many seats the computer will play
+2026-09-13T01:20:00Z - A phone has five minutes, not ninety seconds, before the computer takes over its seat — enough to look up at the table
+2026-09-13T01:20:00Z - Coming back to a sleeping phone now asks you to tap in, and says the computer has been playing your seat
+2026-09-13T01:20:00Z - Restart returns the table to the seating screen instead of dealing straight away
+2026-09-13T03:25:00Z - The table password is no longer masked, and a deployment without one now opens rooms with the word "mah" instead of switching multiplayer off
+2026-09-13T03:25:00Z - The seat picker arrives with a name already filled in — a first-generation Pokemon, with a button to try another
+2026-09-13T03:25:00Z - Waiting alone? Play the computer in the meantime; the table offers to deal everyone in as soon as somebody joins
+2026-09-19T16:30:00Z - One shared table, no password and no room codes — open the link and take a seat
+2026-09-19T16:30:00Z - Each player's discards now sit in front of them instead of stacked in the middle
+2026-09-19T16:30:00Z - Multiplayer animations play slower so everyone can see what just happened
