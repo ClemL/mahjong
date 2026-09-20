@@ -31,3 +31,6 @@
 2026-09-13T03:25:00Z - The table password is no longer masked, and a deployment without one now opens rooms with the word "mah" instead of switching multiplayer off
 2026-09-13T03:25:00Z - The seat picker arrives with a name already filled in — a first-generation Pokemon, with a button to try another
 2026-09-13T03:25:00Z - Waiting alone? Play the computer in the meantime; the table offers to deal everyone in as soon as somebody joins
+2026-09-19T16:30:00Z - One shared table, no password and no room codes — open the link and take a seat
+2026-09-19T16:30:00Z - Each player's discards now sit in front of them instead of stacked in the middle
+2026-09-19T16:30:00Z - Multiplayer animations play slower so everyone can see what just happened

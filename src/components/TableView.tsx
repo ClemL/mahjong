@@ -9,7 +9,7 @@ import { MeldRow } from "./SeatPanel";
 import { useWakeLock } from "@/hooks/useWakeLock";
 
 /** Where each seat sits relative to the tablet lying on the table. */
-const EDGE: Record<Seat, string> = {
+const EDGE: Record<Seat, "top" | "right" | "bottom" | "left"> = {
   0: "bottom",
   1: "right",
   2: "top",
@@ -23,9 +23,10 @@ function SeatBlock({
 }: {
   player: PublicPlayer;
   view: RoomView;
-  edge: string;
+  edge: "top" | "right" | "bottom" | "left";
 }) {
   const seat = player.seat;
+  const lastId = view.lastDiscard?.tile.id;
   const active = view.turn === seat && view.phase === "action";
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
@@ -87,6 +88,26 @@ function SeatBlock({
       ) : null}
 
       {deciding ? <span className="tseat__deciding">deciding…</span> : null}
+
+      {/* This player's pond, on the edge of their block facing the middle —
+          where their tiles would actually land at a real table. */}
+      <div className={`tpond tpond--${edge}`}>
+        {player.discards.length === 0 ? (
+          <span className="seat__meta">no discards yet</span>
+        ) : (
+          player.discards.map((t) => (
+            <TileFace
+              key={t.id}
+              code={t.code}
+              size="sm"
+              entry="toss"
+              tossFrom={edge}
+              justDiscarded={t.id === lastId}
+              dim={t.id !== lastId}
+            />
+          ))
+        )}
+      </div>
     </section>
   );
 }
@@ -110,7 +131,6 @@ export function TableView({
   view: RoomView;
   sound?: SoundToggle;
 }) {
-  const lastId = view.lastDiscard?.tile.id;
   const seats: Seat[] = [0, 1, 2, 3];
   // Only the shared table holds the screen awake; a phone in a pocket should
   // be allowed to sleep.
@@ -214,39 +234,16 @@ export function TableView({
           <SeatBlock key={seat} player={view.players[seat]} view={view} edge={EDGE[seat]} />
         ))}
 
-        <div className="tableview__pond">
-          <div className="pond__center">
-            <span className="pond__round">{tileGlyph(view.roundWind)}</span>
-            <span className="pond__wall">{view.wallCount} left</span>
-          </div>
-          {seats.map((seat) => (
-            <div className="pond__group" key={seat}>
-              <span className="pond__group-label">
-                Seat {seat + 1} · {SEAT_NAMES[seat]}
-              </span>
-              <div
-                className={`pond__row${view.players[seat].discards.length === 0 ? " pond__row--empty" : ""}`}
-              >
-                {view.players[seat].discards.length === 0 ? (
-                  <span className="seat__meta">—</span>
-                ) : (
-                  view.players[seat].discards.map((t) => (
-                    <TileFace
-                      key={t.id}
-                      code={t.code}
-                      size="sm"
-                      entry="toss"
-                      tossFrom={
-                        (["bottom", "right", "top", "left"] as const)[seat]
-                      }
-                      justDiscarded={t.id === lastId}
-                      dim={t.id !== lastId}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="tableview__middle">
+          <span className="pond__round">{tileGlyph(view.roundWind)}</span>
+          <span className="pond__wall">{view.wallCount} tiles left</span>
+          <span className="seat__meta">
+            {view.phase === "handOver"
+              ? "hand over"
+              : view.phase === "gameOver"
+                ? "round complete"
+                : `${SEAT_NAMES[view.turn]} to play`}
+          </span>
         </div>
       </div>
 

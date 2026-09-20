@@ -7,17 +7,14 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 
 interface Props {
   view: RoomView;
-  onClaim: (seat: Seat | "table", password: string, name: string) => Promise<void>;
+  onClaim: (seat: Seat | "table", name: string) => Promise<void>;
   busy: boolean;
   error: string | null;
-  /** Set when we arrived by scanning the table's QR code. */
-  scanned: boolean;
 }
 
-/** Pick a seat, then prove you belong at the table. */
-export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
+/** Pick a seat and sit down. There is nothing else to get past. */
+export function SeatPicker({ view, onClaim, busy, error }: Props) {
   const [choice, setChoice] = useState<Seat | "table" | null>(null);
-  const [password, setPassword] = useState("");
 
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
   const namesInUse = view.players
@@ -35,13 +32,10 @@ export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
 
   return (
     <div className="lobby">
-      <h1 className="lobby__title">
-        Room <span className="lobby__code">{view.roomId}</span>
-      </h1>
+      <h1 className="lobby__title">Take a seat</h1>
       <p className="lobby__lead">
-        {scanned
-          ? "Take a seat. The table deals once everyone is down."
-          : "Take a seat. Any seat still open when the table deals is played by the computer."}
+        Everyone plays at the same table. Any seat still open when the table deals is played by
+        the computer, and the tablet in the middle takes the Table seat.
       </p>
 
       <div className="lobby__seats">
@@ -84,7 +78,7 @@ export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
         className="lobby__form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (choice !== null) void onClaim(choice, password, name);
+          if (choice !== null) void onClaim(choice, name);
         }}
       >
         {choice !== null && choice !== "table" ? (
@@ -110,20 +104,6 @@ export function SeatPicker({ view, onClaim, busy, error, scanned }: Props) {
             </span>
           </label>
         ) : null}
-        {scanned ? null : (
-          <label className="field">
-            <span className="field__label">Table password</span>
-            <input
-              className="field__input"
-              type="text"
-              value={password}
-              autoComplete="off"
-              autoCapitalize="none"
-              spellCheck={false}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
-        )}
         <button type="submit" className="btn btn--primary" disabled={choice === null || busy}>
           {choice === "table" ? "Open the table" : "Sit down"}
         </button>

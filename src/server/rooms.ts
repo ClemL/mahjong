@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import {
   type Room,
   type RoomView,
@@ -31,58 +31,51 @@ import type { Seat } from "@/game/tiles";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
-/** Ambiguous characters are left out so a code can be read off a screen aloud. */
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+/**
+ * One table, no password.
+ *
+ * There is a single room rather than a code per game: everyone goes to the
+ * same place and takes a seat. Anyone who can reach the URL can sit down, so
+ * this suits a group who already share the link and not much else — the rate
+ * limiter is what stops seat-grabbing, not authentication.
+ */
+export const FIXED_ROOM_ID = "TABLE";
 
-export function newRoomCode(length = 4): string {
-  const bytes = randomBytes(length);
-  return Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join("");
-}
+/** Flip to true, and set MAHJONG_ROOM_PASSWORD, to ask for a password again. */
+const REQUIRE_PASSWORD = false;
 
-/** Constant-time comparison, so a shared secret cannot be probed by timing. */
-function secretMatches(supplied: string, expected: string): boolean {
+/** Constant-time comparison, so the shared password cannot be probed by timing. */
+function passwordMatches(supplied: string): boolean {
+  if (!REQUIRE_PASSWORD) return true;
+  const expected = process.env.MAHJONG_ROOM_PASSWORD ?? "";
+  if (!expected) throw new RoomError("Multiplayer is not configured on this deployment", 503);
   const a = Buffer.from(supplied.padEnd(64).slice(0, 64));
   const b = Buffer.from(expected.padEnd(64).slice(0, 64));
   return timingSafeEqual(a, b);
 }
 
-/**
- * The word that opens a room when the deployment has not set one.
- *
- * Three letters, said aloud across a table, and public by definition — a speed
- * bump against a passer-by opening rooms on the deployment, not a secret. Set
- * MAHJONG_ROOM_PASSWORD to replace it; a configured word is never echoed back
- * to the browser, only this default is.
- */
-export const DEFAULT_ROOM_PASSWORD = "mah";
-
-/** The default is safe to show on screen; a word the deployment chose is not. */
-export function suggestedPassword(): string | null {
-  return process.env.MAHJONG_ROOM_PASSWORD ? null : DEFAULT_ROOM_PASSWORD;
+/** Whether a seat still has to be unlocked with the shared password. */
+export function passwordRequired(): boolean {
+  return REQUIRE_PASSWORD;
 }
 
-function passwordMatches(supplied: string): boolean {
-  return secretMatches(supplied, process.env.MAHJONG_ROOM_PASSWORD || DEFAULT_ROOM_PASSWORD);
-}
-
-/**
- * The secret a scanned join link carries. It is per room and disposable, which
- * the deployment password is not — putting that in a URL would leave it in
- * browser history, in a screenshot, and readable by anyone who photographs the
- * tablet, for every room that deployment will ever host.
- */
-function newJoinKey(): string {
-  return randomBytes(18).toString("base64url");
-}
-
-/** Always on now that a room opens with a built-in word when none is set. */
 export function multiplayerEnabled(): boolean {
-  return true;
+  return !REQUIRE_PASSWORD || Boolean(process.env.MAHJONG_ROOM_PASSWORD);
 }
 
+/**
+ * Load the one room, opening it the first time anyone arrives. It opens in its
+ * lobby with nothing dealt, so everybody who turns up starts the same hand.
+ * `create` is NX, so two people opening the page together cannot both win —
+ * the loser simply reads what the winner wrote.
+ */
 async function load(id: string): Promise<Room> {
-  const room = await roomStore().get(id.toUpperCase());
-  if (!room) throw new RoomError("No such room", 404);
+  if (id.toUpperCase() !== FIXED_ROOM_ID) throw new RoomError("No such room", 404);
+  const existing = await roomStore().get(FIXED_ROOM_ID);
+  if (existing) return existing;
+  await roomStore().create(newRoom(FIXED_ROOM_ID));
+  const room = await roomStore().get(FIXED_ROOM_ID);
+  if (!room) throw new RoomError("Could not open the table", 500);
   return room;
 }
 
@@ -108,18 +101,6 @@ async function mutate(
   throw new RoomError("The room changed while you were acting — try again", 409);
 }
 
-export async function createRoom(password: string): Promise<{ id: string; joinKey: string }> {
-  if (!passwordMatches(password)) throw new RoomError("Wrong password", 401);
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    const id = newRoomCode();
-    const joinKey = newJoinKey();
-    if (await roomStore().create(newRoom(id, undefined, Date.now(), joinKey))) {
-      return { id, joinKey };
-    }
-  }
-  throw new RoomError("Could not allocate a room code", 500);
-}
-
 export async function readRoom(id: string, token: string | null): Promise<RoomView> {
   const room = await load(id);
   const now = Date.now();
@@ -141,23 +122,19 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
 }
 
 /**
- * Prove you belong at this table: either the scanned join link's key, or the
- * deployment password typed by hand for anyone who could not scan it.
+ * Anyone who can reach the URL belongs at the table: there is one of them and
+ * it is shared by whoever has the link. The rate limiter is what stops a
+ * passer-by grabbing all four chairs, not authentication.
  */
-async function admitted(id: string, input: { password?: string; key?: string }): Promise<void> {
-  if (input.key) {
-    const room = await load(id);
-    if (room.joinKey && secretMatches(input.key, room.joinKey)) return;
-    throw new RoomError("That join link is no longer good for this room", 401);
-  }
+async function admitted(input: { password?: string }): Promise<void> {
   if (!passwordMatches(input.password ?? "")) throw new RoomError("Wrong password", 401);
 }
 
 export async function claimSeat(
   id: string,
-  input: { seat: Seat | "table"; password?: string; key?: string; name?: string },
+  input: { seat: Seat | "table"; password?: string; name?: string },
 ): Promise<{ token: string; view: RoomView }> {
-  await admitted(id, input);
+  await admitted(input);
   const token = randomUUID();
   const room = await mutate(id, (r, now) => {
     if (input.seat === "table") {
@@ -266,7 +243,7 @@ export async function control(
       // to the seating screen, and the practice scores do not count.
       case "regroup": {
         if (!r.warmup) throw new RoomError("This is not a warm-up game", 409);
-        const fresh = newRoom(r.id, r.state.config, Date.now(), r.joinKey);
+        const fresh = newRoom(r.id, r.state.config, Date.now());
         returnToLobby(r, fresh.state);
         syncSeats(r);
         break;
@@ -282,7 +259,7 @@ export async function control(
         // Everyone keeps their chair and the scores go back to zero, but the
         // tiles are not thrown again until somebody deals — the same gathering
         // screen the room opened on.
-        const fresh = newRoom(r.id, r.state.config, Date.now(), r.joinKey);
+        const fresh = newRoom(r.id, r.state.config, Date.now());
         returnToLobby(r, fresh.state);
         syncSeats(r);
         break;

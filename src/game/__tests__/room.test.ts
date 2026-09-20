@@ -28,7 +28,7 @@ function seat(room: Room, index: Seat, token: string, name = "Someone"): void {
 
 /** A room past its lobby, which is where most of these tests start. */
 function dealt(id: string, seed: number, seats: Seat[]): Room {
-  const room = newRoom(id, undefined, seed, "join-key");
+  const room = newRoom(id, undefined, seed);
   for (const s of seats) seat(room, s, `tok-${s}`);
   startPlay(room);
   return room;
@@ -68,7 +68,7 @@ describe("seating", () => {
 describe("redaction", () => {
   let room: Room;
   beforeEach(() => {
-    room = newRoom("TEST", undefined, 7, "join-key");
+    room = newRoom("TEST", undefined, 7);
     seat(room, 0, "tok-0", "Kris");
     seat(room, 1, "tok-south", "Srini");
     room.table = { token: "tok-table", lastSeen: Date.now() };
@@ -114,15 +114,6 @@ describe("redaction", () => {
     expect(view.players.every((p) => p.hand.every((t) => t.code === "back"))).toBe(true);
   });
 
-  it("gives the join link to the table and the players, never a spectator", () => {
-    expect(viewFor(room, "tok-table").joinKey).toBe("join-key");
-    expect(viewFor(room, "tok-0").joinKey).toBe("join-key");
-    // Anyone at all can open a room URL, so a spectator must not be handed the
-    // secret that lets them sit down.
-    expect(viewFor(room, null).joinKey).toBeNull();
-    expect(JSON.stringify(viewFor(room, null))).not.toContain("join-key");
-  });
-
   it("only reveals the drawn tile to the seat holding it", () => {
     const dealer = room.state.dealer;
     room.state.turn = dealer;
@@ -135,14 +126,14 @@ describe("redaction", () => {
 
 describe("lobby", () => {
   it("deals nothing until somebody deals", () => {
-    const room = newRoom("TEST", undefined, 3, "k");
+    const room = newRoom("TEST", undefined, 3);
     expect(room.started).toBe(false);
     expect(room.state.players.every((p) => p.hand.length === 0)).toBe(true);
     expect(room.state.wall).toHaveLength(0);
   });
 
   it("does not start play while people are still arriving", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     // The whole point: whoever connects first must not kick off a hand that
     // the computer then plays on everyone else's behalf while they join.
     seat(room, 2, "tok-west");
@@ -154,7 +145,7 @@ describe("lobby", () => {
   });
 
   it("deals everyone a full hand when play starts", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     for (const s of [0, 1, 2, 3] as Seat[]) seat(room, s, `tok-${s}`);
     startPlay(room);
     expect(room.started).toBe(true);
@@ -167,7 +158,7 @@ describe("lobby", () => {
   });
 
   it("lets the table deal, and a player only when there is no table", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     expect(mayDeal(room, "tok-0")).toBe(true);
     expect(mayDeal(room, "nobody")).toBe(false);
@@ -179,7 +170,7 @@ describe("lobby", () => {
   });
 
   it("gives the tablet the deal before anyone sits, and takes it back after", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     room.table = { token: "tok-table", lastSeen: Date.now() };
     // Holding the deal is a role, so the empty table still shows the button —
     // greyed out, with the seat count saying why.
@@ -190,7 +181,7 @@ describe("lobby", () => {
   });
 
   it("marks a hand dealt to one person as a warm-up, and a real table not", () => {
-    const solo = newRoom("TEST", undefined, 5, "k");
+    const solo = newRoom("TEST", undefined, 5);
     seat(solo, 0, "tok-0");
     startPlay(solo);
     expect(solo.warmup).toBe(true);
@@ -200,7 +191,7 @@ describe("lobby", () => {
   });
 
   it("offers to regroup once somebody joins the warm-up, and not before", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     startPlay(room);
     expect(shouldRegroup(room)).toBe(false);
@@ -221,7 +212,7 @@ describe("lobby", () => {
   });
 
   it("gives the regroup to the table when there is one", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     room.table = { token: "tok-table", lastSeen: Date.now() };
     startPlay(room);
@@ -231,17 +222,17 @@ describe("lobby", () => {
   });
 
   it("clears the warm-up on the way back to the lobby", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     startPlay(room);
-    returnToLobby(room, newRoom("TEST", undefined, 9, "k").state);
+    returnToLobby(room, newRoom("TEST", undefined, 9).state);
     expect(room.warmup).toBe(false);
     expect(room.started).toBe(false);
     expect(mayRegroup(room, "tok-0")).toBe(false);
   });
 
   it("reports open seats as open until the deal, and computer-played after", () => {
-    const room = newRoom("TEST", undefined, 5, "k");
+    const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("open");
     startPlay(room);
@@ -251,7 +242,7 @@ describe("lobby", () => {
 
 describe("draining", () => {
   it("does not start play until somebody sits down", () => {
-    const room = newRoom("TEST", undefined, 3, "k");
+    const room = newRoom("TEST", undefined, 3);
     startPlay(room);
     const before = JSON.stringify(room.state);
     // A dealt room with every chair freed has nobody left to play for.
@@ -269,7 +260,7 @@ describe("draining", () => {
   });
 
   it("stops when it reaches a person's turn", () => {
-    const room = newRoom("TEST", undefined, 11, "k");
+    const room = newRoom("TEST", undefined, 11);
     seat(room, 0, "tok");
     startPlay(room);
     seat(room, room.state.dealer, "tok");
@@ -336,7 +327,7 @@ describe("presence", () => {
   });
 
   it("only writes a heartbeat once it has gone stale", () => {
-    const room = newRoom("TEST", undefined, 4, "k");
+    const room = newRoom("TEST", undefined, 4);
     const now = Date.now();
     room.seats[0] = { kind: "human", name: "Kris", token: "tok", lastSeen: now };
     // A poll a second later is not worth a write.

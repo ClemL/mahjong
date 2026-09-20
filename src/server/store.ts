@@ -22,6 +22,8 @@ export interface RoomStore {
   create(room: Room): Promise<boolean>;
   /** Writes only if the stored version still matches `expectedVersion`. */
   compareAndSet(room: Room, expectedVersion: number): Promise<boolean>;
+  /** Removes a room, so the next arrival deals a fresh table. */
+  delete(id: string): Promise<void>;
   isPersistent(): boolean;
 }
 
@@ -48,6 +50,10 @@ class MemoryStore implements RoomStore {
     if ((JSON.parse(raw) as Room).version !== expectedVersion) return false;
     this.rooms.set(key(room.id), JSON.stringify(room));
     return true;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.rooms.delete(key(id));
   }
 
   isPersistent(): boolean {
@@ -88,6 +94,10 @@ class UpstashStore implements RoomStore {
       [String(expectedVersion), JSON.stringify(room), String(ROOM_TTL_SECONDS)],
     );
     return result === 1;
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.redis.del(key(id));
   }
 
   isPersistent(): boolean {

@@ -8,24 +8,19 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   try {
-    // The only endpoint that checks the password, so this is the gate.
+    // Seats are the only thing worth grabbing on an open table, so this is
+    // the gate that stops a passer-by taking all four.
     await enforceLimit("claim", request);
     const body = (await request.json()) as {
       seat?: number | "table";
       password?: string;
-      key?: string;
       name?: string;
     };
     const seat = body.seat === "table" ? "table" : ((body.seat ?? -1) as Seat);
     if (seat !== "table" && ![0, 1, 2, 3].includes(seat)) {
       return NextResponse.json({ error: "Pick a seat" }, { status: 400 });
     }
-    const result = await claimSeat(id, {
-      seat,
-      password: body.password,
-      key: body.key,
-      name: body.name,
-    });
+    const result = await claimSeat(id, { seat, password: body.password, name: body.name });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RoomError) {

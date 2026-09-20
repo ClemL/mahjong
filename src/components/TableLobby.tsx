@@ -25,10 +25,9 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
   const [origin, setOrigin] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
 
-  const joinUrl =
-    origin && view.joinKey
-      ? `${origin}/room/${view.roomId}?k=${encodeURIComponent(view.joinKey)}`
-      : null;
+  // One open table, so the link is just its address — there is no key to carry
+  // and nothing to type once it has been scanned.
+  const joinUrl = origin ? `${origin}/room/${view.roomId}` : null;
 
   const seats: Seat[] = [0, 1, 2, 3];
   const seated = seats.filter((s) => view.players[s].occupant.kind === "human");
@@ -41,13 +40,9 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
     <div className="gather__join">
       {joinUrl ? (
         <>
-          <QrCode value={joinUrl} label={`Join room ${view.roomId}`} />
-          <span className="gather__url">
-            {joinUrl.replace(/^https?:\/\//, "").split("?")[0]}
-          </span>
-          <span className="gather__hint">
-            No camera? Open that address and enter the table password.
-          </span>
+          <QrCode value={joinUrl} label={`Join the ${view.roomId} table`} />
+          <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
+          <span className="gather__hint">No camera? Open that address and take a seat.</span>
         </>
       ) : (
         <p className="gather__hint">Preparing the join code…</p>
@@ -59,7 +54,7 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
     <div className="gather">
       <header className="gather__head">
         <div>
-          <span className="gather__label">Room code</span>
+          <span className="gather__label">The table</span>
           <span className="gather__code">{view.roomId}</span>
         </div>
         <p className="gather__lead">

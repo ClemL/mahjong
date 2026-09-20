@@ -52,13 +52,6 @@ export interface Room {
   createdAt: number;
   updatedAt: number;
   /**
-   * Secret carried by the join link the table puts on screen as a QR code, so
-   * a phone can take a seat without anyone typing the deployment password.
-   * Minted per room, and never shown to a viewer who is not already at the
-   * table.
-   */
-  joinKey: string;
-  /**
    * False until somebody deals. A room waits in its lobby while people arrive
    * rather than starting the moment the first phone connects.
    */
@@ -97,12 +90,6 @@ export interface RoomView {
   version: number;
   /** False while the room is still gathering; no tiles have been dealt. */
   started: boolean;
-  /**
-   * The room's join secret, for building the QR code — sent only to people
-   * already at the table, never to a spectator, or the link would be no
-   * better than the room code it is meant to protect.
-   */
-  joinKey: string | null;
   /** Whether this viewer may deal: the table, or any player with no tablet. */
   canDeal: boolean;
   /** True while a solo game against the computer is running. */
@@ -136,12 +123,7 @@ export interface RoomView {
 
 const HIDDEN: TileCode = "back";
 
-export function newRoom(
-  id: string,
-  config?: RuleConfig,
-  seed = Date.now(),
-  joinKey = "",
-): Room {
+export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Room {
   // No tiles yet. The room opens in its lobby and deals when someone says so,
   // which is the only way four people arriving one at a time all start the
   // same hand.
@@ -154,7 +136,6 @@ export function newRoom(
     version: 1,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    joinKey,
     started: false,
     warmup: false,
     seats: [{ kind: "open" }, { kind: "open" }, { kind: "open" }, { kind: "open" }],
@@ -429,15 +410,10 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
   const actions =
     you.role === "player" && you.seat !== null ? turnActions(state, you.seat) : null;
 
-  // The join link is a shared secret. Anybody can open a room URL and become a
-  // spectator, so handing it out there would defeat the point of having one.
-  const atTheTable = you.role === "table" || you.role === "player";
-
   return {
     roomId: room.id,
     version: room.version,
     started: room.started,
-    joinKey: atTheTable ? room.joinKey : null,
     canDeal: mayDeal(room, token),
     warmup: room.warmup,
     canRegroup: shouldRegroup(room) && mayRegroup(room, token),

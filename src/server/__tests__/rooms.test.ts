@@ -1,69 +1,81 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
-process.env.MAHJONG_ROOM_PASSWORD = "lotus";
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const { DEFAULT_ROOM_PASSWORD, RoomError, act, claimSeat, control, createRoom, readRoom, suggestedPassword } =
+const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, passwordRequired, readRoom } =
   await import("../rooms");
+const { roomStore } = await import("../store");
 
+const ID = FIXED_ROOM_ID;
+
+/** The one table, wiped back to an empty lobby. */
 async function room(): Promise<string> {
-  return (await createRoom("lotus")).id;
+  await roomStore().delete(ID);
+  return ID;
 }
 
-/** A room past its lobby: seats taken, a tablet on the table, tiles dealt. */
+/** A table past its lobby: seats taken, a tablet in the middle, tiles dealt. */
 async function dealtRoom(seats: (0 | 1 | 2 | 3)[] = [0]) {
   const id = await room();
   const tokens: Record<number, string> = {};
   for (const seat of seats) {
-    tokens[seat] = (await claimSeat(id, { seat, password: "lotus" })).token;
+    tokens[seat] = (await claimSeat(id, { seat })).token;
   }
-  const table = (await claimSeat(id, { seat: "table", password: "lotus" })).token;
+  const table = (await claimSeat(id, { seat: "table" })).token;
   await control(id, table, { type: "deal" });
   return { id, tokens, table };
 }
 
-describe("creating a room", () => {
-  it("refuses the wrong password", async () => {
-    await expect(createRoom("wrong")).rejects.toBeInstanceOf(RoomError);
+describe("the single table", () => {
+  it("needs no password for now", () => {
+    expect(passwordRequired()).toBe(false);
   });
 
-  it("issues a readable code", async () => {
-    const { id } = await createRoom("lotus");
-    expect(id).toMatch(/^[A-Z2-9]{4}$/);
-    expect(id).not.toMatch(/[OI01]/);
+  it("opens on first arrival rather than being created by hand", async () => {
+    const id = await room();
+    const view = await readRoom(id, null);
+    expect(view.roomId).toBe(ID);
+    expect(view.started).toBe(false);
+    expect(view.players.every((p) => p.occupant.kind === "open")).toBe(true);
+  });
+
+  it("serves the same table to everyone", async () => {
+    const id = await room();
+    await claimSeat(id, { seat: 0, name: "Kris" });
+    expect((await readRoom(id, null)).players[0].occupant.name).toBe("Kris");
+  });
+
+  it("refuses any other room id", async () => {
+    await expect(readRoom("XYZW", null)).rejects.toMatchObject({ status: 404 });
+    await expect(claimSeat("XYZW", { seat: 0 })).rejects.toMatchObject({ status: 404 });
   });
 });
 
 describe("claiming seats", () => {
-  let id: string;
-  beforeEach(async () => {
-    id = await room();
-  });
-
-  it("needs the password", async () => {
-    await expect(claimSeat(id, { seat: 0, password: "nope" })).rejects.toBeInstanceOf(RoomError);
-  });
-
-  it("hands out a token that identifies the seat", async () => {
-    const { token, view } = await claimSeat(id, { seat: 2, password: "lotus", name: "Teja" });
+  it("seats anyone who asks", async () => {
+    const id = await room();
+    const { token, view } = await claimSeat(id, { seat: 2, name: "Teja" });
     expect(token).toBeTruthy();
     expect(view.you).toEqual({ role: "player", seat: 2 });
     expect(view.players[2].occupant).toEqual({ kind: "human", name: "Teja", away: false });
   });
 
   it("refuses a seat that is already taken", async () => {
-    await claimSeat(id, { seat: 1, password: "lotus" });
-    await expect(claimSeat(id, { seat: 1, password: "lotus" })).rejects.toMatchObject({ status: 409 });
+    const id = await room();
+    await claimSeat(id, { seat: 1 });
+    await expect(claimSeat(id, { seat: 1 })).rejects.toMatchObject({ status: 409 });
   });
 
   it("allows exactly one table device", async () => {
-    await claimSeat(id, { seat: "table", password: "lotus" });
-    await expect(claimSeat(id, { seat: "table", password: "lotus" })).rejects.toMatchObject({ status: 409 });
+    const id = await room();
+    await claimSeat(id, { seat: "table" });
+    await expect(claimSeat(id, { seat: "table" })).rejects.toMatchObject({ status: 409 });
   });
 
   it("falls back to a seat label when no name is given", async () => {
-    const { view } = await claimSeat(id, { seat: 3, password: "lotus", name: "   " });
+    const id = await room();
+    const { view } = await claimSeat(id, { seat: 3, name: "   " });
     expect(view.players[3].occupant.name).toBe("Seat 4");
   });
 });
@@ -71,16 +83,16 @@ describe("claiming seats", () => {
 describe("the lobby", () => {
   it("holds the tiles until the table deals", async () => {
     const id = await room();
-    await claimSeat(id, { seat: 0, password: "lotus" });
+    await claimSeat(id, { seat: 0 });
     const waiting = await readRoom(id, null);
     expect(waiting.started).toBe(false);
     expect(waiting.players.every((p) => p.handCount === 0)).toBe(true);
     expect(waiting.wallCount).toBe(0);
   });
 
-  it("refuses to deal a room nobody is sitting in", async () => {
+  it("refuses to deal a table nobody is sitting at", async () => {
     const id = await room();
-    const { token } = await claimSeat(id, { seat: "table", password: "lotus" });
+    const { token } = await claimSeat(id, { seat: "table" });
     await expect(control(id, token, { type: "deal" })).rejects.toMatchObject({ status: 409 });
   });
 
@@ -93,15 +105,14 @@ describe("the lobby", () => {
   });
 
   it("lets a player deal when there is no tablet, but not when there is", async () => {
-    const id = await room();
-    const { token } = await claimSeat(id, { seat: 0, password: "lotus" });
-    const dealt = await control(id, token, { type: "deal" });
-    expect(dealt.started).toBe(true);
+    const alone = await room();
+    const { token } = await claimSeat(alone, { seat: 0 });
+    expect((await control(alone, token, { type: "deal" })).started).toBe(true);
 
-    const other = await room();
-    const player = await claimSeat(other, { seat: 0, password: "lotus" });
-    await claimSeat(other, { seat: "table", password: "lotus" });
-    await expect(control(other, player.token, { type: "deal" })).rejects.toMatchObject({
+    const withTablet = await room();
+    const player = await claimSeat(withTablet, { seat: 0 });
+    await claimSeat(withTablet, { seat: "table" });
+    await expect(control(withTablet, player.token, { type: "deal" })).rejects.toMatchObject({
       status: 403,
     });
   });
@@ -109,11 +120,11 @@ describe("the lobby", () => {
   it("holds everyone at the same starting line no matter who arrived first", async () => {
     const id = await room();
     // Kris connects, then puts the phone down while the others walk over.
-    await claimSeat(id, { seat: 2, password: "lotus", name: "Kris" });
+    await claimSeat(id, { seat: 2, name: "Kris" });
     await readRoom(id, null);
     await readRoom(id, null);
     for (const seat of [0, 1, 3] as const) {
-      await claimSeat(id, { seat, password: "lotus" });
+      await claimSeat(id, { seat });
     }
     const view = await readRoom(id, null);
     // Nobody has had a tile thrown for them by the computer in the meantime.
@@ -152,12 +163,12 @@ describe("playing", () => {
   });
 
   it("fills unclaimed seats with the computer and keeps play moving", async () => {
-    // Rooms are seeded from the clock, so one deal proves very little. Twenty
-    // of them cover the openings where a computer seat claims the first
+    // The table is seeded from the clock, so one deal proves very little.
+    // Twenty of them cover the openings where a computer seat claims the first
     // discard, or wins off it outright.
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const id = await room();
-      const { token } = await claimSeat(id, { seat: 0, password: "lotus" });
+      const { token } = await claimSeat(id, { seat: 0 });
       let view = await control(id, token, { type: "deal" });
       // Seat 0 is the dealer on the opening hand, so the turn is already here.
       expect(view.turn).toBe(0);
@@ -185,23 +196,24 @@ describe("playing", () => {
 describe("table control", () => {
   it("refuses commands from a player", async () => {
     const id = await room();
-    const { token } = await claimSeat(id, { seat: 0, password: "lotus" });
+    const { token } = await claimSeat(id, { seat: 0 });
     await expect(control(id, token, { type: "restart" })).rejects.toMatchObject({ status: 403 });
+    expect(RoomError).toBeDefined();
   });
 
   it("lets the table change the faan minimum and free a seat", async () => {
     const id = await room();
-    await claimSeat(id, { seat: 1, password: "lotus", name: "Parth" });
-    const { token } = await claimSeat(id, { seat: "table", password: "lotus" });
-    const withMin = await control(id, token, { type: "minFaan", value: 3 });
-    expect(withMin.config.minFaan).toBe(3);
-    const freed = await control(id, token, { type: "freeSeat", seat: 1 });
-    expect(freed.players[1].occupant.kind).toBe("open");
+    await claimSeat(id, { seat: 1, name: "Parth" });
+    const { token } = await claimSeat(id, { seat: "table" });
+    expect((await control(id, token, { type: "minFaan", value: 3 })).config.minFaan).toBe(3);
+    expect((await control(id, token, { type: "freeSeat", seat: 1 })).players[1].occupant.kind).toBe(
+      "open",
+    );
   });
 
   it("restarts back to the lobby while keeping everyone seated", async () => {
     const { id, table } = await dealtRoom([0]);
-    await claimSeat(id, { seat: 1, password: "lotus", name: "Kris" });
+    await claimSeat(id, { seat: 1, name: "Kris" });
     const restarted = await control(id, table, { type: "restart" });
     expect(restarted.players[1].occupant.name).toBe("Kris");
     expect(restarted.scores).toEqual([0, 0, 0, 0]);
@@ -212,37 +224,16 @@ describe("table control", () => {
   });
 });
 
-describe("the table password", () => {
-  it("keeps a configured word to itself", () => {
-    expect(suggestedPassword()).toBeNull();
-  });
-
-  it("falls back to a short word anyone can say aloud", async () => {
-    // Three letters, and public by design — there is nothing to look up.
-    expect(DEFAULT_ROOM_PASSWORD).toHaveLength(3);
-    delete process.env.MAHJONG_ROOM_PASSWORD;
-    try {
-      expect(suggestedPassword()).toBe(DEFAULT_ROOM_PASSWORD);
-      // Multiplayer works out of the box rather than answering 503.
-      const { id } = await createRoom(DEFAULT_ROOM_PASSWORD);
-      expect(id).toMatch(/^[A-Z2-9]{4}$/);
-      await expect(createRoom("lotus")).rejects.toMatchObject({ status: 401 });
-    } finally {
-      process.env.MAHJONG_ROOM_PASSWORD = "lotus";
-    }
-  });
-});
-
 describe("playing the computer while you wait", () => {
   it("marks a solo deal as a warm-up and offers to regroup when someone joins", async () => {
     const id = await room();
-    const { token } = await claimSeat(id, { seat: 0, password: "lotus", name: "Kris" });
+    const { token } = await claimSeat(id, { seat: 0, name: "Kris" });
     const solo = await control(id, token, { type: "deal" });
     expect(solo.warmup).toBe(true);
     expect(solo.seatedCount).toBe(1);
     expect(solo.canRegroup).toBe(false);
 
-    await claimSeat(id, { seat: 2, password: "lotus", name: "Srini" });
+    await claimSeat(id, { seat: 2, name: "Srini" });
     const joined = await readRoom(id, token);
     expect(joined.canRegroup).toBe(true);
 
@@ -260,35 +251,5 @@ describe("playing the computer while you wait", () => {
     expect((await readRoom(id, tokens[0])).warmup).toBe(false);
     await expect(control(id, table, { type: "regroup" })).rejects.toMatchObject({ status: 409 });
     await expect(control(id, tokens[1], { type: "regroup" })).rejects.toMatchObject({ status: 403 });
-  });
-});
-
-describe("the join link", () => {
-  it("mints a key per room and lets it stand in for the password", async () => {
-    const a = await createRoom("lotus");
-    const b = await createRoom("lotus");
-    expect(a.joinKey).toBeTruthy();
-    expect(a.joinKey).not.toBe(b.joinKey);
-
-    const { view } = await claimSeat(a.id, { key: a.joinKey, seat: 1, name: "Srini" });
-    expect(view.you).toEqual({ role: "player", seat: 1 });
-    // One room's link is no good at another's table.
-    await expect(claimSeat(b.id, { key: a.joinKey, seat: 1 })).rejects.toMatchObject({
-      status: 401,
-    });
-  });
-
-  it("refuses a wrong key without falling back to the password", async () => {
-    const { id } = await createRoom("lotus");
-    await expect(claimSeat(id, { key: "not-the-key", seat: 0 })).rejects.toMatchObject({
-      status: 401,
-    });
-  });
-
-  it("shows the key to the table but not to a passer-by", async () => {
-    const { id, joinKey } = await createRoom("lotus");
-    const { token } = await claimSeat(id, { seat: "table", password: "lotus" });
-    expect((await readRoom(id, token)).joinKey).toBe(joinKey);
-    expect((await readRoom(id, null)).joinKey).toBeNull();
   });
 });
