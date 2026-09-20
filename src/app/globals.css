@@ -2119,10 +2119,47 @@ a.btn {
 }
 
 .gather__url {
+  display: block;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   word-break: break-all;
+  color: var(--ink-dim);
+}
+
+/* A chair's own code sits inside its card, so it is sized to the card rather
+   than to the screen the single table-wide code used to have to itself. */
+.qr--seat {
+  width: min(190px, 22vh);
+  max-width: 100%;
+  flex: 0 0 auto;
+}
+
+.gather__seatinfo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* The tablet types a name into the chair before anyone scans it. It has to be
+   legible from across the table, like everything else on this screen. */
+.gather__nameinput {
+  width: min(100%, 220px);
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--raise-1);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(15px, 2.2vh, 22px);
   text-align: center;
+}
+
+.gather__nameinput::placeholder {
+  font-weight: 400;
+  font-size: 0.8em;
+  color: var(--ink-dim);
 }
 
 .gather__hint {
@@ -2147,8 +2184,8 @@ a.btn {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: clamp(12px, 2vh, 24px) 10px;
+  gap: 8px;
+  padding: clamp(10px, 1.6vh, 18px) 10px;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--raise-0);
@@ -2162,7 +2199,7 @@ a.btn {
 }
 
 .gather__wind {
-  font-size: clamp(30px, 5vh, 52px);
+  font-size: clamp(24px, 3.4vh, 40px);
   line-height: 1;
   color: var(--gold);
 }
@@ -2275,6 +2312,20 @@ a.btn {
 @media (prefers-reduced-motion: reduce) {
   .gather__seat {
     transition: none;
+  }
+}
+
+/* A tablet lying flat in landscape has width to spare and no height at all.
+   Stacked, four cards carrying a code push the Deal button off the bottom, so
+   there the code goes beside the chair's details rather than under them. */
+@media (min-width: 900px) and (max-height: 950px) {
+  .gather__seat {
+    flex-direction: row;
+    gap: clamp(10px, 1.4vw, 20px);
+  }
+
+  .qr--seat {
+    width: min(165px, 23vh);
   }
 }
 
