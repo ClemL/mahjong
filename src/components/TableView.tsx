@@ -2,11 +2,12 @@
 
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
-import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { TileBack, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { SettingsMenu } from "./SettingsMenu";
+import { TableSettings } from "./TableSettings";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, "top" | "right" | "bottom" | "left"> = {
@@ -126,10 +127,13 @@ export function TableView({
   api,
   view,
   sound,
+  readOnly = false,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
+  /** Mirror the table without driving it — the controls belong to the tablet. */
+  readOnly?: boolean;
 }) {
   const seats: Seat[] = [0, 1, 2, 3];
   // Only the shared table holds the screen awake; a phone in a pocket should
@@ -161,21 +165,8 @@ export function TableView({
           </span>
         ) : null}
         <span className="topbar__spacer" />
+        {readOnly ? null : (
         <div className="actions">
-          <label className="field">
-            <span className="field__label">Min faan</span>
-            <select
-              className="field__select"
-              value={view.config.minFaan}
-              onChange={(e) => void api.control({ type: "minFaan", value: Number(e.target.value) })}
-            >
-              {MIN_FAAN_CHOICES.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
           {view.phase === "handOver" ? (
             <button
               type="button"
@@ -194,16 +185,6 @@ export function TableView({
               onClick={() => void api.control({ type: "forcePass" })}
             >
               Skip waiting ({view.awaitingClaimSeats.length})
-            </button>
-          ) : null}
-          {sound ? (
-            <button
-              type="button"
-              className="btn btn--ghost"
-              aria-pressed={!sound.muted}
-              onClick={() => sound.setMuted(!sound.muted)}
-            >
-              {sound.muted ? "Sound off" : "Sound on"}
             </button>
           ) : null}
           <button
@@ -226,7 +207,11 @@ export function TableView({
           >
             Restart
           </button>
+          <SettingsMenu>
+            <TableSettings api={api} view={view} sound={sound} />
+          </SettingsMenu>
         </div>
+        )}
       </header>
 
       <div className="tableview__grid">
