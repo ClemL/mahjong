@@ -25,9 +25,21 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
   const [origin, setOrigin] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
 
+  // Names typed on the tablet, one per chair. They ride along in that seat's
+  // QR rather than being held on the server: nobody owns the chair until
+  // somebody scans it, so there is nothing to reserve.
+  const [names, setNames] = useState<Record<number, string>>({});
+
   // One open table, so the link is just its address — there is no key to carry
   // and nothing to type once it has been scanned.
   const joinUrl = origin ? `${origin}/room/${view.roomId}` : null;
+
+  /** A seat's own link: which chair, and the name the table typed for it. */
+  const seatUrl = (seat: Seat): string | null => {
+    if (!joinUrl) return null;
+    const name = (names[seat] ?? "").trim();
+    return `${joinUrl}?seat=${seat}${name ? `&name=${encodeURIComponent(name)}` : ""}`;
+  };
 
   const seats: Seat[] = [0, 1, 2, 3];
   const seated = seats.filter((s) => view.players[s].occupant.kind === "human");
@@ -56,38 +68,68 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
         <div>
           <span className="gather__label">The table</span>
           <span className="gather__code">{view.roomId}</span>
+          {isTable && joinUrl ? (
+            <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
+          ) : null}
         </div>
         <p className="gather__lead">
           {isTable
-            ? "Scan to take a seat. Nothing is dealt until everyone is down and the table deals."
+            ? "Scan the code on the chair you are sitting in. Type a name into it first and it arrives with them. Nothing is dealt until the table deals."
             : view.canDeal
               ? "Deal once everyone is down. Seats left open are played by the computer."
               : "You are in. The table deals once everyone is down."}
         </p>
       </header>
 
-      <div className={`gather__body${isTable ? "" : " gather__body--seats"}`}>
-        {isTable ? joinPanel : null}
-
+      <div className="gather__body gather__body--seats">
         <div className="gather__seats">
           {seats.map((seat) => {
             const occupant = view.players[seat].occupant;
             const here = occupant.kind === "human";
+            const url = seatUrl(seat);
             return (
               <div
                 key={seat}
                 className={`gather__seat${here ? " gather__seat--here" : ""}`}
                 aria-live="polite"
               >
-                <span className="gather__wind">{tileGlyph(seatWind(seat))}</span>
-                <span className="gather__seatname">
-                  {here ? occupant.name : "Waiting…"}
-                </span>
-                <span className="gather__seatmeta">
-                  Seat {seat + 1} · {SEAT_NAMES[seat]} · {EDGE[seat]} edge
-                </span>
-                {/* Joined state must not rest on the colour of the card alone. */}
-                <span className="gather__state">{here ? "✓ Seated" : "Open"}</span>
+                <div className="gather__seatinfo">
+                  <span className="gather__wind">{tileGlyph(seatWind(seat))}</span>
+
+                  {here ? (
+                    <span className="gather__seatname">{occupant.name}</span>
+                  ) : isTable ? (
+                    <input
+                      className="gather__nameinput"
+                      value={names[seat] ?? ""}
+                      maxLength={16}
+                      placeholder="Name (optional)"
+                      aria-label={`Name for seat ${seat + 1}`}
+                      autoComplete="off"
+                      spellCheck={false}
+                      onChange={(e) => setNames((n) => ({ ...n, [seat]: e.target.value }))}
+                    />
+                  ) : (
+                    <span className="gather__seatname">Waiting…</span>
+                  )}
+
+                  <span className="gather__seatmeta">
+                    Seat {seat + 1} · {SEAT_NAMES[seat]} · {EDGE[seat]} edge
+                  </span>
+                  {/* Joined state must not rest on the colour of the card alone. */}
+                  <span className="gather__state">{here ? "✓ Seated" : "Open"}</span>
+                </div>
+
+                {/* Each chair has its own code, so scanning it sits you down
+                    there rather than dropping you on a seat picker to choose
+                    the one you are already standing behind. */}
+                {!here && isTable && url ? (
+                  <QrCode
+                    value={url}
+                    label={`Scan to take seat ${seat + 1}, ${SEAT_NAMES[seat]}`}
+                    className="qr--seat"
+                  />
+                ) : null}
               </div>
             );
           })}

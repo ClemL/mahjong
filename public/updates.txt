@@ -36,3 +36,6 @@
 2026-09-19T16:30:00Z - Multiplayer animations play slower so everyone can see what just happened
 2026-09-20T00:40:00Z - Settings moved behind a ☰ menu: the bar now carries only the controls that act on the hand
 2026-09-20T00:40:00Z - The side panels keep scores, history and the table log; rules, faan table and appearance moved into the menu
+2026-09-20T01:10:00Z - Every open chair on the table screen now shows its own QR code — scan the one in front of you and you are sat down there
+2026-09-20T01:10:00Z - The table can type a player's name into a chair, and whoever scans that chair arrives under it
+2026-09-20T01:10:00Z - Play together is back on the main screen instead of inside the settings menu

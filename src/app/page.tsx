@@ -84,15 +84,15 @@ export default function Page() {
           <button type="button" className="btn btn--sm" onClick={api.newGame}>
             New game
           </button>
+          <a className="btn btn--sm" href="/room/TABLE">
+            Play together
+          </a>
           <SettingsMenu>
             <GamePanel api={api} />
             <PlayPanel api={api} />
             <AppearancePanel api={appearance} />
             <RulesPanel config={state.config} />
             <FaanPanel config={state.config} />
-            <a className="btn btn--sm btn--ghost" href="/room/TABLE">
-              Play together
-            </a>
           </SettingsMenu>
         </div>
       </header>
