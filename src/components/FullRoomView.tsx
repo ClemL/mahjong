@@ -23,7 +23,7 @@ export function FullRoomView({
   return (
     <div className="fullroom">
       <div className="fullroom__table">
-        <TableView api={readOnlyTable} view={view} />
+        <TableView api={readOnlyTable} view={view} readOnly />
       </div>
       <PhoneView api={api} view={view} sound={sound} />
     </div>

@@ -8,6 +8,8 @@ import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import type { SoundToggle } from "./TableView";
+import { SettingsMenu } from "./SettingsMenu";
+import { PhoneSettings } from "./PhoneSettings";
 
 function claimLabel(type: string): string {
   return type === "chow" ? "Chow 上" : type === "pung" ? "Pung 碰" : type === "kong" ? "Kong 槓" : "Win 糊";
@@ -75,15 +77,9 @@ export function PhoneView({
         </span>
         <span className="phone__wall">{view.wallCount} left</span>
         {sound ? (
-          <button
-            type="button"
-            className="btn btn--sm btn--ghost"
-            aria-label={sound.muted ? "Unmute" : "Mute"}
-            aria-pressed={!sound.muted}
-            onClick={() => sound.setMuted(!sound.muted)}
-          >
-            {sound.muted ? "🔇" : "🔊"}
-          </button>
+          <SettingsMenu>
+            <PhoneSettings sound={sound} />
+          </SettingsMenu>
         ) : null}
       </header>
 

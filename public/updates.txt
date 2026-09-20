@@ -34,3 +34,5 @@
 2026-09-19T16:30:00Z - One shared table, no password and no room codes — open the link and take a seat
 2026-09-19T16:30:00Z - Each player's discards now sit in front of them instead of stacked in the middle
 2026-09-19T16:30:00Z - Multiplayer animations play slower so everyone can see what just happened
+2026-09-20T00:40:00Z - Settings moved behind a ☰ menu: the bar now carries only the controls that act on the hand
+2026-09-20T00:40:00Z - The side panels keep scores, history and the table log; rules, faan table and appearance moved into the menu
