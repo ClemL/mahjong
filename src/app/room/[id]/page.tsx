@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useCallback } from "react";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 import { useRoom } from "@/hooks/useRoom";
 import { useRoomSound } from "@/hooks/useRoomSound";
 import { SeatPicker } from "@/components/SeatPicker";
@@ -20,6 +20,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const { view } = api;
   const sound = useRoomSound(view);
 
+  // Set while a scanned seat code is being redeemed, so the seat picker does
+  // not flash up on the way to the chair the scan already chose.
+  const [joining, setJoining] = useState<Seat | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
   const claim = useCallback(
     async (seat: Seat | "table", name: string) => {
       const response = await fetch(`/api/rooms/${roomId}/claim`, {
@@ -37,6 +42,34 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     [roomId, api],
   );
 
+  // A seat's QR carries which chair it belongs to and whatever name the table
+  // typed into it. Redeem it once, then strip the parameters: a reload — or
+  // the link being passed on to somebody else — must not sit anyone down
+  // again.
+  const redeemed = useRef(false);
+  useEffect(() => {
+    if (redeemed.current || !view || view.you.role !== "spectator") return;
+    const url = new URL(window.location.href);
+    const asked = url.searchParams.get("seat");
+    if (asked === null) return;
+
+    redeemed.current = true;
+    const name = url.searchParams.get("name") ?? "";
+    url.searchParams.delete("seat");
+    url.searchParams.delete("name");
+    window.history.replaceState(null, "", url.pathname + url.search);
+
+    const seat = Number(asked);
+    if (!Number.isInteger(seat) || seat < 0 || seat > 3) {
+      setJoinError("That code is not for a seat at this table");
+      return;
+    }
+    setJoining(seat as Seat);
+    void claim(seat as Seat, name)
+      .catch((error: Error) => setJoinError(error.message))
+      .finally(() => setJoining(null));
+  }, [view, claim]);
+
   if (!view) {
     return (
       <main className="app">
@@ -46,12 +79,19 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   }
 
   if (view.you.role === "spectator") {
+    if (joining !== null) {
+      return (
+        <main className="app">
+          <div className="panel">Taking seat {joining + 1}…</div>
+        </main>
+      );
+    }
     return (
       <main className="app">
         <SeatPicker
           view={view}
           busy={api.busy}
-          error={api.error}
+          error={joinError ?? api.error}
           onClaim={async (seat, name) => {
             try {
               await claim(seat, name);

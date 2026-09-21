@@ -10,7 +10,15 @@ import qrcode from "qrcode-generator";
  * the light quiet zone around the symbol, and a tastefully muted QR code is one
  * nobody's phone can read.
  */
-export function QrCode({ value, label }: { value: string; label: string }) {
+export function QrCode({
+  value,
+  label,
+  className = "",
+}: {
+  value: string;
+  label: string;
+  className?: string;
+}) {
   const { size, path } = useMemo(() => {
     const qr = qrcode(0, "M");
     qr.addData(value);
@@ -30,7 +38,7 @@ export function QrCode({ value, label }: { value: string; label: string }) {
 
   return (
     <svg
-      className="qr"
+      className={`qr ${className}`.trim()}
       viewBox={`0 0 ${extent} ${extent}`}
       role="img"
       aria-label={label}
