@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useMahjong } from "@/hooks/useMahjong";
 import { SEAT_NAMES, type Seat, nextSeat, tileGlyph } from "@/game/tiles";
 import { SeatPanel } from "@/components/SeatPanel";
@@ -11,6 +12,7 @@ import { AppearancePanel } from "@/components/AppearancePanel";
 import { PlayPanel } from "@/components/PlayPanel";
 import { GamePanel } from "@/components/GamePanel";
 import { SettingsMenu } from "@/components/SettingsMenu";
+import { FilmDialog } from "@/components/FilmPlayer";
 import { useAppearance } from "@/hooks/useAppearance";
 import {
   FaanPanel,
@@ -24,6 +26,7 @@ export default function Page() {
   const api = useMahjong(0);
   const appearance = useAppearance();
   const { state } = api;
+  const [film, setFilm] = useState(false);
 
   if (!state) {
     return (
@@ -87,6 +90,15 @@ export default function Page() {
           <a className="btn btn--sm" href="/room/TABLE">
             Play together
           </a>
+          {/* Nobody who has not played can tell what this table is for; four
+              minutes of pictures does what a wall of rules cannot. */}
+          <button
+            type="button"
+            className="btn btn--sm btn--primary topbar__film"
+            onClick={() => setFilm(true)}
+          >
+            How to play
+          </button>
           <SettingsMenu>
             <GamePanel api={api} />
             <PlayPanel api={api} />
@@ -124,6 +136,8 @@ export default function Page() {
       </div>
 
       <ResultModal state={state} onNextHand={api.nextHand} onNewGame={api.newGame} />
+
+      {film ? <FilmDialog onClose={() => setFilm(false)} /> : null}
 
       <BuildFooter />
     </main>

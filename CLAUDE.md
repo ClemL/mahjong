@@ -52,6 +52,13 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
 src/server/        Room store (Upstash + memory) and room service — server only
 src/app/api/       Room endpoints
 src/hooks/         React bindings for the engine and for a room
+src/film/          The explainer film — hand-drawn canvas animation, no React
+  rough.ts         Wobbled lines, shapes, ink text; the boil
+  paper.ts         Sheet, grain, torn scraps, tape
+  tiles.ts         Hand-drawn tile faces, cached as sprites
+  script.ts        Subtitles and chapters
+  scenes.ts        The twelve scenes
+  film.ts          renderFrame(ctx, t) — the whole film from a timestamp
 src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, footer
 src/app/           Next.js entry and all styles
 public/updates.txt Changelog, oldest first
@@ -86,6 +93,13 @@ public/updates.txt Changelog, oldest first
 * **Opponent changes need a measured before/after.** The AI is judged on the
   washout rate over a few hundred simulated hands, not on how the code reads. State
   the numbers in the PR.
+* **The film renders from a timestamp, and nothing else.** `renderFrame(ctx, t)` in `src/film/`
+  must stay a pure function of `t` — no state carried between frames. That is what makes the
+  scrubber exact and the poster a still. The wobble comes from a seed sampled at 8fps, not from a
+  random number, for the same reason.
+* **Watch the film's frame budget.** It redraws everything each frame, so anything static — the
+  sheet, the grain, a tile face, a shadow — belongs in a cache, not in the loop. A canvas filter
+  per tile once took it from 60fps to 4.
 * **Motion and color are accessibility surfaces.** Animations must respect `prefers-reduced-motion`,
   hover-only affordances must be gated behind `(hover: hover) and (pointer: fine)`, and identity must
   never rest on color alone.

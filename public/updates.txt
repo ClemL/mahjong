@@ -39,3 +39,5 @@
 2026-09-20T01:10:00Z - Every open chair on the table screen now shows its own QR code — scan the one in front of you and you are sat down there
 2026-09-20T01:10:00Z - The table can type a player's name into a chair, and whoever scans that chair arrives under it
 2026-09-20T01:10:00Z - Play together is back on the main screen instead of inside the settings menu
+2026-09-26T13:00:00Z - New: a four-and-a-half minute hand-drawn film explaining mahjong, under "How to play" — no sound, subtitles throughout
+2026-09-26T13:00:00Z - The film has chapters, a scrubber, fullscreen, and a readable transcript if you would rather not watch it
