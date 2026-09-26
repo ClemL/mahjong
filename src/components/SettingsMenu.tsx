@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { FilmDialog } from "./FilmPlayer";
 
 /**
  * Settings behind a hamburger.
@@ -18,6 +19,7 @@ export function SettingsMenu({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [film, setFilm] = useState(false);
   const panelId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
@@ -81,10 +83,32 @@ export function SettingsMenu({
                 Close
               </button>
             </header>
-            <div className="drawer__body">{children}</div>
+            <div className="drawer__body">
+              {children}
+              {/* Every settings drawer carries the film — the table and the
+                  phones have no top-bar button for it, and someone mid-game who
+                  has forgotten a rule looks here first. The drawer closes as the
+                  film opens, so Escape on the film does not also dismiss a
+                  drawer hidden behind it. */}
+              <section className="panel">
+                <h2 className="panel__title">How to play</h2>
+                <button
+                  type="button"
+                  className="btn btn--sm topbar__film"
+                  onClick={() => {
+                    setOpen(false);
+                    setFilm(true);
+                  }}
+                >
+                  Watch the film
+                </button>
+              </section>
+            </div>
           </aside>
         </div>
       ) : null}
+
+      {film ? <FilmDialog onClose={() => setFilm(false)} /> : null}
     </>
   );
 }
