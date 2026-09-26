@@ -2485,3 +2485,401 @@ a.btn {
     animation: none;
   }
 }
+
+/* ======================================================= the film ======= */
+
+.film__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(8px, 2vh, 28px);
+  background: rgba(14, 20, 17, 0.88);
+  overflow-y: auto;
+}
+
+.film__shell {
+  width: min(1180px, 100%);
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.film__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.film__title {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #e7dcc3;
+}
+
+.film {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* The frame the paper sits in: a dark mount, like a print on a wall. */
+.film__stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #efe5cd;
+  box-shadow:
+    0 0 0 1px rgba(255, 245, 220, 0.16),
+    0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.film__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Burned-in subtitles would soften at every size the canvas is drawn at, so
+   these are real text laid over the frame instead. */
+.film__sub {
+  position: absolute;
+  left: 50%;
+  bottom: 3.2%;
+  transform: translateX(-50%);
+  margin: 0;
+  width: min(88%, 900px);
+  text-align: center;
+  pointer-events: none;
+  animation: film-sub 260ms ease both;
+}
+
+.film__sub span {
+  display: inline;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0.3em 0.62em;
+  border-radius: 7px;
+  background: rgba(26, 22, 18, 0.84);
+  color: #f6edd9;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: clamp(14px, 2.05vw, 25px);
+  line-height: 1.5;
+  letter-spacing: 0.005em;
+}
+
+@keyframes film-sub {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.film__big {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 0;
+  background: radial-gradient(ellipse at 50% 46%, rgba(20, 16, 12, 0.18), rgba(20, 16, 12, 0.6));
+  color: #f6edd9;
+  cursor: pointer;
+}
+
+.film__bigicon {
+  width: clamp(54px, 7vw, 84px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(246, 237, 217, 0.95);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+  position: relative;
+  transition: transform 160ms ease;
+}
+
+.film__bigicon::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 54%;
+  transform: translate(-50%, -50%);
+  border-style: solid;
+  border-width: 0.42em 0 0.42em 0.68em;
+  border-color: transparent transparent transparent #23201b;
+  font-size: clamp(22px, 2.6vw, 34px);
+}
+
+.film__biglabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: clamp(17px, 2.3vw, 29px);
+  font-weight: 700;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+.film__biglabel small {
+  font-family: inherit;
+  font-size: clamp(11px, 1.25vw, 15px);
+  font-weight: 400;
+  opacity: 0.82;
+  letter-spacing: 0.04em;
+}
+
+.film__end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: rgba(243, 233, 212, 0.93);
+}
+
+.film__endline {
+  margin: 0;
+  font-family: ui-serif, Georgia, "Times New Roman", serif;
+  font-size: clamp(20px, 3vw, 38px);
+  color: #2e2823;
+}
+
+.film__endrow {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* The narration again, for a screen reader; the band above is decorative to it. */
+.film__live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.film__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 250, 235, 0.07);
+  border: 1px solid rgba(255, 245, 220, 0.14);
+}
+
+.film__play {
+  width: 38px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 245, 220, 0.24);
+  background: rgba(255, 250, 235, 0.12);
+  color: #f2e8d2;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.film__play:hover {
+  background: rgba(255, 250, 235, 0.2);
+}
+
+.film__time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #cfc3a8;
+  font-variant-numeric: tabular-nums;
+}
+
+.film__time--total {
+  opacity: 0.7;
+}
+
+.film__track {
+  position: relative;
+  flex: 1 1 220px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+}
+
+.film__track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 245, 220, 0.18);
+}
+
+.film__fill {
+  position: absolute;
+  left: 0;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--gold, #d8b25f);
+  pointer-events: none;
+}
+
+/* The real control sits on top, invisible, so keyboard and touch get the
+   native range behaviour while the painted bar carries the look. */
+.film__range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.film__mark {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin-left: -5.5px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  border: 2px solid rgba(20, 24, 20, 0.7);
+  background: rgba(255, 246, 224, 0.62);
+  padding: 0;
+  cursor: pointer;
+}
+
+.film__mark:hover,
+.film__mark:focus-visible {
+  background: var(--gold, #d8b25f);
+  transform: translateY(-50%) scale(1.25);
+}
+
+.film__chapter {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #cfc3a8;
+  min-width: 108px;
+}
+
+.film__transcript {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 250, 235, 0.07);
+  border: 1px solid rgba(255, 245, 220, 0.14);
+}
+
+.film__transcript ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.film__transcript button {
+  width: 100%;
+  text-align: left;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
+  color: #e7dcc3;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.film__transcript button:hover {
+  background: rgba(255, 250, 235, 0.12);
+}
+
+.film__tstamp {
+  display: inline-block;
+  width: 46px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #a99a7c;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The invitation on the table itself. */
+.topbar__film {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.topbar__film::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent currentColor;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .film__big:hover .film__bigicon {
+    transform: scale(1.07);
+  }
+}
+
+@media (max-width: 640px) {
+  .film__chapter {
+    display: none;
+  }
+
+  .film__bar {
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .film__sub {
+    animation: none;
+  }
+
+  .film__bigicon {
+    transition: none;
+  }
+}
+
+/* Fullscreen: the frame takes the screen and the picture grows to fit it. */
+.film:fullscreen {
+  justify-content: center;
+  padding: 10px;
+  background: #100e0b;
+}
+
+.film:fullscreen .film__stage {
+  width: min(100%, calc((100vh - 104px) * 2));
+  margin: 0 auto;
+}
+
+.film:fullscreen .film__transcript {
+  max-height: 22vh;
+}
