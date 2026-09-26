@@ -34,6 +34,14 @@ export function FilmPlayer({ onClose }: { onClose?: () => void }) {
   const [uiTime, setUiTime] = useState(0);
   const [ended, setEnded] = useState(false);
   const [showText, setShowText] = useState(false);
+  const [showChapters, setShowChapters] = useState(false);
+  const chaptersRef = useRef<HTMLElement>(null);
+
+  // On a laptop screen the list opens below the fold; bring it up rather than
+  // leave the button looking as if it did nothing.
+  useEffect(() => {
+    if (showChapters) chaptersRef.current?.scrollIntoView({ block: "nearest" });
+  }, [showChapters]);
   const [calm, setCalm] = useState(false);
   const [started, setStarted] = useState(false);
   const [full, setFull] = useState(false);
@@ -136,6 +144,21 @@ export function FilmPlayer({ onClose }: { onClose?: () => void }) {
       paint();
     },
     [paint, started],
+  );
+
+  // Picking a chapter from the list is a request to watch it, unlike dragging
+  // the scrubber, which leaves play state alone.
+  const playChapter = useCallback(
+    (at: number) => {
+      seek(at + 0.05);
+      if (!playingRef.current) {
+        playingRef.current = true;
+        lastRef.current = 0;
+        setPlaying(true);
+      }
+      setShowChapters(false);
+    },
+    [seek],
   );
 
   const toggle = useCallback(() => {
@@ -273,7 +296,17 @@ export function FilmPlayer({ onClose }: { onClose?: () => void }) {
         </div>
 
         <span className="film__time film__time--total">{clock(RUNTIME)}</span>
-        <span className="film__chapter">{chapter.title}</span>
+        {/* The dots on the track carry their names only on hover, which a
+            phone never has; this is the way to every chapter by name. */}
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost film__chapter"
+          onClick={() => setShowChapters((v) => !v)}
+          aria-expanded={showChapters}
+        >
+          <span className="film__chapterlabel">Chapters</span>
+          <span className="film__chaptername">{chapter.title}</span>
+        </button>
 
         <button
           type="button"
@@ -294,6 +327,26 @@ export function FilmPlayer({ onClose }: { onClose?: () => void }) {
           {full ? "Exit full" : "Fullscreen"}
         </button>
       </div>
+
+      {showChapters ? (
+        <nav className="film__chapters" aria-label="Chapters" ref={chaptersRef}>
+          <ol>
+            {CHAPTERS.map((c, i) => (
+              <li key={c.at}>
+                <button
+                  type="button"
+                  aria-current={c.at === chapter.at ? "true" : undefined}
+                  onClick={() => playChapter(c.at)}
+                >
+                  <span className="film__chapternum">{i + 1}</span>
+                  <span className="film__chaptertitle">{c.title}</span>
+                  <span className="film__tstamp">{clock(c.at)}</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      ) : null}
 
       {showText ? (
         <div className="film__transcript">

@@ -42,3 +42,4 @@
 2026-09-26T13:00:00Z - New: a four-and-a-half minute hand-drawn film explaining mahjong, under "How to play" — no sound, subtitles throughout
 2026-09-26T13:00:00Z - The film has chapters, a scrubber, fullscreen, and a readable transcript if you would rather not watch it
 2026-09-26T18:00:00Z - The how-to-play film is now in the settings menu too, including on the shared table and on phones
+2026-09-26T19:00:00Z - The film has a Chapters menu: every chapter by name, one tap to jump there, on phones too
