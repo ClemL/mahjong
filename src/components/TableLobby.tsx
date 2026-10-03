@@ -3,9 +3,15 @@
 import { useEffect, useState } from "react";
 import type { RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
+import { useAppearance } from "@/hooks/useAppearance";
+import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { QrCode } from "./QrCode";
+import { SettingsMenu } from "./SettingsMenu";
+import { TableSettings } from "./TableSettings";
+import { PhoneSettings } from "./PhoneSettings";
+import type { SoundToggle } from "./TableView";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, string> = { 0: "bottom", 1: "right", 2: "top", 3: "left" };
@@ -19,7 +25,18 @@ const EDGE: Record<Seat, string> = { 0: "bottom", 1: "right", 2: "top", 3: "left
  * first phone to connect from starting a hand the computer then plays on
  * everyone else's behalf.
  */
-export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
+export function TableLobby({
+  api,
+  view,
+  sound,
+}: {
+  api: RoomApi;
+  view: RoomView;
+  sound: SoundToggle;
+}) {
+  const appearance = useAppearance();
+  const layout = useCompactLayout();
+
   // The join link has to be built in the browser — a statically exported page
   // has no idea what host it will be served from.
   const [origin, setOrigin] = useState<string | null>(null);
@@ -65,13 +82,9 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
   return (
     <div className="gather">
       <header className="gather__head">
-        <div>
-          <span className="gather__label">The table</span>
-          <span className="gather__code">{view.roomId}</span>
-          {isTable && joinUrl ? (
-            <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
-          ) : null}
-        </div>
+        {isTable && joinUrl ? (
+          <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
+        ) : null}
         <p className="gather__lead">
           {isTable
             ? "Scan the code on the chair you are sitting in. Type a name into it first and it arrives with them. Nothing is dealt until the table deals."
@@ -79,6 +92,21 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
               ? "Deal once everyone is down. Seats left open are played by the computer."
               : "You are in. The table deals once everyone is down."}
         </p>
+        {/* The same drawer as during play, so the look and the house rules can
+            be settled while people are still sitting down. */}
+        <SettingsMenu>
+          {isTable ? (
+            <TableSettings api={api} view={view} sound={sound} appearance={appearance} />
+          ) : (
+            <PhoneSettings
+              sound={sound}
+              config={view.config}
+              appearance={appearance}
+              // The controller layout only exists once a tablet is the table.
+              layout={view.tablePresent ? layout : undefined}
+            />
+          )}
+        </SettingsMenu>
       </header>
 
       <div className="gather__body gather__body--seats">
@@ -176,6 +204,28 @@ export function TableLobby({ api, view }: { api: RoomApi; view: RoomView }) {
             ? " · start one now and the table regroups when somebody joins"
             : ""}
         </span>
+
+        {/* Restart keeps everyone in their chairs; this empties them, for when
+            the next game is a different group of people. */}
+        {isTable ? (
+          <button
+            type="button"
+            className="btn btn--ghost btn--reset"
+            disabled={api.busy}
+            onClick={() => {
+              if (
+                confirm(
+                  "Reset the table? Everyone is sent back to choose a seat, and the scores and house rules go back to the defaults.",
+                )
+              ) {
+                setNames({});
+                void api.control({ type: "reset" });
+              }
+            }}
+          >
+            Reset table
+          </button>
+        ) : null}
 
         {view.canDeal ? (
           <button

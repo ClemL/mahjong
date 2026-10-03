@@ -12,6 +12,7 @@ import {
   mayRegroup,
   newRoom,
   openClaimWindow,
+  resetRoom,
   returnToLobby,
   startPlay,
   syncSeats,
@@ -209,6 +210,7 @@ export type TableCommand =
   | { type: "regroup" }
   | { type: "nextHand" }
   | { type: "restart" }
+  | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
   | { type: "freeSeat"; seat: Seat }
@@ -264,6 +266,11 @@ export async function control(
         syncSeats(r);
         break;
       }
+      // Restart's bigger sibling: the chairs are emptied too, so everybody
+      // has to sit down again.
+      case "reset":
+        resetRoom(r, Date.now());
+        break;
       case "minFaan":
         r.state = setMinFaan(r.state, command.value);
         break;
