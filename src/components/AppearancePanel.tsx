@@ -1,13 +1,13 @@
 "use client";
 
 import { PLAYABLE_CODES } from "@/game/tiles";
-import { SUIT_PALETTES, THEMES, TILE_STYLES } from "@/game/appearance";
+import { SUIT_PALETTES, THEMES, TILE_BACKS, TILE_BODIES, TILE_STYLES } from "@/game/appearance";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import { TileFace } from "./TileView";
+import { TileBack, TileFace } from "./TileView";
 import { Choice } from "./Choice";
 
-/** One sample of each suit plus an honor, so a choice can be judged at a glance. */
-const PREVIEW = ["m5", "p3", "s7", "dr"].filter((c) => PLAYABLE_CODES.includes(c));
+/** One sample of each suit, an honor and a back, so a choice can be judged at a glance. */
+const PREVIEW = ["m5", "p3", "s7", "we", "dr"].filter((c) => PLAYABLE_CODES.includes(c));
 
 export function AppearancePanel({ api }: { api: AppearanceApi }) {
   const { appearance, set, reset } = api;
@@ -21,6 +21,7 @@ export function AppearancePanel({ api }: { api: AppearanceApi }) {
             {PREVIEW.map((code) => (
               <TileFace key={code} code={code} size="md" />
             ))}
+            <TileBack size="md" />
           </div>
 
           <Choice
@@ -34,6 +35,18 @@ export function AppearancePanel({ api }: { api: AppearanceApi }) {
             options={TILE_STYLES}
             value={appearance.tiles}
             onChange={(value) => set("tiles", value)}
+          />
+          <Choice
+            label="Tile body"
+            options={TILE_BODIES}
+            value={appearance.body}
+            onChange={(value) => set("body", value)}
+          />
+          <Choice
+            label="Tile backs"
+            options={TILE_BACKS}
+            value={appearance.backs}
+            onChange={(value) => set("backs", value)}
           />
           <Choice
             label="Suit colors"

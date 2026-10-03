@@ -1431,6 +1431,138 @@ details[open] > summary::after {
   display: block;
 }
 
+.tile__glyph--arabic,
+.tile__index {
+  display: none;
+}
+
+/* Arabic numeral in place of the Chinese one, for every suit. */
+[data-tiles="western"] .tile__pips,
+[data-tiles="western"] .tile__glyph--cn {
+  display: none;
+}
+
+[data-tiles="western"] .tile__glyph--arabic,
+[data-tiles="western"] .tile__suit--alt {
+  display: block;
+}
+
+[data-tiles="western"] .tile__glyph--arabic {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: lining-nums;
+}
+
+/* The corner index replaces the faint Latin label wherever a tile has one;
+   it takes the suit ink so it reads at pond size, and a halo of the face
+   color keeps it clear of the artwork it overlaps. */
+[data-tiles="indexed"] .tile__index {
+  display: block;
+  position: absolute;
+  top: calc(var(--tile-w) * 0.02);
+  left: calc(var(--tile-w) * 0.08);
+  z-index: 1;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: calc(var(--tile-w) * 0.3);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow:
+    1px 0 0 var(--tile-face),
+    -1px 0 0 var(--tile-face),
+    0 1px 0 var(--tile-face),
+    0 -1px 0 var(--tile-face);
+}
+
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__label {
+  display: none;
+}
+
+/* Nudge the artwork off the index so the two do not collide. */
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__pips,
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__glyph,
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__suit {
+  transform: translate(calc(var(--tile-w) * 0.06), calc(var(--tile-w) * 0.07)) scale(0.9);
+}
+
+/* =========================================================== tile body ==
+   Each body restates the face and edge tokens. These come after the themes
+   so a body choice wins over the parchment table's firmer default edge.
+   ====================================================================== */
+
+[data-body="bone"] {
+  --tile-face: #ffffff;
+  --tile-face-2: #e8e9e6;
+  --tile-edge: #b4b6b0;
+  --tile-shadow: #8f928a;
+}
+
+/* A real set's construction: the face is laminated onto a colored layer, so
+   the tile's visible thickness takes the back color. */
+[data-body="twotone"] {
+  --tile-face: #fdfcf8;
+  --tile-face-2: #eeece4;
+  --tile-edge: var(--tile-back-2);
+  --tile-shadow: var(--tile-back);
+}
+
+[data-body="amber"] {
+  --tile-face: #fcf1d6;
+  --tile-face-2: #f0dcaa;
+  --tile-edge: #b8975a;
+  --tile-shadow: #8e6c33;
+}
+
+[data-body="flat"] {
+  --tile-face: #fffdf6;
+  --tile-face-2: #fffdf6;
+  --tile-edge: #9c9583;
+  --tile-shadow: #9c9583;
+}
+
+[data-body="flat"] .tile:not(.tile--back) {
+  border-radius: calc(var(--tile-w) * 0.1);
+  box-shadow: 0 1px 0 var(--tile-shadow), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+[data-body="flat"] .tile:not(.tile--back):not(.tile--m):not(.tile--p):not(.tile--s):not(.tile--f) {
+  background: var(--tile-face);
+}
+
+[data-body="flat"] .tile__glyph {
+  text-shadow: none;
+}
+
+[data-body="flat"] .tile__pips {
+  filter: none;
+}
+
+/* ========================================================== tile backs == */
+
+[data-backs="emerald"] {
+  --tile-back: #1f7a5c;
+  --tile-back-2: #14503d;
+}
+
+[data-backs="crimson"] {
+  --tile-back: #a3302b;
+  --tile-back-2: #6b1a17;
+}
+
+[data-backs="sapphire"] {
+  --tile-back: #2c56a8;
+  --tile-back-2: #1a3672;
+}
+
+[data-backs="gold"] {
+  --tile-back: #b88a2c;
+  --tile-back-2: #7c5a16;
+}
+
+[data-backs="ebony"] {
+  --tile-back: #34343a;
+  --tile-back-2: #17171a;
+}
+
 /* ------------------------------------------------------ appearance panel */
 
 .appearance {

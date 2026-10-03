@@ -4,6 +4,7 @@ import {
   type TileCode,
   isFlower,
   isHonor,
+  rankOf,
   tileGlyph,
   tileLabel,
   tileName,
@@ -32,21 +33,41 @@ function entryClass(entry: TileEntry, from: TossFrom): string {
   }
 }
 
+/** Western sets index winds by letter; dragons and bonus tiles carry none. */
+const WIND_INDEX: Record<string, string> = { we: "E", ws: "S", ww: "W", wn: "N" };
+
 /**
- * The face itself. Dots and Bamboo carry both a pip drawing and a numeral
- * face; CSS shows one according to the chosen tile style, so switching is
- * instant and no component has to know the setting. Characters and honors
- * only ever have the glyph face.
+ * The face itself. Every face a tile can wear is rendered and CSS shows the
+ * ones the chosen tile style calls for, so switching is instant and no
+ * component has to know the setting. Dots and Bamboo carry a pip drawing and
+ * a numeral face; every suited tile also carries an Arabic numeral for the
+ * Western style, and suited tiles and winds a corner index.
  */
 function TileArt({ code }: { code: TileCode }) {
   const pips = hasPips(code);
   const suit = tileSuitGlyph(code);
+  const rank = rankOf(code);
+  const index = rank ? String(rank) : WIND_INDEX[code];
   return (
     <>
+      {index ? (
+        <span className="tile__index" aria-hidden>
+          {index}
+        </span>
+      ) : null}
       {pips ? <TilePips code={code} /> : null}
-      <span className={pips ? "tile__glyph tile__glyph--alt" : "tile__glyph"}>
+      <span
+        className={[
+          "tile__glyph",
+          pips ? "tile__glyph--alt" : "",
+          rank ? "tile__glyph--cn" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         {tileGlyph(code)}
       </span>
+      {rank ? <span className="tile__glyph tile__glyph--arabic">{rank}</span> : null}
       {suit ? (
         <span className={pips ? "tile__suit tile__suit--alt" : "tile__suit"}>{suit}</span>
       ) : null}

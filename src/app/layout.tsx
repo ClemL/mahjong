@@ -32,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme="jade" data-suits="vivid" data-tiles="pips">
+    <html lang="en" data-theme="jade" data-suits="vivid" data-tiles="pips" data-body="ivory" data-backs="table">
       <head>
         {/* Restores the saved appearance before first paint, so a chosen
             theme never flashes the default one. */}
