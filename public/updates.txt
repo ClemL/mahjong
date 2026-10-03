@@ -43,3 +43,9 @@
 2026-09-26T13:00:00Z - The film has chapters, a scrubber, fullscreen, and a readable transcript if you would rather not watch it
 2026-09-26T18:00:00Z - The how-to-play film is now in the settings menu too, including on the shared table and on phones
 2026-09-26T19:00:00Z - The film has a Chapters menu: every chapter by name, one tap to jump there, on phones too
+2026-10-03T12:00:00Z - The table screen is now drawn as a table: a rack along each edge with that player's melds, flowers and tiles in hand, every pond in front of its owner and turned to face them
+2026-10-03T12:00:00Z - Discards on the table screen are larger, and the tile just thrown sits big in the middle, facing whoever threw it
+2026-10-03T12:00:00Z - With a table screen in the room, a phone becomes a sideways, full-screen controller — just your hand and your choices
+2026-10-03T12:00:00Z - Claim buttons show the meld each claim would make, so two or three ways to chow the same tile can be told apart; press one to see which of your tiles it takes
+2026-10-03T12:00:00Z - Phones and the table screen now have the full settings menu: table theme, tile faces, suit colors, house rules and the faan table
+2026-10-03T14:00:00Z - The phone controller has a Compact layout (Settings → This phone): one header line, slimmer claim buttons and larger hand tiles

@@ -15,8 +15,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#0d3b2e",
     theme_color: "#0d3b2e",
-    // The table wants landscape and a phone wants portrait, and one manifest
-    // cannot say both, so neither is forced.
+    // The solo game and the seating screen work upright, while the table and
+    // a phone used as a controller want landscape — so nothing is forced here,
+    // and the controller locks itself sideways when it goes full screen.
     orientation: "any",
     categories: ["games"],
     icons: [
