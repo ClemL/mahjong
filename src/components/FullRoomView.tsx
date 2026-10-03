@@ -19,11 +19,10 @@ export function FullRoomView({
   view: RoomView;
   sound?: SoundToggle;
 }) {
-  const readOnlyTable: RoomApi = { ...api, control: async () => {}, busy: true };
   return (
     <div className="fullroom">
       <div className="fullroom__table">
-        <TableView api={readOnlyTable} view={view} readOnly />
+        <TableView view={view} />
       </div>
       <PhoneView api={api} view={view} sound={sound} />
     </div>

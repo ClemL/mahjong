@@ -1,44 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ClaimOption } from "@/game/engine";
 import type { RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
-import { SEAT_NAMES, tileName } from "@/game/tiles";
+import { SEAT_NAMES, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import { useFullscreen } from "@/hooks/useFullscreen";
 import { TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import type { SoundToggle } from "./TableView";
 import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
-
-function claimLabel(type: string): string {
-  return type === "chow" ? "Chow 上" : type === "pung" ? "Pung 碰" : type === "kong" ? "Kong 槓" : "Win 糊";
-}
+import { ClaimChoices } from "./ClaimChoices";
 
 /**
- * The player's own view. When a table device is present this is all a phone
- * shows — your hand and the decisions that are yours — because the shared
- * screen is already carrying the pond, the scores and everyone's melds.
+ * The player's own view: their hand and the decisions that are theirs.
+ *
+ * `landscape` is the controller a phone becomes when a tablet is acting as the
+ * table. The pond, the scores and everyone's melds are on the shared screen,
+ * so the phone gives its whole width to the hand and the choices, held
+ * sideways and full screen where the browser allows it.
  */
 export function PhoneView({
   api,
   view,
   sound,
+  landscape = false,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
+  landscape?: boolean;
 }) {
   const seat = view.you.seat!;
   const me = view.players[seat];
   const coarse = useCoarsePointer();
+  const appearance = useAppearance();
+  const fullscreen = useFullscreen("landscape");
   // On touch a tile is armed by the first tap and thrown by the second; with a
   // mouse the click discards directly.
   const [armed, setArmed] = useState<string | null>(null);
+  // The claim being pressed or hovered, whose tiles the hand lifts.
+  const [preview, setPreview] = useState<ClaimOption | null>(null);
   useEffect(() => {
-    // Never leave a tile armed across a turn or a new deal.
+    // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
+    setPreview(null);
   }, [view.turn, view.handNumber, view.phase]);
+
+  // The first touch asks for full screen. It cannot be asked for without one,
+  // and once is enough: someone who backs out of it meant to.
+  const askedFullscreen = useRef(false);
+  const onFirstTouch = () => {
+    if (askedFullscreen.current || !coarse || !fullscreen.supported || fullscreen.active) return;
+    askedFullscreen.current = true;
+    fullscreen.enter();
+  };
 
   const tapTile = (tileId: string) => {
     if (!coarse) {
@@ -56,6 +75,13 @@ export function PhoneView({
   const yourTurn = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
   const drawn = me.hand.find((t) => t.id === view.drawnTileId);
   const rest = me.hand.filter((t) => t.id !== view.drawnTileId);
+  const previewed = view.claim?.options.find((o) => o.id === preview?.id);
+  const using = new Set(previewed?.tileIds ?? []);
+
+  const tileClass = (tileId: string) =>
+    [armed === tileId ? "tile--armed" : "", using.has(tileId) ? "tile--uses" : ""]
+      .filter(Boolean)
+      .join(" ");
 
   let prompt: string;
   if (view.phase === "gameOver") prompt = "The round is over.";
@@ -66,9 +92,15 @@ export function PhoneView({
   else prompt = `Waiting for ${SEAT_NAMES[view.turn]}…`;
 
   return (
-    <div className="phone">
+    <div
+      className={landscape ? "phone phone--landscape" : "phone"}
+      onPointerDownCapture={landscape ? onFirstTouch : undefined}
+    >
       <header className="phone__bar">
         <span className="phone__seat">
+          <span className="phone__wind" aria-hidden>
+            {tileGlyph(seatWind(seat))}
+          </span>
           {SEAT_NAMES[seat]}
           {view.dealer === seat ? " · dealer" : ""}
         </span>
@@ -76,9 +108,19 @@ export function PhoneView({
           {view.scores[seat] > 0 ? `+${view.scores[seat]}` : view.scores[seat]}
         </span>
         <span className="phone__wall">{view.wallCount} left</span>
+        {landscape && fullscreen.supported && !fullscreen.active ? (
+          <button type="button" className="btn btn--sm btn--ghost" onClick={fullscreen.enter}>
+            Full screen
+          </button>
+        ) : null}
         {sound ? (
           <SettingsMenu>
-            <PhoneSettings sound={sound} />
+            <PhoneSettings
+              sound={sound}
+              config={view.config}
+              appearance={appearance}
+              fullscreenHint={landscape && !fullscreen.supported}
+            />
           </SettingsMenu>
         ) : null}
       </header>
@@ -87,7 +129,9 @@ export function PhoneView({
         {prompt}
       </p>
 
-      {view.lastDiscard ? (
+      {/* The shared screen already shows the pond; only a phone standing in
+          for the whole table needs the last discard. */}
+      {!landscape && view.lastDiscard ? (
         <div className="phone__discard">
           <span className="seat__meta">Last discard</span>
           <TileFace code={view.lastDiscard.tile.code} size="md" />
@@ -111,7 +155,7 @@ export function PhoneView({
             key={t.id}
             code={t.code}
             size="lg"
-            className={armed === t.id ? "tile--armed" : ""}
+            className={tileClass(t.id)}
             disabled={!yourTurn || api.busy}
             onClick={() => tapTile(t.id)}
           />
@@ -124,7 +168,7 @@ export function PhoneView({
               size="lg"
               drawn
               entry="draw"
-              className={armed === drawn.id ? "tile--armed" : ""}
+              className={tileClass(drawn.id)}
               disabled={!yourTurn || api.busy}
               onClick={() => tapTile(drawn.id)}
             />
@@ -132,77 +176,69 @@ export function PhoneView({
         ) : null}
       </div>
 
-      {armedTile && yourTurn ? (
-        <div className="confirm-bar" role="status">
-          <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>
-          <button
-            type="button"
-            className="btn btn--win"
-            disabled={api.busy}
-            onClick={() => {
-              setArmed(null);
-              void api.act({ type: "discard", tileId: armedTile.id });
-            }}
-          >
-            Discard
-          </button>
-          <button type="button" className="btn btn--ghost" onClick={() => setArmed(null)}>
-            Keep
-          </button>
-        </div>
-      ) : null}
-
-      <div className="actions phone__actions">
-        {view.claim ? (
-          <>
-            {view.claim.options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className={option.type === "win" ? "btn btn--win" : "btn btn--primary"}
-                disabled={api.busy}
-                onClick={() => void api.act({ type: "claim", optionId: option.id })}
-              >
-                {claimLabel(option.type)}
-              </button>
-            ))}
+      <div className="phone__controls">
+        {armedTile && yourTurn ? (
+          <div className="confirm-bar" role="status">
+            <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>
             <button
               type="button"
-              className="btn btn--ghost"
+              className="btn btn--win"
               disabled={api.busy}
-              onClick={() => void api.act({ type: "claim", optionId: null })}
+              onClick={() => {
+                setArmed(null);
+                void api.act({ type: "discard", tileId: armedTile.id });
+              }}
             >
-              Pass
+              Discard
             </button>
-            <span className="seat__meta">
-              {Math.ceil(view.claim.deadlineIn / 1000)}s
-            </span>
-          </>
-        ) : (
-          <>
-            {view.actions?.canWin ? (
-              <button
-                type="button"
-                className="btn btn--win"
-                disabled={api.busy}
-                onClick={() => void api.act({ type: "win" })}
-              >
-                Win 自摸
-              </button>
-            ) : null}
-            {(view.actions?.kongs ?? []).map((kong) => (
-              <button
-                key={`${kong.kind}-${kong.code}`}
-                type="button"
-                className="btn btn--primary"
-                disabled={api.busy}
-                onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
-              >
-                Kong {tileName(kong.code)}
-              </button>
-            ))}
-          </>
-        )}
+            <button type="button" className="btn btn--ghost" onClick={() => setArmed(null)}>
+              Keep
+            </button>
+          </div>
+        ) : null}
+
+        <div className="actions phone__actions">
+          {view.claim && view.lastDiscard ? (
+            <ClaimChoices
+              options={view.claim.options}
+              discard={view.lastDiscard.tile.code}
+              deadlineIn={view.claim.deadlineIn}
+              busy={api.busy}
+              onClaim={(optionId) => {
+                setPreview(null);
+                void api.act({ type: "claim", optionId });
+              }}
+              onPreview={setPreview}
+            />
+          ) : (
+            <>
+              {view.actions?.canWin ? (
+                <button
+                  type="button"
+                  className="btn btn--win"
+                  disabled={api.busy}
+                  onClick={() => void api.act({ type: "win" })}
+                >
+                  Win 自摸
+                </button>
+              ) : null}
+              {(view.actions?.kongs ?? []).map((kong) => (
+                <button
+                  key={`${kong.kind}-${kong.code}`}
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={api.busy}
+                  onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
+                >
+                  {kong.kind === "concealed" ? "Kong" : "Add to kong"}
+                  <span className="btn__preview">
+                    <TileFace code={kong.code} size="sm" />
+                  </span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

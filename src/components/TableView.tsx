@@ -1,13 +1,9 @@
 "use client";
 
 import type { PublicPlayer, RoomView } from "@/game/room";
-import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { TileBack, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
-import { useWakeLock } from "@/hooks/useWakeLock";
-import { SettingsMenu } from "./SettingsMenu";
-import { TableSettings } from "./TableSettings";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, "top" | "right" | "bottom" | "left"> = {
@@ -113,32 +109,19 @@ function SeatBlock({
   );
 }
 
-/**
- * The shared tablet. It shows the pond, everyone's melds, flowers and scores,
- * and which seat belongs on which edge — never anyone's concealed tiles, which
- * the server does not send here at all.
- */
 export interface SoundToggle {
   muted: boolean;
   setMuted: (value: boolean) => void;
 }
 
-export function TableView({
-  api,
-  view,
-  sound,
-  readOnly = false,
-}: {
-  api: RoomApi;
-  view: RoomView;
-  sound?: SoundToggle;
-  /** Mirror the table without driving it — the controls belong to the tablet. */
-  readOnly?: boolean;
-}) {
+/**
+ * The whole table on one screen, for a phone when no tablet is acting as the
+ * table: the ponds, everyone's melds, flowers and scores — never anyone's
+ * concealed tiles, which the server does not send. It only mirrors the table;
+ * the tablet's own screen is `TableTop`.
+ */
+export function TableView({ view }: { view: RoomView }) {
   const seats: Seat[] = [0, 1, 2, 3];
-  // Only the shared table holds the screen awake; a phone in a pocket should
-  // be allowed to sleep.
-  const wakeLock = useWakeLock(view.you.role === "table");
 
   return (
     <div className="tableview">
@@ -155,63 +138,6 @@ export function TableView({
               ? "Round complete"
               : `${SEAT_NAMES[view.turn]} to play`}
         </span>
-        {view.you.role === "table" && wakeLock !== "held" ? (
-          <span className="tableview__wake" title="This device may sleep during a hand">
-            {wakeLock === "unsupported"
-              ? "Screen may sleep — this browser cannot keep it awake"
-              : wakeLock === "denied"
-                ? "Screen may sleep — the browser refused to keep it awake"
-                : "Screen lock pending…"}
-          </span>
-        ) : null}
-        <span className="topbar__spacer" />
-        {readOnly ? null : (
-        <div className="actions">
-          {view.phase === "handOver" ? (
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={api.busy}
-              onClick={() => void api.control({ type: "nextHand" })}
-            >
-              Next hand
-            </button>
-          ) : null}
-          {view.awaitingClaimSeats.length > 0 ? (
-            <button
-              type="button"
-              className="btn"
-              disabled={api.busy}
-              onClick={() => void api.control({ type: "forcePass" })}
-            >
-              Skip waiting ({view.awaitingClaimSeats.length})
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="btn"
-            disabled={api.busy}
-            onClick={() => void api.control({ type: "redeal" })}
-          >
-            Redeal
-          </button>
-          <button
-            type="button"
-            className="btn btn--ghost"
-            disabled={api.busy}
-            onClick={() => {
-              if (confirm("Reset all scores and go back to the seating screen?")) {
-                void api.control({ type: "restart" });
-              }
-            }}
-          >
-            Restart
-          </button>
-          <SettingsMenu>
-            <TableSettings api={api} view={view} sound={sound} />
-          </SettingsMenu>
-        </div>
-        )}
       </header>
 
       <div className="tableview__grid">

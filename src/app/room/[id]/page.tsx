@@ -5,7 +5,7 @@ import { useRoom } from "@/hooks/useRoom";
 import { useRoomSound } from "@/hooks/useRoomSound";
 import { SeatPicker } from "@/components/SeatPicker";
 import { PhoneView } from "@/components/PhoneView";
-import { TableView } from "@/components/TableView";
+import { TableTop } from "@/components/TableTop";
 import { TableLobby } from "@/components/TableLobby";
 import { FullRoomView } from "@/components/FullRoomView";
 import { ResumeGate } from "@/components/ResumeGate";
@@ -118,21 +118,21 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   if (view.you.role === "table") {
     return (
-      <main className="app app--table app--paced">
+      <main className="app app--table app--paced app--felt">
         {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
-        <TableView api={api} view={view} sound={sound} />
+        <TableTop api={api} view={view} sound={sound} />
         {api.error ? <p className="lobby__error">{api.error}</p> : null}
       </main>
     );
   }
 
   // A seated player. With a table device in the room the phone only carries
-  // their own hand; without one it has to show the whole table.
+  // their own hand, held sideways; without one it has to show the whole table.
   return (
-    <main className="app app--paced">
+    <main className={view.tablePresent ? "app app--paced app--handset" : "app app--paced"}>
       {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
       {view.tablePresent ? (
-        <PhoneView api={api} view={view} sound={sound} />
+        <PhoneView api={api} view={view} sound={sound} landscape />
       ) : (
         <FullRoomView api={api} view={view} sound={sound} />
       )}
