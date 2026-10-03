@@ -7,6 +7,7 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
+import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
@@ -39,6 +40,10 @@ export function PhoneView({
   const coarse = useCoarsePointer();
   const appearance = useAppearance();
   const fullscreen = useFullscreen("landscape");
+  const layout = useCompactLayout();
+  // Density is a choice for the controller; the phone that stands in for the
+  // whole table keeps its single column.
+  const compact = landscape && layout.compact;
   // On touch a tile is armed by the first tap and thrown by the second; with a
   // mouse the click discards directly.
   const [armed, setArmed] = useState<string | null>(null);
@@ -91,9 +96,28 @@ export function PhoneView({
   else if (yourTurn) prompt = "Your turn — discard a tile.";
   else prompt = `Waiting for ${SEAT_NAMES[view.turn]}…`;
 
+  const promptLine = (
+    <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
+      {prompt}
+    </p>
+  );
+  const exposed =
+    me.melds.length > 0 || me.flowers.length > 0 ? (
+      <div className="seat__row phone__melds">
+        {me.melds.map((m, i) => (
+          <MeldRow key={`m${i}`} meld={m} />
+        ))}
+        {me.flowers.map((t) => (
+          <TileFace key={t.id} code={t.code} size="sm" />
+        ))}
+      </div>
+    ) : null;
+
   return (
     <div
-      className={landscape ? "phone phone--landscape" : "phone"}
+      className={["phone", landscape ? "phone--landscape" : "", compact ? "phone--compact" : ""]
+        .filter(Boolean)
+        .join(" ")}
       onPointerDownCapture={landscape ? onFirstTouch : undefined}
     >
       <header className="phone__bar">
@@ -101,16 +125,25 @@ export function PhoneView({
           <span className="phone__wind" aria-hidden>
             {tileGlyph(seatWind(seat))}
           </span>
-          {SEAT_NAMES[seat]}
+          {/* The wind glyph says it already; compact keeps the name for screen readers only. */}
+          <span className={compact ? "sr-only" : undefined}>{SEAT_NAMES[seat]}</span>
           {view.dealer === seat ? " · dealer" : ""}
         </span>
         <span className="phone__score">
           {view.scores[seat] > 0 ? `+${view.scores[seat]}` : view.scores[seat]}
         </span>
         <span className="phone__wall">{view.wallCount} left</span>
+        {/* Compact folds the prompt and the open melds into this one line. */}
+        {compact ? promptLine : null}
+        {compact ? exposed : null}
         {landscape && fullscreen.supported && !fullscreen.active ? (
-          <button type="button" className="btn btn--sm btn--ghost" onClick={fullscreen.enter}>
-            Full screen
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost"
+            aria-label="Full screen"
+            onClick={fullscreen.enter}
+          >
+            {compact ? "⛶" : "Full screen"}
           </button>
         ) : null}
         {sound ? (
@@ -120,14 +153,13 @@ export function PhoneView({
               config={view.config}
               appearance={appearance}
               fullscreenHint={landscape && !fullscreen.supported}
+              layout={landscape ? layout : undefined}
             />
           </SettingsMenu>
         ) : null}
       </header>
 
-      <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
-        {prompt}
-      </p>
+      {compact ? null : promptLine}
 
       {/* The shared screen already shows the pond; only a phone standing in
           for the whole table needs the last discard. */}
@@ -138,16 +170,7 @@ export function PhoneView({
         </div>
       ) : null}
 
-      {me.melds.length > 0 || me.flowers.length > 0 ? (
-        <div className="seat__row phone__melds">
-          {me.melds.map((m, i) => (
-            <MeldRow key={`m${i}`} meld={m} />
-          ))}
-          {me.flowers.map((t) => (
-            <TileFace key={t.id} code={t.code} size="sm" />
-          ))}
-        </div>
-      ) : null}
+      {compact ? null : exposed}
 
       <div className="phone__hand">
         {rest.map((t) => (

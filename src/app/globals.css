@@ -3484,3 +3484,112 @@ body:has(.app--handset) {
   outline-offset: 2px;
   z-index: 20;
 }
+
+/* ------------------------------------------------ compact phone controller */
+
+/* The same controller with the air let out: one header line carrying the
+   prompt and the open melds, claims laid out sideways, and the hand without
+   its tray — so the tiles take the width the chrome gave back. */
+.app--handset:has(.phone--compact) {
+  padding-left: max(4px, env(safe-area-inset-left));
+  padding-right: max(4px, env(safe-area-inset-right));
+}
+
+@media (orientation: portrait) {
+  .app--handset:has(.phone--compact) {
+    padding-left: max(4px, env(safe-area-inset-top));
+    padding-right: max(4px, env(safe-area-inset-bottom));
+  }
+}
+
+.phone--landscape.phone--compact {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar"
+    "controls"
+    "hand";
+  gap: 4px;
+}
+
+.phone--compact .phone__bar {
+  gap: 8px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+}
+
+.phone--compact .phone__score {
+  margin-left: 0;
+}
+
+.phone--compact .phone__prompt {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone--compact .phone__melds {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  gap: 2px;
+  --tile-sm: clamp(16px, 7cqh, 24px);
+}
+
+.phone--compact .phone__melds .meld {
+  padding: 1px;
+}
+
+/* The menu is a glyph here; its label stays for screen readers. */
+.phone--compact .hamburger__text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.phone--compact .confirm-bar {
+  padding: 2px 8px;
+  gap: 8px;
+}
+
+.phone--compact .claims {
+  gap: 6px;
+}
+
+.phone--compact .claim {
+  --tile-sm: 24px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 3px 8px;
+}
+
+.phone--compact .claims__pass {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phone--compact .claims__timer {
+  min-width: 34px;
+}
+
+.phone--compact .phone__hand {
+  gap: 3px;
+  padding: 10px 0 2px;
+  border: none;
+  background: none;
+  /* Fourteen tiles, the gap before the drawn one, and nothing else. */
+  --tile-lg: clamp(24px, min(calc((100cqw - 50px) / 14.2), 30cqh), 88px);
+}
+
+.phone--compact .hand__gap {
+  width: 8px;
+}
