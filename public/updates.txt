@@ -51,3 +51,4 @@
 2026-10-03T14:00:00Z - The phone controller has a Compact layout (Settings → This phone): one header line, slimmer claim buttons and larger hand tiles
 2026-10-03T16:00:00Z - The seating screen drops the large TABLE label and gains the same settings menu as play: look, sound, house rules and the faan table
 2026-10-03T16:00:00Z - Reset table, next to Deal: empties every chair so everyone picks a seat again, and puts scores and house rules back to the defaults
+2026-10-03T16:30:00Z - More tile designs (Settings → Table & tiles): Indexed and Western faces, a Tile body choice (Ivory, Bone, Two-tone, Amber, Flat) and a Tile backs choice (Match table, Emerald, Crimson, Sapphire, Gold, Ebony)
