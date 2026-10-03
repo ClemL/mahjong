@@ -170,6 +170,19 @@ export function returnToLobby(room: Room, state: GameState): void {
   room.claimDeadline = null;
 }
 
+/**
+ * A clean table: every chair emptied — so every phone holding a seat token is
+ * back at the seat picker — scores and house rules at their defaults, nothing
+ * dealt. The tablet keeps its place; it is the one asking.
+ */
+export function resetRoom(room: Room, seed = Date.now()): void {
+  const fresh = newRoom(room.id, undefined, seed);
+  room.seats = fresh.seats;
+  room.rngSeed = fresh.rngSeed;
+  room.rngCalls = 0;
+  returnToLobby(room, fresh.state);
+}
+
 /** True when a seated player has gone quiet for long enough to be counted away. */
 export function isAway(occupant: Occupant, now: number): boolean {
   return occupant.kind === "human" && now - occupant.lastSeen > SEAT_IDLE_MS;

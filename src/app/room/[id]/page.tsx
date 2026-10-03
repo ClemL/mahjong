@@ -110,7 +110,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   if (!view.started) {
     return (
       <main className={view.you.role === "table" ? "app app--table" : "app"}>
-        <TableLobby api={api} view={view} />
+        <TableLobby api={api} view={view} sound={sound} />
         {api.error ? <p className="lobby__error">{api.error}</p> : null}
       </main>
     );

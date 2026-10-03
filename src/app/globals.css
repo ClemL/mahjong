@@ -2071,26 +2071,9 @@ a.btn {
 
 .gather__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px 20px;
-}
-
-.gather__label {
-  display: block;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--ink-dim);
-}
-
-.gather__code {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: clamp(40px, 9vw, 76px);
-  line-height: 1;
-  letter-spacing: 0.16em;
-  color: var(--gold);
 }
 
 .gather__lead {
@@ -2262,6 +2245,16 @@ a.btn {
   font-size: 17px;
   padding: 12px 34px;
   border-radius: 10px;
+}
+
+/* Wipes the room, so it is quieter than Deal and set apart from it. */
+.btn--reset {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--ink);
+}
+
+.btn--reset:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
 /* On a phone the seats matter more than the QR — you are already in. */

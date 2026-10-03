@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_RULES } from "@/game/rules";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -221,6 +222,30 @@ describe("table control", () => {
     expect(restarted.started).toBe(false);
     expect(restarted.players.every((p) => p.handCount === 0)).toBe(true);
     expect((await control(id, table, { type: "deal" })).handNumber).toBe(1);
+  });
+
+  it("resets to an empty table, sending every player back to the seat picker", async () => {
+    const { id, tokens, table } = await dealtRoom([0, 2]);
+    await control(id, table, { type: "minFaan", value: 3 });
+
+    const reset = await control(id, table, { type: "reset" });
+    expect(reset.you.role).toBe("table");
+    expect(reset.started).toBe(false);
+    expect(reset.players.every((p) => p.occupant.kind === "open")).toBe(true);
+    expect(reset.scores).toEqual([0, 0, 0, 0]);
+    expect(reset.config.minFaan).toBe(DEFAULT_RULES.minFaan);
+
+    // The old seat tokens no longer belong to anyone at the table.
+    const kicked = await readRoom(id, tokens[0]);
+    expect(kicked.you).toEqual({ role: "spectator", seat: null });
+    await expect(act(id, tokens[2], { type: "win" })).rejects.toMatchObject({ status: 403 });
+    // And the chairs are free for whoever sits down next.
+    expect((await claimSeat(id, { seat: 0, name: "Srini" })).view.players[0].occupant.name).toBe("Srini");
+  });
+
+  it("only lets the table reset", async () => {
+    const { id, tokens } = await dealtRoom([0]);
+    await expect(control(id, tokens[0], { type: "reset" })).rejects.toMatchObject({ status: 403 });
   });
 });
 
