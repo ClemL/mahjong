@@ -3,6 +3,7 @@
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { CompactLayout } from "@/hooks/useCompactLayout";
+import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
@@ -22,6 +23,16 @@ const LAYOUT: ChoiceOption<"standard" | "compact">[] = [
   },
 ];
 
+const SORT: ChoiceOption<SortMode>[] = [
+  { value: "suits", label: "Suits", hint: "Characters, dots, bamboo, then winds and dragons" },
+  { value: "honors", label: "Honors first", hint: "Winds and dragons on the left, then the suits" },
+  {
+    value: "manual",
+    label: "Manual",
+    hint: "Your own order — drag a tile to move it. New tiles join at the right",
+  },
+];
+
 /**
  * A phone's own settings. The house minimum belongs to the table, but how the
  * tiles look is each player's own choice, and the rules and faan table are
@@ -33,6 +44,7 @@ export function PhoneSettings({
   appearance,
   fullscreenHint = false,
   layout,
+  sort,
 }: {
   sound: SoundToggle;
   config: RuleConfig;
@@ -41,6 +53,8 @@ export function PhoneSettings({
   fullscreenHint?: boolean;
   /** Only the controller has a density to choose. */
   layout?: CompactLayout;
+  /** How the hand is laid out; absent where there is no hand yet. */
+  sort?: HandOrder;
 }) {
   return (
     <>
@@ -53,6 +67,14 @@ export function PhoneSettings({
             value={sound.muted ? "off" : "on"}
             onChange={(value) => sound.setMuted(value === "off")}
           />
+          {sort ? (
+            <Choice
+              label="Sort hand"
+              options={SORT}
+              value={sort.mode}
+              onChange={sort.setMode}
+            />
+          ) : null}
           {layout ? (
             <Choice
               label="Layout"

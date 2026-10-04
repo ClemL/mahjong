@@ -5,6 +5,7 @@ import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { useAppearance } from "@/hooks/useAppearance";
+import { useCountdown } from "@/hooks/useCountdown";
 import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
@@ -13,7 +14,13 @@ import { MeldRow } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
 import type { SoundToggle } from "./TableView";
-import { SEAT_ROTATION, type TableLayout, layoutTable, placementStyle } from "./tableLayout";
+import {
+  POSITION_ROTATION,
+  type TableLayout,
+  layoutTable,
+  placementStyle,
+  positionOf,
+} from "./tableLayout";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -46,19 +53,31 @@ function Rack({
   player,
   view,
   layout,
+  position,
 }: {
   player: PublicPlayer;
   view: RoomView;
   layout: TableLayout;
+  position: number;
 }) {
   const seat = player.seat;
   const active = view.turn === seat && view.phase === "action";
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
-  const status = deciding ? "deciding…" : active ? "to play" : player.occupant.away ? "away" : null;
+  // Only the seat to play has a clock running, and only when the table set one.
+  const left = useCountdown(active ? view.turnDeadlineIn : null);
+  const status = deciding
+    ? "deciding…"
+    : active
+      ? left !== null
+        ? `to play · ${Math.ceil(left / 1000)}s`
+        : "to play"
+      : player.occupant.away
+        ? "away"
+        : null;
   const style: Vars = {
-    ...placementStyle(layout.racks[seat]),
-    "--tile-sm": `${layout.rackTiles[seat]}px`,
+    ...placementStyle(layout.racks[position]),
+    "--tile-sm": `${layout.rackTiles[position]}px`,
   };
 
   return (
@@ -110,14 +129,16 @@ function Rack({
 function Discards({
   player,
   layout,
+  position,
   lastId,
 }: {
   player: PublicPlayer;
   layout: TableLayout;
+  position: number;
   lastId: string | undefined;
 }) {
   const style: Vars = {
-    ...placementStyle(layout.ponds[player.seat]),
+    ...placementStyle(layout.ponds[position]),
     "--tile-md": `${layout.tile}px`,
     gap: layout.gap,
   };
@@ -141,14 +162,28 @@ function Discards({
 /**
  * The middle of the table, like the console of an automatic table: each
  * seat's wind on its own side, lit for whoever is to play, and the tile just
- * thrown — large, and turned to face the player who threw it.
+ * thrown, turned to face the player who threw it. It is drawn the same size
+ * as the ponds — the middle says which tile, not that it matters more.
  */
-function Console({ api, view, layout }: { api: RoomApi; view: RoomView; layout: TableLayout }) {
+function Console({
+  api,
+  view,
+  layout,
+  position,
+}: {
+  api: RoomApi;
+  view: RoomView;
+  layout: TableLayout;
+  position: (seat: Seat) => number;
+}) {
   const style: Vars = {
     ...placementStyle(layout.console),
-    "--tile-lg": `${layout.spotlight}px`,
+    "--tile-lg": `${layout.tile}px`,
   };
-  const discard = view.lastDiscard;
+  const played = view.lastPlayed;
+  // A claimed discard has left its pond for somebody's meld.
+  const claimed =
+    played !== null && !view.players[played.from].discards.some((t) => t.id === played.tile.id);
   const over = view.phase === "handOver" || view.phase === "gameOver";
 
   return (
@@ -162,7 +197,7 @@ function Console({ api, view, layout }: { api: RoomApi; view: RoomView; layout: 
               key={seat}
               className={[
                 "console__wind",
-                `console__wind--${seat}`,
+                `console__wind--${position(seat)}`,
                 active ? "console__wind--active" : "",
                 deciding ? "console__wind--deciding" : "",
               ]
@@ -210,17 +245,24 @@ function Console({ api, view, layout }: { api: RoomApi; view: RoomView; layout: 
         </div>
       ) : (
         <div className="console__middle">
-          {discard ? (
+          {played ? (
             <>
               <span
                 className="console__spot"
-                key={discard.tile.id}
-                style={{ transform: `rotate(${SEAT_ROTATION[discard.from]}deg)` }}
+                key={played.tile.id}
+                style={{ transform: `rotate(${POSITION_ROTATION[position(played.from)]}deg)` }}
               >
-                <TileFace code={discard.tile.code} size="lg" entry="toss" tossFrom="bottom" />
+                <TileFace
+                  code={played.tile.code}
+                  size="lg"
+                  entry="toss"
+                  tossFrom="bottom"
+                  dim={claimed}
+                />
               </span>
               <span className="console__caption">
-                {SEAT_NAMES[discard.from]} · {tileName(discard.tile.code)}
+                {SEAT_NAMES[played.from]} · {tileName(played.tile.code)}
+                {claimed ? " · claimed" : ""}
               </span>
             </>
           ) : (
@@ -247,17 +289,26 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   const felt = useRef<HTMLDivElement>(null);
   const size = useElementSize(felt);
 
+  const position = (seat: Seat) => positionOf(seat, view.settings.rotation);
+  // The solver thinks in screen positions; the rack sizes come from whoever sits there.
+  const bySeatAtPosition = <T,>(value: (seat: Seat) => T): T[] =>
+    [0, 1, 2, 3].map((pos) => value(SEATS.find((seat) => position(seat) === pos)!));
+
   // A few thousand comparisons; cheaper to redo on each new view than to memoise.
   const layout = layoutTable({
     width: size.width,
     height: size.height,
     capacity: Math.max(POND_CAPACITY, ...view.players.map((p) => p.discards.length)),
-    revealed: view.players.map(
-      (p) => p.melds.reduce((n, m) => n + m.tiles.length, 0) + p.flowers.length,
-    ),
-    groups: view.players.map((p) => p.melds.length + (p.flowers.length > 0 ? 1 : 0)),
+    revealed: bySeatAtPosition((seat) => {
+      const p = view.players[seat];
+      return p.melds.reduce((n, m) => n + m.tiles.length, 0) + p.flowers.length;
+    }),
+    groups: bySeatAtPosition((seat) => {
+      const p = view.players[seat];
+      return p.melds.length + (p.flowers.length > 0 ? 1 : 0);
+    }),
   });
-  const lastId = view.lastDiscard?.tile.id;
+  const lastId = view.lastPlayed?.tile.id;
 
   return (
     <div className="tabletop">
@@ -334,12 +385,24 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         {size.width > 0 ? (
           <>
             {SEATS.map((seat) => (
-              <Rack key={seat} player={view.players[seat]} view={view} layout={layout} />
+              <Rack
+                key={seat}
+                player={view.players[seat]}
+                view={view}
+                layout={layout}
+                position={position(seat)}
+              />
             ))}
             {SEATS.map((seat) => (
-              <Discards key={seat} player={view.players[seat]} layout={layout} lastId={lastId} />
+              <Discards
+                key={seat}
+                player={view.players[seat]}
+                layout={layout}
+                position={position(seat)}
+                lastId={lastId}
+              />
             ))}
-            <Console api={api} view={view} layout={layout} />
+            <Console api={api} view={view} layout={layout} position={position} />
           </>
         ) : null}
       </div>

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CLAIM_WINDOW_MS,
+  DEFAULT_ROOM_SETTINGS,
   HEARTBEAT_WRITE_MS,
   SEAT_IDLE_MS,
   type Room,
@@ -10,6 +11,7 @@ import {
   mayDeal,
   mayRegroup,
   newRoom,
+  normalizeRoom,
   pendingHumanClaimants,
   returnToLobby,
   shouldRegroup,
@@ -252,7 +254,9 @@ describe("draining", () => {
 
   it("plays the computer seats up to the first person's turn", () => {
     const room = dealt("TEST", 5, [2]);
-    drain(room);
+    // Computer turns are paced; ten seconds covers two of them at the default
+    // speed and stays inside seat 2's own time limit.
+    drain(room, room.lastStepAt + 10_000);
     if (room.state.phase === "action") {
       expect(room.state.turn).toBe(2);
       expect(room.state.players.some((p) => p.discards.length > 0)).toBe(true);
@@ -357,5 +361,88 @@ describe("presence", () => {
     if (room.state.phase !== "claiming") return;
     const later = Date.now() + SEAT_IDLE_MS + 1;
     expect(pendingHumanClaimants(room, later)).toEqual([]);
+  });
+});
+
+/** How many discards this hand has seen, claimed ones included. */
+function discardsMade(room: Room): number {
+  return room.state.log.filter((entry) => / discards /.test(entry.text)).length;
+}
+
+describe("pacing", () => {
+  it("waits the table's pace before each computer turn", () => {
+    const room = dealt("TEST", 5, [2]);
+    room.settings.speed = 1;
+    const t0 = room.lastStepAt;
+    expect(room.state.players[room.state.turn].isHuman).toBe(false);
+
+    drain(room, t0 + 3_999);
+    expect(discardsMade(room)).toBe(0);
+    drain(room, t0 + 4_000);
+    expect(discardsMade(room)).toBe(1);
+    // One turn per four seconds, however often the table is asked.
+    drain(room, t0 + 4_500);
+    drain(room, t0 + 7_999);
+    expect(discardsMade(room)).toBe(1);
+  });
+
+  it("plays a backlog out at the same pace rather than all at once", () => {
+    const room = dealt("TEST", 5, [2]);
+    room.settings.speed = 5;
+    const t0 = room.lastStepAt;
+    drain(room, t0 + 400);
+    expect(discardsMade(room)).toBe(1);
+    expect(room.lastStepAt).toBe(t0 + 400);
+  });
+
+  it("keeps the newest discard after the next player has drawn", () => {
+    const room = dealt("TEST", 5, [2]);
+    room.settings.speed = 5;
+    drain(room, room.lastStepAt + 400);
+    const view = viewFor(room, "tok-2");
+    expect(view.lastPlayed).not.toBeNull();
+    expect(view.lastPlayed!.from).toBe(room.state.dealer);
+    expect(room.state.log.some((e) => e.text.includes("discards"))).toBe(true);
+  });
+});
+
+describe("turn limit", () => {
+  it("discards the drawn tile for a person whose time runs out", () => {
+    const room = dealt("TEST", 5, [0]);
+    room.settings.turnLimit = 15;
+    expect(room.state.turn).toBe(0);
+    const drawn = room.state.drawnTileId;
+    const t0 = room.lastStepAt;
+
+    expect(viewFor(room, "tok-0", t0 + 5_000).turnDeadlineIn).toBe(10_000);
+    drain(room, t0 + 14_999);
+    expect(room.state.players[0].discards).toHaveLength(0);
+    drain(room, t0 + 15_000);
+    expect(room.state.players[0].discards.map((t) => t.id)).toContain(drawn);
+  });
+
+  it("waits as long as it takes when there is no limit", () => {
+    const room = dealt("TEST", 5, [0]);
+    room.settings.turnLimit = 0;
+    // Short of the five minutes after which a silent seat counts as away.
+    drain(room, room.lastStepAt + SEAT_IDLE_MS - 1);
+    expect(room.state.players[0].discards).toHaveLength(0);
+    expect(viewFor(room, "tok-0").turnDeadlineIn).toBeNull();
+  });
+
+  it("never shows a deadline on a computer's turn", () => {
+    const room = dealt("TEST", 5, [2]);
+    expect(viewFor(room, "tok-2").turnDeadlineIn).toBeNull();
+  });
+});
+
+describe("room settings", () => {
+  it("fills in settings for a room stored before they existed", () => {
+    const room = newRoom("TEST", undefined, 5) as Partial<Room> & Room;
+    delete (room as Partial<Room>).settings;
+    delete (room as Partial<Room>).lastPlayed;
+    normalizeRoom(room);
+    expect(room.settings).toEqual(DEFAULT_ROOM_SETTINGS);
+    expect(room.lastPlayed).toBeNull();
   });
 });

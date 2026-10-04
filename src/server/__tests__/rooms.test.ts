@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_RULES } from "@/game/rules";
+import { DEFAULT_ROOM_SETTINGS } from "@/game/room";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -175,7 +176,12 @@ describe("playing", () => {
       expect(view.turn).toBe(0);
       const wallBefore = view.wallCount;
       await act(id, token, { type: "discard", tileId: view.players[0].hand[0].id });
+      // Computer turns are paced; let ten seconds pass, which covers three of
+      // them at the default speed and stays inside seat 0's own time limit.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 10_000);
       view = await readRoom(id, token);
+      vi.useRealTimers();
 
       // The property that matters: the table never parks on a chair nobody is
       // sitting in. It comes back round to the one person here, stops to ask
@@ -192,6 +198,10 @@ describe("playing", () => {
       expect(view.wallCount).toBeLessThanOrEqual(wallBefore);
     }
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("table control", () => {
@@ -241,6 +251,29 @@ describe("table control", () => {
     await expect(act(id, tokens[2], { type: "win" })).rejects.toMatchObject({ status: 403 });
     // And the chairs are free for whoever sits down next.
     expect((await claimSeat(id, { seat: 0, name: "Srini" })).view.players[0].occupant.name).toBe("Srini");
+  });
+
+  it("lets the table set the pace, the turn limit and the rotation", async () => {
+    const { id, table } = await dealtRoom([0]);
+    expect((await control(id, table, { type: "speed", value: 1 })).settings.speed).toBe(1);
+    expect((await control(id, table, { type: "turnLimit", value: 60 })).settings.turnLimit).toBe(60);
+    expect((await control(id, table, { type: "rotate" })).settings.rotation).toBe(1);
+    // Four quarter turns come back round.
+    for (let i = 0; i < 3; i++) await control(id, table, { type: "rotate" });
+    expect((await readRoom(id, table)).settings.rotation).toBe(0);
+  });
+
+  it("refuses a pace or a limit it does not offer", async () => {
+    const { id, table } = await dealtRoom([0]);
+    await expect(control(id, table, { type: "speed", value: 9 })).rejects.toMatchObject({ status: 400 });
+    await expect(control(id, table, { type: "turnLimit", value: 7 })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it("puts the table's settings back to the defaults on a reset, but not a restart", async () => {
+    const { id, table } = await dealtRoom([0]);
+    await control(id, table, { type: "speed", value: 1 });
+    expect((await control(id, table, { type: "restart" })).settings.speed).toBe(1);
+    expect((await control(id, table, { type: "reset" })).settings).toEqual(DEFAULT_ROOM_SETTINGS);
   });
 
   it("only lets the table reset", async () => {

@@ -137,10 +137,18 @@ export function TileFace({
 interface ButtonProps extends FaceProps {
   onClick: () => void;
   disabled?: boolean;
+  /**
+   * Not actionable right now, but still there to be touched — a tile can be
+   * dragged into place while it is not your turn. A disabled button would
+   * swallow the pointer events that dragging needs.
+   */
+  inactive?: boolean;
+  /** Identifies the tile to a container handling drags. */
+  tileId?: string;
   ariaLabel?: string;
 }
 
-export function TileButton({ onClick, disabled, ariaLabel, ...face }: ButtonProps) {
+export function TileButton({ onClick, disabled, inactive, tileId, ariaLabel, ...face }: ButtonProps) {
   return (
     <button
       type="button"
@@ -157,6 +165,8 @@ export function TileButton({ onClick, disabled, ariaLabel, ...face }: ButtonProp
         .join(" ")}
       onClick={onClick}
       disabled={disabled}
+      aria-disabled={inactive || undefined}
+      data-tile-id={tileId}
       aria-label={ariaLabel ?? `Discard ${tileName(face.code)}`}
       title={tileName(face.code)}
     >

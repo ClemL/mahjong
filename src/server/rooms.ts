@@ -11,6 +11,8 @@ import {
   mayDeal,
   mayRegroup,
   newRoom,
+  normalizeRoom,
+  notePlayed,
   openClaimWindow,
   resetRoom,
   returnToLobby,
@@ -18,6 +20,9 @@ import {
   syncSeats,
   touch,
   viewFor,
+  SPEED_LEVELS,
+  type SpeedLevel,
+  TURN_LIMITS,
 } from "@/game/room";
 import {
   declareAddedKong,
@@ -73,7 +78,7 @@ export function multiplayerEnabled(): boolean {
 async function load(id: string): Promise<Room> {
   if (id.toUpperCase() !== FIXED_ROOM_ID) throw new RoomError("No such room", 404);
   const existing = await roomStore().get(FIXED_ROOM_ID);
-  if (existing) return existing;
+  if (existing) return normalizeRoom(existing);
   await roomStore().create(newRoom(FIXED_ROOM_ID));
   const room = await roomStore().get(FIXED_ROOM_ID);
   if (!room) throw new RoomError("Could not open the table", 500);
@@ -94,6 +99,7 @@ async function mutate(
     const expected = room.version;
     const now = Date.now();
     apply(room, now);
+    notePlayed(room);
     drain(room, now);
     room.version = expected + 1;
     room.updatedAt = now;
@@ -201,6 +207,9 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
         r.state = declareSelfDraw(r.state, seat);
         break;
     }
+    // The person moved: the computer's reply is paced from now, and so is
+    // their own time limit if a kong hands the turn straight back to them.
+    r.lastStepAt = now;
   });
   return viewFor(room, token);
 }
@@ -213,6 +222,9 @@ export type TableCommand =
   | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
+  | { type: "speed"; value: number }
+  | { type: "turnLimit"; value: number }
+  | { type: "rotate" }
   | { type: "freeSeat"; seat: Seat }
   | { type: "forcePass" };
 
@@ -253,9 +265,11 @@ export async function control(
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
         r.state = nextHand(r.state);
+        r.lastStepAt = now;
         break;
       case "redeal":
         r.state = startHand({ ...r.state, phase: "handOver" });
+        r.lastStepAt = now;
         break;
       case "restart": {
         // Everyone keeps their chair and the scores go back to zero, but the
@@ -273,6 +287,25 @@ export async function control(
         break;
       case "minFaan":
         r.state = setMinFaan(r.state, command.value);
+        break;
+      case "speed":
+        if (!SPEED_LEVELS.some((s) => s.level === command.value)) {
+          throw new RoomError("No such speed", 400);
+        }
+        r.settings.speed = command.value as SpeedLevel;
+        break;
+      case "turnLimit":
+        if (!(TURN_LIMITS as readonly number[]).includes(command.value)) {
+          throw new RoomError("No such time limit", 400);
+        }
+        r.settings.turnLimit = command.value;
+        // A new limit starts counting now, not from when the turn began.
+        r.lastStepAt = now;
+        break;
+      // A quarter turn clockwise, for a tablet set down at a different angle
+      // to the chairs than the table assumed.
+      case "rotate":
+        r.settings.rotation = ((r.settings.rotation + 1) % 4) as 0 | 1 | 2 | 3;
         break;
       case "freeSeat":
         r.seats[command.seat] = { kind: "open" };

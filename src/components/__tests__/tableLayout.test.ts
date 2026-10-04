@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Placement, layoutTable } from "../tableLayout";
+import { type Placement, layoutTable, positionOf } from "../tableLayout";
 
 /** Screen rectangle a placed box covers once it is turned to face its seat. */
 function footprint(p: Placement) {
@@ -71,5 +71,15 @@ describe("table layout", () => {
     });
     expect(layout.rackTiles[1]).toBeLessThan(layout.rackTiles[0]);
     expect(layout.rackTiles[2]).toBe(layout.rackTiles[0]);
+  });
+});
+
+describe("rotation", () => {
+  it("moves every seat one edge clockwise per quarter turn", () => {
+    // Positions run bottom, right, top, left.
+    expect([0, 1, 2, 3].map((seat) => positionOf(seat, 0))).toEqual([0, 1, 2, 3]);
+    // East goes from the bottom edge to the left one, South from right to bottom.
+    expect([0, 1, 2, 3].map((seat) => positionOf(seat, 1))).toEqual([3, 0, 1, 2]);
+    expect([0, 1, 2, 3].map((seat) => positionOf(seat, 4))).toEqual([0, 1, 2, 3]);
   });
 });
