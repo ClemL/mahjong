@@ -16,7 +16,7 @@ import { RoomError } from "./errors";
  * is weaker in production, exactly like the memory room store.
  */
 
-export type LimitKind = "claim" | "act";
+export type LimitKind = "claim" | "act" | "reset";
 
 /** Windows chosen for a table of friends, not a public service. */
 const LIMITS: Record<LimitKind, { tokens: number; window: `${number} ${"s" | "m" | "h"}` }> = {
@@ -26,6 +26,8 @@ const LIMITS: Record<LimitKind, { tokens: number; window: `${number} ${"s" | "m"
   claim: { tokens: 20, window: "10 m" },
   // Generous: a fast player plus polling should never reach it.
   act: { tokens: 120, window: "1 m" },
+  // Anyone at the seat picker can empty the room, so a handful at most.
+  reset: { tokens: 5, window: "10 m" },
 };
 
 function parseWindowMs(window: string): number {

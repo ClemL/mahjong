@@ -320,6 +320,7 @@ export function PhoneView({
               fullscreenHint={landscape && !fullscreen.supported}
               layout={landscape ? layout : undefined}
               sort={order}
+              onLeave={() => void api.leave()}
             />
           </SettingsMenu>
         ) : null}

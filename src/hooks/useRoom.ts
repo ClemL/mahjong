@@ -17,6 +17,10 @@ export interface RoomApi {
   setToken: (token: string | null) => void;
   act: (action: PlayerAction) => Promise<void>;
   control: (command: TableCommand) => Promise<void>;
+  /** Give up this seat and go back to the seat picker. */
+  leave: () => Promise<void>;
+  /** Empty the whole room, table included — from the seat picker, with no seat. */
+  resetTable: () => Promise<void>;
   resume: () => void;
   refresh: () => void;
 }
@@ -169,10 +173,55 @@ export function useRoom(roomId: string): RoomApi {
     [roomId],
   );
 
+  const leave = useCallback(async () => {
+    if (!tokenRef.current) return;
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/action`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: tokenRef.current, action: { type: "leave" } }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setError(body.error ?? "Could not leave the table");
+        return;
+      }
+      setError(null);
+      // The seat is gone on the server; forget the token that held it.
+      setToken(null);
+    } catch {
+      setError("Could not reach the table");
+    } finally {
+      setBusy(false);
+    }
+  }, [roomId, setToken]);
+
+  const resetTable = useCallback(async () => {
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/rooms/${roomId}/reset`, { method: "POST" });
+      const body = (await response.json()) as RoomView & { error?: string };
+      if (!response.ok) {
+        setError(body.error ?? "Could not reset the table");
+        return;
+      }
+      setError(null);
+      versionRef.current = body.version;
+      setView(body);
+    } catch {
+      setError("Could not reach the table");
+    } finally {
+      setBusy(false);
+    }
+  }, [roomId]);
+
   return {
     view,
     error,
     busy,
+    leave,
+    resetTable,
     token,
     stale,
     resume,

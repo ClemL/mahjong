@@ -105,6 +105,7 @@ export function TableLobby({
               appearance={appearance}
               // The controller layout only exists once a tablet is the table.
               layout={view.tablePresent ? layout : undefined}
+              onLeave={() => void api.leave()}
             />
           )}
         </SettingsMenu>
@@ -226,6 +227,23 @@ export function TableLobby({
             }}
           >
             Reset table
+          </button>
+        ) : null}
+
+        {/* A seated phone can get up again before the deal — wrong chair, or not
+            playing after all. */}
+        {view.you.role === "player" ? (
+          <button
+            type="button"
+            className="btn btn--ghost btn--reset"
+            disabled={api.busy}
+            onClick={() => {
+              if (confirm("Leave your seat? This phone goes back to choosing a seat.")) {
+                void api.leave();
+              }
+            }}
+          >
+            Leave seat
           </button>
         ) : null}
 

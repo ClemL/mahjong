@@ -91,6 +91,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         <SeatPicker
           view={view}
           busy={api.busy}
+          onReset={() => void api.resetTable()}
           error={joinError ?? api.error}
           onClaim={async (seat, name) => {
             try {
