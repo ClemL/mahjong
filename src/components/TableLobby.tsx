@@ -8,13 +8,14 @@ import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { QrCode } from "./QrCode";
+import { positionOf } from "./tableLayout";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
 import { PhoneSettings } from "./PhoneSettings";
 import type { SoundToggle } from "./TableView";
 
-/** Where each seat sits relative to the tablet lying on the table. */
-const EDGE: Record<Seat, string> = { 0: "bottom", 1: "right", 2: "top", 3: "left" };
+/** Screen edges by position; which seat is at which follows the table's rotation. */
+const EDGES = ["bottom", "right", "top", "left"];
 
 /**
  * The gathering screen.
@@ -142,7 +143,8 @@ export function TableLobby({
                   )}
 
                   <span className="gather__seatmeta">
-                    Seat {seat + 1} · {SEAT_NAMES[seat]} · {EDGE[seat]} edge
+                    Seat {seat + 1} · {SEAT_NAMES[seat]} ·{" "}
+                    {EDGES[positionOf(seat, view.settings.rotation)]} edge
                   </span>
                   {/* Joined state must not rest on the colour of the card alone. */}
                   <span className="gather__state">{here ? "✓ Seated" : "Open"}</span>

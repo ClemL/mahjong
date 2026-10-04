@@ -1,6 +1,7 @@
 "use client";
 
-import type { RoomView } from "@/game/room";
+import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS } from "@/game/room";
+import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
@@ -8,6 +9,24 @@ import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
 import type { SoundToggle } from "./TableView";
+import { positionOf } from "./tableLayout";
+
+const SPEEDS: ChoiceOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
+  value: `${s.level}` as `${SpeedLevel}`,
+  label: s.label,
+  hint: `About ${s.turnMs / 1000} seconds per computer turn, with the animations paced to match`,
+}));
+
+const LIMITS: ChoiceOption<string>[] = TURN_LIMITS.map((seconds) => ({
+  value: String(seconds),
+  label: seconds === 0 ? "Off" : seconds < 60 ? `${seconds}s` : `${seconds / 60} min`,
+  hint:
+    seconds === 0
+      ? "Wait as long as a player takes"
+      : `After ${seconds < 60 ? `${seconds} seconds` : `${seconds / 60} minute${seconds > 60 ? "s" : ""}`}, the tile just drawn is discarded for them`,
+}));
+
+const EDGES = ["bottom", "right", "top", "left"];
 
 const SOUND: ChoiceOption<"on" | "off">[] = [
   { value: "on", label: "On", hint: "Clacks on discards, claims and wins" },
@@ -47,6 +66,38 @@ export function TableSettings({
                 ))}
               </select>
             </label>
+
+            <Choice
+              label="Computer speed"
+              options={SPEEDS}
+              value={`${view.settings.speed}` as `${SpeedLevel}`}
+              onChange={(value) => void api.control({ type: "speed", value: Number(value) })}
+            />
+
+            <Choice
+              label="Turn time limit"
+              options={LIMITS}
+              value={String(view.settings.turnLimit)}
+              onChange={(value) => void api.control({ type: "turnLimit", value: Number(value) })}
+            />
+
+            {/* For a tablet laid down at a different angle to the chairs. */}
+            <div className="choice">
+              <span className="choice__label">Board</span>
+              <div className="choice__options">
+                <button
+                  type="button"
+                  className="choice__btn"
+                  disabled={api.busy}
+                  onClick={() => void api.control({ type: "rotate" })}
+                >
+                  Rotate clockwise ↻
+                </button>
+              </div>
+              <span className="choice__hint">
+                {SEAT_NAMES[0]} sits at the {EDGES[positionOf(0, view.settings.rotation)]} edge
+              </span>
+            </div>
 
             {sound ? (
               <Choice

@@ -118,7 +118,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
 
   if (view.you.role === "table") {
     return (
-      <main className="app app--table app--paced app--felt">
+      <main className="app app--table app--paced app--felt" data-speed={view.settings.speed}>
         {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
         <TableTop api={api} view={view} sound={sound} />
         {api.error ? <p className="lobby__error">{api.error}</p> : null}
@@ -129,7 +129,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // A seated player. With a table device in the room the phone only carries
   // their own hand, held sideways; without one it has to show the whole table.
   return (
-    <main className={view.tablePresent ? "app app--paced app--handset" : "app app--paced"}>
+    <main
+      className={view.tablePresent ? "app app--paced app--handset" : "app app--paced"}
+      data-speed={view.settings.speed}
+    >
       {view.canRegroup ? <RegroupBanner api={api} view={view} /> : null}
       {view.tablePresent ? (
         <PhoneView api={api} view={view} sound={sound} landscape />

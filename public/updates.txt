@@ -52,3 +52,10 @@
 2026-10-03T16:00:00Z - The seating screen drops the large TABLE label and gains the same settings menu as play: look, sound, house rules and the faan table
 2026-10-03T16:00:00Z - Reset table, next to Deal: empties every chair so everyone picks a seat again, and puts scores and house rules back to the defaults
 2026-10-03T16:30:00Z - More tile designs (Settings → Table & tiles): Indexed and Western faces, a Tile body choice (Ivory, Bone, Two-tone, Amber, Flat) and a Tile backs choice (Match table, Emerald, Crimson, Sapphire, Gold, Ebony)
+2026-10-04T12:00:00Z - The table screen can be rotated clockwise from Settings, for a tablet laid down at a different angle; the seating screen's edge labels follow it
+2026-10-04T12:00:00Z - Computer speed has five levels at the table, from about four seconds per computer turn to under half a second, and the animations pace with it
+2026-10-04T12:00:00Z - A turn time limit at the table (off, 15s, 30s, 1 or 2 minutes; 30s to start): when it runs out the tile just drawn is discarded. Phones and the table show the countdown
+2026-10-04T12:00:00Z - The last tile played sits in the middle of the table at the same size as the ponds, and stays there until the next discard
+2026-10-04T12:00:00Z - Phones can sort the hand by suits, honors first, or by hand — drag a tile to move it
+2026-10-04T12:00:00Z - When you can claim a tile, faint ghost sets show every meld on offer, where your claimed sets go
+2026-10-04T12:00:00Z - Phones show the most recently played tile, and whose it was, next to the prompt

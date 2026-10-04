@@ -439,7 +439,7 @@ button {
     transform: scale(1.4);
   }
 
-  .tile--button:hover:not(:disabled) {
+  .tile--button:hover:not(:disabled):not([aria-disabled="true"]) {
     transform: translateY(-10px) scale(1.4);
     box-shadow: 0 10px 2px var(--tile-shadow), 0 16px 26px rgba(0, 0, 0, 0.5);
   }
@@ -477,7 +477,8 @@ button {
   padding: 0;
 }
 
-.tile--button:disabled {
+.tile--button:disabled,
+.tile--button[aria-disabled="true"] {
   cursor: default;
 }
 
@@ -976,9 +977,9 @@ details[open] > summary::after {
 }
 
 .tile--toss-bottom { animation: toss-from-bottom var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
-.tile--toss-top    { animation: toss-from-top 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
-.tile--toss-left   { animation: toss-from-left 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
-.tile--toss-right  { animation: toss-from-right 340ms cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-top    { animation: toss-from-top var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-left   { animation: toss-from-left var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-right  { animation: toss-from-right var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
 .tile--claimed     { animation: claim-pop var(--anim-claim) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
 .tile--drew        { animation: draw-in var(--anim-draw) ease-out both; }
 
@@ -1941,11 +1942,6 @@ details[open] > summary::after {
   font-weight: 700;
 }
 
-.phone__discard {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 
 .phone__hand {
   display: flex;
@@ -2126,6 +2122,13 @@ a.btn {
   --anim-claim: 950ms;
   --anim-draw: 650ms;
 }
+
+/* The table's computer speed paces the animations too, so a slow table is
+   slow to watch as well as to play. Level 3 is the default above. */
+.app--paced[data-speed="1"] { --anim-toss: 1500ms; --anim-claim: 1550ms; --anim-draw: 1000ms; }
+.app--paced[data-speed="2"] { --anim-toss: 1150ms; --anim-claim: 1200ms; --anim-draw: 800ms; }
+.app--paced[data-speed="4"] { --anim-toss: 600ms; --anim-claim: 650ms; --anim-draw: 450ms; }
+.app--paced[data-speed="5"] { --anim-toss: 340ms; --anim-claim: 380ms; --anim-draw: 260ms; }
 
 /* The newest discard keeps a ring so it stays findable after it lands. */
 .app--paced .tile--just-discarded {
@@ -3450,9 +3453,13 @@ body:has(.app--handset) {
   gap: 10px;
 }
 
-.phone--landscape .phone__prompt {
+.phone--landscape .phone__status {
   grid-area: prompt;
   align-self: center;
+  min-width: 0;
+}
+
+.phone--landscape .phone__prompt {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3629,9 +3636,10 @@ body:has(.app--handset) {
 
 .phone--landscape.phone--compact {
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
     "bar"
+    "melds"
     "controls"
     "hand";
   gap: 4px;
@@ -3717,4 +3725,117 @@ body:has(.app--handset) {
 
 .phone--compact .hand__gap {
   width: 8px;
+}
+
+/* ------------------------------------------- phone: status, ghosts, sorting */
+
+/* The last tile, the prompt and the turn clock share one line. */
+.phone__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.phone__status .phone__prompt {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The newest discard at the table, with the wind of whoever threw it. */
+.phone__last {
+  --tile-sm: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 6px 2px 4px;
+  border-radius: 8px;
+  background: var(--raise-1);
+}
+
+.phone__last-from {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  line-height: 1;
+}
+
+.phone--compact .phone__last {
+  --tile-sm: clamp(16px, 7cqh, 24px);
+  padding: 1px 4px 1px 3px;
+}
+
+/* Time left to discard: the count, and a bar draining under it. */
+.phone__timer {
+  flex: none;
+  min-width: 38px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.phone__timer::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) calc(var(--left, 1) * 100%), var(--line) 0);
+}
+
+/* Claims on offer, drawn faintly where your claimed sets go. Identity is the
+   dashed outline and the label, not the fading alone. */
+.meld--ghost {
+  position: relative;
+  align-items: flex-end;
+  opacity: 0.55;
+  background: transparent;
+  outline: 1.5px dashed var(--gold);
+  outline-offset: 1px;
+  transition: opacity 120ms ease;
+}
+
+.meld--ghost-lit {
+  opacity: 1;
+  outline-style: solid;
+}
+
+.meld__ghost-label {
+  align-self: center;
+  margin: 0 3px 0 1px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--gold);
+}
+
+.phone--compact .phone__melds {
+  grid-area: melds;
+}
+
+/* A tile being dragged into a new place in the hand. */
+.tile--dragging {
+  transform: translateY(-8px) scale(1.06);
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  z-index: 30;
+  box-shadow: 0 10px 2px var(--tile-shadow), 0 16px 26px rgba(0, 0, 0, 0.5);
+}
+
+/* The page still scrolls under a finger moving up and down the column; only
+   sideways movement belongs to the hand. The controller does not scroll, so
+   there the hand takes every direction — it may be turned on its side. */
+.phone__hand {
+  touch-action: pan-y;
+}
+
+.phone--landscape .phone__hand {
+  touch-action: none;
+}
+
+.phone__hand--dragging {
+  cursor: grabbing;
 }

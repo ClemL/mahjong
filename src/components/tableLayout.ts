@@ -19,9 +19,9 @@ export interface TableLayoutInput {
   height: number;
   /** Discards each pond must hold at the chosen size. */
   capacity: number;
-  /** Per seat: the exposed tiles (melds and flowers) its rack carries. */
+  /** Per position: the exposed tiles (melds and flowers) that rack carries. */
   revealed: readonly number[];
-  /** Per seat: separate groups on its rack (each meld, plus one for flowers). */
+  /** Per position: separate groups on that rack (each meld, plus one for flowers). */
   groups: readonly number[];
 }
 
@@ -45,14 +45,13 @@ export interface TableLayout {
   tile: number;
   /** Gap between discards. */
   gap: number;
-  /** Rack thickness, and per seat the exposed-tile width inside it. */
+  /** Rack thickness, and per position the exposed-tile width inside it. */
   rack: number;
   rackTiles: [number, number, number, number];
-  /** Width of the last discard shown in the console. */
-  spotlight: number;
   /** Ponds facing the bottom/top seats and the left/right seats. */
   across: PondShape;
   side: PondShape;
+  /** Indexed by position: 0 bottom, 1 right, 2 top, 3 left. */
   racks: [Placement, Placement, Placement, Placement];
   ponds: [Placement, Placement, Placement, Placement];
   console: Placement;
@@ -90,11 +89,19 @@ function rowLength(tile: number, cols: number): number {
 }
 
 /**
- * Seat → screen rotation. Seat 0 sits at the bottom and play passes
- * counter-clockwise, so South is on the right, West across, North on the left.
- * Each box is drawn as its owner would read it and turned to face them.
+ * Position → screen rotation, for positions bottom, right, top, left. Each
+ * box is drawn as its owner would read it and turned to face them.
  */
-export const SEAT_ROTATION = [0, -90, 180, 90] as const;
+export const POSITION_ROTATION = [0, -90, 180, 90] as const;
+
+/**
+ * Where a seat sits on the screen. Unrotated, East is at the bottom and play
+ * passes counter-clockwise: South right, West across, North left. Each
+ * clockwise quarter turn moves every seat one edge round — bottom to left.
+ */
+export function positionOf(seat: number, rotation: number): number {
+  return (((seat - rotation) % 4) + 4) % 4;
+}
 
 interface Candidate {
   across: PondShape;
@@ -111,7 +118,8 @@ interface Candidate {
  */
 function fitPonds(tile: number, width: number, height: number, capacity: number): Candidate | null {
   const pitch = rowPitch(tile);
-  const minInner = TILE_RATIO * tile * 1.3;
+  // Room for the last discard, at pond size, turned whichever way it faces.
+  const minInner = TILE_RATIO * tile + 8;
   const minW = Math.max(170, 2 * CONSOLE_BAND + minInner);
   const minH = Math.max(120, 2 * CONSOLE_BAND + CAPTION + minInner);
   let best: Candidate | null = null;
@@ -180,17 +188,14 @@ export function layoutTable({
 
   // Exposed tiles shrink only when that rack would otherwise overflow its edge.
   const fromHeight = (rack - 2 * RACK_INSET - 12) / (TILE_RATIO + 0.06);
-  const rackTile = (seat: number): number => {
-    const length = (seat % 2 === 0 ? width : height) - 2 * rack - 2 * RACK_INSET;
-    const count = revealed[seat] ?? 0;
+  const rackTile = (position: number): number => {
+    const length = (position % 2 === 0 ? width : height) - 2 * rack - 2 * RACK_INSET;
+    const count = revealed[position] ?? 0;
     const fromLength =
-      count > 0 ? (length - RACK_INFO - (groups[seat] ?? 0) * 8) / count - 2 : MAX_RACK_TILE;
+      count > 0 ? (length - RACK_INFO - (groups[position] ?? 0) * 8) / count - 2 : MAX_RACK_TILE;
     return Math.floor(Math.max(16, Math.min(MAX_RACK_TILE, fromHeight, fromLength)));
   };
 
-  // The spotlight may be turned either way, so it has to fit both directions.
-  const inner = Math.min(fit.centerW - 2 * CONSOLE_BAND, fit.centerH - 2 * CONSOLE_BAND - CAPTION);
-  const spotlight = Math.floor(Math.max(tile, Math.min(tile * 2.4, (inner - 8) / (TILE_RATIO + 0.04))));
 
   const cx = width / 2;
   const cy = height / 2;
@@ -204,10 +209,10 @@ export function layoutTable({
   const along = height - 2 * rack - 2 * RACK_INSET;
   const depth = rack - 2 * RACK_INSET;
   const racks: TableLayout["racks"] = [
-    { cx, cy: height - rack / 2, w: across, h: depth, rotate: SEAT_ROTATION[0] },
-    { cx: width - rack / 2, cy, w: along, h: depth, rotate: SEAT_ROTATION[1] },
-    { cx, cy: rack / 2, w: across, h: depth, rotate: SEAT_ROTATION[2] },
-    { cx: rack / 2, cy, w: along, h: depth, rotate: SEAT_ROTATION[3] },
+    { cx, cy: height - rack / 2, w: across, h: depth, rotate: POSITION_ROTATION[0] },
+    { cx: width - rack / 2, cy, w: along, h: depth, rotate: POSITION_ROTATION[1] },
+    { cx, cy: rack / 2, w: across, h: depth, rotate: POSITION_ROTATION[2] },
+    { cx: rack / 2, cy, w: along, h: depth, rotate: POSITION_ROTATION[3] },
   ];
 
   const ponds: TableLayout["ponds"] = [
@@ -216,17 +221,17 @@ export function layoutTable({
       cy: height - rack - MARGIN - acrossDepth / 2,
       w: acrossLength,
       h: acrossDepth,
-      rotate: SEAT_ROTATION[0],
+      rotate: POSITION_ROTATION[0],
     },
     {
       cx: width - rack - MARGIN - sideDepth / 2,
       cy,
       w: sideLength,
       h: sideDepth,
-      rotate: SEAT_ROTATION[1],
+      rotate: POSITION_ROTATION[1],
     },
-    { cx, cy: rack + MARGIN + acrossDepth / 2, w: acrossLength, h: acrossDepth, rotate: SEAT_ROTATION[2] },
-    { cx: rack + MARGIN + sideDepth / 2, cy, w: sideLength, h: sideDepth, rotate: SEAT_ROTATION[3] },
+    { cx, cy: rack + MARGIN + acrossDepth / 2, w: acrossLength, h: acrossDepth, rotate: POSITION_ROTATION[2] },
+    { cx: rack + MARGIN + sideDepth / 2, cy, w: sideLength, h: sideDepth, rotate: POSITION_ROTATION[3] },
   ];
 
   return {
@@ -234,7 +239,6 @@ export function layoutTable({
     gap: GAP,
     rack,
     rackTiles: [rackTile(0), rackTile(1), rackTile(2), rackTile(3)],
-    spotlight,
     across: fit.across,
     side: fit.side,
     racks,

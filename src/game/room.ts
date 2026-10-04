@@ -17,13 +17,14 @@ import {
   type TurnActions,
   advanceTurn,
   createGame,
+  discard,
   resolveClaims,
   startHand,
   turnActions,
 } from "./engine";
 import { needsTurnAdvance, stepAiTurn } from "./controller";
 import { greedyAi } from "./ai";
-import { SEAT_NAMES, type Seat, type Tile, type TileCode } from "./tiles";
+import { SEAT_NAMES, type Seat, type Tile, type TileCode, isFlower } from "./tiles";
 import type { Meld } from "./melds";
 import type { RuleConfig } from "./rules";
 import { createRng } from "./rng";
@@ -31,6 +32,38 @@ import { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS } from "./presence";
 
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
+
+/**
+ * How long each computer turn takes, slowest first. A whole round of three
+ * computer seats at the slowest pace is twelve seconds — long enough to watch
+ * every tile land.
+ */
+export const SPEED_LEVELS = [
+  { level: 1, label: "Very slow", turnMs: 4000 },
+  { level: 2, label: "Slow", turnMs: 2500 },
+  { level: 3, label: "Normal", turnMs: 1500 },
+  { level: 4, label: "Fast", turnMs: 800 },
+  { level: 5, label: "Very fast", turnMs: 400 },
+] as const;
+
+export type SpeedLevel = (typeof SPEED_LEVELS)[number]["level"];
+
+/** Seconds a person may take over a discard before the table makes it; 0 is no limit. */
+export const TURN_LIMITS = [0, 15, 30, 60, 120] as const;
+
+export interface RoomSettings {
+  speed: SpeedLevel;
+  /** Seconds; one of TURN_LIMITS. */
+  turnLimit: number;
+  /** Quarter turns clockwise the table screen is drawn at. */
+  rotation: 0 | 1 | 2 | 3;
+}
+
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 3, turnLimit: 30, rotation: 0 };
+
+export function turnMs(speed: SpeedLevel): number {
+  return SPEED_LEVELS.find((s) => s.level === speed)?.turnMs ?? 1500;
+}
 
 export { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS };
 
@@ -70,6 +103,20 @@ export interface Room {
   claimDeadline: number | null;
   rngSeed: number;
   rngCalls: number;
+  settings: RoomSettings;
+  /**
+   * When the table last moved. Computer turns are paced from it and a
+   * person's turn limit runs from it. It is the time a move was due rather
+   * than when a poll happened to notice, so a backlog plays out at the same
+   * pace however often the table is asked.
+   */
+  lastStepAt: number;
+  /**
+   * The newest discard, kept after the engine has moved on: the engine clears
+   * its own copy the moment the next player draws, which with the computer
+   * playing is before anyone could have seen it.
+   */
+  lastPlayed: { tile: Tile; from: Seat; hand: number } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -119,6 +166,11 @@ export interface RoomView {
   awaitingClaimSeats: Seat[];
   claim: { options: ClaimOption[]; deadlineIn: number } | null;
   actions: TurnActions | null;
+  settings: RoomSettings;
+  /** The newest discard this hand, still shown after the next player draws. */
+  lastPlayed: { tile: Tile; from: Seat } | null;
+  /** Time left for the person whose turn it is, when the table has a limit. */
+  turnDeadlineIn: number | null;
 }
 
 const HIDDEN: TileCode = "back";
@@ -145,7 +197,26 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     claimDeadline: null,
     rngSeed: seed ^ 0x5bf03635,
     rngCalls: 0,
+    settings: { ...DEFAULT_ROOM_SETTINGS },
+    lastStepAt: Date.now(),
+    lastPlayed: null,
   };
+}
+
+/** Fill in fields added since a stored room was written. */
+export function normalizeRoom(room: Room): Room {
+  room.settings = { ...DEFAULT_ROOM_SETTINGS, ...(room.settings ?? {}) };
+  room.lastStepAt ??= room.updatedAt ?? Date.now();
+  room.lastPlayed ??= null;
+  return room;
+}
+
+/** Remember the discard on the table, if it is a new one. */
+export function notePlayed(room: Room): void {
+  const discardNow = room.state.lastDiscard;
+  if (discardNow && discardNow.tile.id !== room.lastPlayed?.tile.id) {
+    room.lastPlayed = { ...discardNow, hand: room.state.handNumber };
+  }
 }
 
 /**
@@ -158,6 +229,7 @@ export function startPlay(room: Room, now = Date.now()): void {
   room.claimResponses = {};
   room.claimDeadline = null;
   room.state = startHand(room.state);
+  room.lastStepAt = now;
   syncSeats(room, now);
 }
 
@@ -180,6 +252,8 @@ export function resetRoom(room: Room, seed = Date.now()): void {
   room.seats = fresh.seats;
   room.rngSeed = fresh.rngSeed;
   room.rngCalls = 0;
+  room.settings = fresh.settings;
+  room.lastPlayed = null;
   returnToLobby(room, fresh.state);
 }
 
@@ -275,9 +349,24 @@ export function pendingHumanClaimants(room: Room, now = Date.now()): Seat[] {
 }
 
 /**
+ * What the table throws for someone whose time ran out: the tile they just
+ * drew, which leaves the hand exactly as they were holding it, or failing
+ * that the discard the computer would make.
+ */
+function autoDiscardChoice(state: GameState, seat: Seat, rng: ReturnType<typeof createRng>): string | null {
+  const hand = state.players[seat].hand;
+  if (state.drawnTileId && hand.some((t) => t.id === state.drawnTileId)) return state.drawnTileId;
+  const decision = greedyAi.chooseTurnAction(state, seat, rng);
+  if (decision.type === "discard" && hand.some((t) => t.id === decision.tileId)) return decision.tileId;
+  return hand.find((t) => !isFlower(t.code))?.id ?? null;
+}
+
+/**
  * Advance the table as far as it can go without a person's input: resolve a
  * claim round once everyone has answered or the window has closed, pass the
- * turn on, and play any computer seats.
+ * turn on, play computer seats one at a time at the table's pace, and discard
+ * for a person whose time limit has run out. Moves that are not due yet wait
+ * for a later call — every poll is one.
  */
 export function drain(room: Room, now = Date.now()): boolean {
   syncSeats(room, now);
@@ -293,6 +382,20 @@ export function drain(room: Room, now = Date.now()): boolean {
   for (let i = 0; i < room.rngCalls; i++) rng.next();
 
   let changed = false;
+  const move = (next: GameState) => {
+    room.state = next;
+    notePlayed(room);
+    changed = true;
+  };
+  // A fresh discard opens a new claim window for the people at the table.
+  const openWindow = () => {
+    if (room.state.phase === "claiming" && pendingHumanClaimants(room, now).length > 0) {
+      room.claimDeadline = now + CLAIM_WINDOW_MS;
+    }
+  };
+  const pace = turnMs(room.settings.speed);
+  const limit = room.settings.turnLimit * 1000;
+
   for (let guard = 0; guard < 400; guard += 1) {
     const state = room.state;
     if (state.phase === "handOver" || state.phase === "gameOver") break;
@@ -309,30 +412,46 @@ export function drain(room: Room, now = Date.now()): boolean {
         const choice = greedyAi.chooseClaim(state, c.seat, c.options, rng);
         return { seat: c.seat, optionId: choice?.id ?? null };
       });
-      room.state = resolveClaims(state, decisions);
+      // People were being waited on: the computer's next move is paced from
+      // when the window closed, not from the discard that opened it.
+      if (room.claimDeadline !== null) {
+        room.lastStepAt = Math.max(room.lastStepAt, Math.min(now, room.claimDeadline));
+      }
+      move(resolveClaims(state, decisions));
       room.claimResponses = {};
       room.claimDeadline = null;
-      changed = true;
       continue;
     }
 
     if (needsTurnAdvance(state)) {
-      room.state = advanceTurn(state);
-      changed = true;
+      move(advanceTurn(state));
       continue;
     }
 
-    if (isHumanSeat(room, state.turn, now)) break;
+    if (isHumanSeat(room, state.turn, now)) {
+      // A person's turn waits for them — unless the table has a time limit
+      // and it has run out, in which case the table discards for them.
+      if (limit <= 0) break;
+      const due = room.lastStepAt + limit;
+      if (now < due) break;
+      const tileId = autoDiscardChoice(state, state.turn, rng);
+      if (!tileId) break;
+      const next = discard(state, state.turn, tileId);
+      if (next.lastDiscard?.tile.id !== tileId) break;
+      move(next);
+      room.lastStepAt = due;
+      openWindow();
+      continue;
+    }
 
+    // The computer's turn, at the table's pace.
+    const due = room.lastStepAt + pace;
+    if (now < due) break;
     const next = stepAiTurn(state, rng, greedyAi);
     if (next === state) break;
-    room.state = next;
-    changed = true;
-
-    // A fresh discard opens a new claim window for the people at the table.
-    if (room.state.phase === "claiming" && pendingHumanClaimants(room, now).length > 0) {
-      room.claimDeadline = now + CLAIM_WINDOW_MS;
-    }
+    move(next);
+    room.lastStepAt = due;
+    openWindow();
   }
 
   room.rngCalls += 1;
@@ -451,6 +570,19 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     awaitingClaimSeats: pendingHumanClaimants(room, now),
     claim,
     actions,
+    settings: room.settings,
+    lastPlayed:
+      room.lastPlayed && room.lastPlayed.hand === state.handNumber
+        ? { tile: room.lastPlayed.tile, from: room.lastPlayed.from }
+        : null,
+    turnDeadlineIn:
+      room.started &&
+      room.settings.turnLimit > 0 &&
+      state.phase === "action" &&
+      state.lastDiscard === null &&
+      isHumanSeat(room, state.turn, now)
+        ? Math.max(0, room.lastStepAt + room.settings.turnLimit * 1000 - now)
+        : null,
   };
 }
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { type CSSProperties, useEffect, useState } from "react";
+import type { CSSProperties } from "react";
+import { useCountdown } from "@/hooks/useCountdown";
 import type { ClaimOption } from "@/game/engine";
 import { CLAIM_WINDOW_MS } from "@/game/room";
 import { type TileCode, tileName } from "@/game/tiles";
 import { TileFace } from "./TileView";
 
-const LABEL: Record<ClaimOption["type"], string> = {
+export const CLAIM_LABEL: Record<ClaimOption["type"], string> = {
   chow: "Chow 上",
   pung: "Pung 碰",
   kong: "Kong 槓",
@@ -14,7 +15,7 @@ const LABEL: Record<ClaimOption["type"], string> = {
 };
 
 /** Where the claimed tile lands: its place in a run, or the end of a set. */
-function claimedIndex(option: ClaimOption, discard: TileCode): number {
+export function claimedIndex(option: ClaimOption, discard: TileCode): number {
   return option.type === "chow" ? option.codes.indexOf(discard) : option.codes.length - 1;
 }
 
@@ -25,22 +26,6 @@ function describe(option: ClaimOption, discard: TileCode): string {
   return `${option.type[0].toUpperCase()}${option.type.slice(1)} ${option.codes
     .map(tileName)
     .join(", ")}, using your ${yours.join(" and ")}`;
-}
-
-/**
- * Milliseconds left on the claim window, counted down here: the view is only
- * re-sent when something at the table changes, so the number it carries goes
- * stale between polls.
- */
-function useCountdown(ms: number): number {
-  const [left, setLeft] = useState(ms);
-  useEffect(() => {
-    const ends = Date.now() + ms;
-    setLeft(ms);
-    const timer = setInterval(() => setLeft(Math.max(0, ends - Date.now())), 250);
-    return () => clearInterval(timer);
-  }, [ms]);
-  return left;
 }
 
 /**
@@ -65,7 +50,7 @@ export function ClaimChoices({
   onClaim: (optionId: string | null) => void;
   onPreview?: (option: ClaimOption | null) => void;
 }) {
-  const left = useCountdown(deadlineIn);
+  const left = useCountdown(deadlineIn) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
     "--left": Math.min(1, left / CLAIM_WINDOW_MS),
   };
@@ -87,7 +72,7 @@ export function ClaimChoices({
             onFocus={() => onPreview?.(option)}
             onBlur={() => onPreview?.(null)}
           >
-            <span className="claim__label">{LABEL[option.type]}</span>
+            <span className="claim__label">{CLAIM_LABEL[option.type]}</span>
             <span className="claim__meld" aria-hidden>
               {option.type === "win" ? (
                 <span className="claim__taken">
