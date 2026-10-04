@@ -59,3 +59,5 @@
 2026-10-04T12:00:00Z - Phones can sort the hand by suits, honors first, or by hand — drag a tile to move it
 2026-10-04T12:00:00Z - When you can claim a tile, faint ghost sets show every meld on offer, where your claimed sets go
 2026-10-04T12:00:00Z - Phones show the most recently played tile, and whose it was, next to the prompt
+2026-10-04T18:00:00Z - Players can leave the table: Leave seat on the waiting screen, and Leave the table in the phone's settings during a game — the computer carries on with the hand
+2026-10-04T18:00:00Z - Reset table on the Take a seat page empties the room, table screen included, so a table stuck on a device that has gone can be taken back

@@ -245,10 +245,13 @@ export function returnToLobby(room: Room, state: GameState): void {
 /**
  * A clean table: every chair emptied — so every phone holding a seat token is
  * back at the seat picker — scores and house rules at their defaults, nothing
- * dealt. The tablet keeps its place; it is the one asking.
+ * dealt. A tablet resetting its own table keeps its place; a reset from the
+ * seat picker frees the table too, which is how a table left signed in on a
+ * device that has gone away is taken back.
  */
-export function resetRoom(room: Room, seed = Date.now()): void {
+export function resetRoom(room: Room, seed = Date.now(), { keepTable = true } = {}): void {
   const fresh = newRoom(room.id, undefined, seed);
+  if (!keepTable) room.table = null;
   room.seats = fresh.seats;
   room.rngSeed = fresh.rngSeed;
   room.rngCalls = 0;

@@ -5,7 +5,7 @@ import { DEFAULT_ROOM_SETTINGS } from "@/game/room";
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, passwordRequired, readRoom } =
+const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, passwordRequired, readRoom, resetTable } =
   await import("../rooms");
 const { roomStore } = await import("../store");
 
@@ -309,5 +309,41 @@ describe("playing the computer while you wait", () => {
     expect((await readRoom(id, tokens[0])).warmup).toBe(false);
     await expect(control(id, table, { type: "regroup" })).rejects.toMatchObject({ status: 409 });
     await expect(control(id, tokens[1], { type: "regroup" })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("getting up", () => {
+  it("frees the chair when a player leaves the lobby", async () => {
+    const id = await room();
+    const { token } = await claimSeat(id, { seat: 1, name: "Teja" });
+    const after = await act(id, token, { type: "leave" });
+    expect(after.players[1].occupant.kind).toBe("open");
+    expect((await readRoom(id, token)).you).toEqual({ role: "spectator", seat: null });
+    // Somebody else can sit straight down.
+    expect((await claimSeat(id, { seat: 1, name: "Sherman" })).view.players[1].occupant.name).toBe("Sherman");
+  });
+
+  it("hands a chair left mid-hand to the computer", async () => {
+    const { id, tokens } = await dealtRoom([0, 1]);
+    const after = await act(id, tokens[1], { type: "leave" });
+    expect(after.started).toBe(true);
+    expect(after.players[1].occupant.kind).toBe("ai");
+    // Their tiles stay in play; only the person has gone.
+    expect(after.players[1].handCount).toBeGreaterThan(0);
+    await expect(act(id, tokens[1], { type: "win" })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("resetting from the seat picker", () => {
+  it("empties every chair and frees the table, so a new device can take it", async () => {
+    const { id, tokens, table } = await dealtRoom([0, 2]);
+    const reset = await resetTable(id);
+    expect(reset.started).toBe(false);
+    expect(reset.tablePresent).toBe(false);
+    expect(reset.players.every((p) => p.occupant.kind === "open")).toBe(true);
+    expect(reset.settings).toEqual(DEFAULT_ROOM_SETTINGS);
+    expect((await readRoom(id, table)).you.role).toBe("spectator");
+    expect((await readRoom(id, tokens[0])).you.role).toBe("spectator");
+    expect((await claimSeat(id, { seat: "table" })).view.you.role).toBe("table");
   });
 });

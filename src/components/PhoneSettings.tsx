@@ -45,6 +45,7 @@ export function PhoneSettings({
   fullscreenHint = false,
   layout,
   sort,
+  onLeave,
 }: {
   sound: SoundToggle;
   config: RuleConfig;
@@ -55,6 +56,8 @@ export function PhoneSettings({
   layout?: CompactLayout;
   /** How the hand is laid out; absent where there is no hand yet. */
   sort?: HandOrder;
+  /** Give up the seat. */
+  onLeave?: () => void;
 }) {
   return (
     <>
@@ -88,6 +91,31 @@ export function PhoneSettings({
               This browser cannot go full screen. On iPhone, Share → Add to Home Screen opens
               the table without the browser bars.
             </p>
+          ) : null}
+          {onLeave ? (
+            <div className="choice">
+              <span className="choice__label">Seat</span>
+              <div className="choice__options">
+                <button
+                  type="button"
+                  className="btn btn--sm btn--ghost btn--reset"
+                  onClick={() => {
+                    if (
+                      confirm(
+                        "Leave the table? The computer plays your seat from here, and this phone goes back to choosing a seat.",
+                      )
+                    ) {
+                      onLeave();
+                    }
+                  }}
+                >
+                  Leave the table
+                </button>
+              </div>
+              <span className="choice__hint">
+                The computer takes over your hand; anyone can sit back down in it
+              </span>
+            </div>
           ) : null}
         </div>
       </section>

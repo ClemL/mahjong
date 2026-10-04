@@ -8,12 +8,14 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 interface Props {
   view: RoomView;
   onClaim: (seat: Seat | "table", name: string) => Promise<void>;
+  /** Empty the room, table included. */
+  onReset: () => void;
   busy: boolean;
   error: string | null;
 }
 
 /** Pick a seat and sit down. There is nothing else to get past. */
-export function SeatPicker({ view, onClaim, busy, error }: Props) {
+export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
   const [choice, setChoice] = useState<Seat | "table" | null>(null);
 
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
@@ -108,6 +110,35 @@ export function SeatPicker({ view, onClaim, busy, error }: Props) {
           {choice === "table" ? "Open the table" : "Sit down"}
         </button>
       </form>
+
+      {/* The way back in when the table is marked in use by a device that has
+          gone — a cleared browser, a borrowed tablet — or when a new group is
+          sitting down to what is left of the last one's game. */}
+      {view.tablePresent || view.seatedCount > 0 || view.started ? (
+        <div className="lobby__reset">
+          <span className="seat__meta">
+            {view.tablePresent
+              ? "Table stuck on a device that is not here, or starting over?"
+              : "Starting over with new people?"}
+          </span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--reset"
+            disabled={busy}
+            onClick={() => {
+              if (
+                confirm(
+                  "Reset the table? Everyone at it — the players and the table screen — goes back to choosing a seat, and the scores and house rules go back to the defaults.",
+                )
+              ) {
+                onReset();
+              }
+            }}
+          >
+            Reset table
+          </button>
+        </div>
+      ) : null}
 
       {error ? <p className="lobby__error">{error}</p> : null}
     </div>

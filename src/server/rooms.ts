@@ -166,7 +166,8 @@ export type PlayerAction =
   | { type: "discard"; tileId: string }
   | { type: "kong"; kind: "concealed" | "added"; code: string }
   | { type: "win" }
-  | { type: "claim"; optionId: string | null };
+  | { type: "claim"; optionId: string | null }
+  | { type: "leave" };
 
 export async function act(id: string, token: string, action: PlayerAction): Promise<RoomView> {
   const room = await mutate(id, (r, now) => {
@@ -176,6 +177,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     const occupant = r.seats[seat];
     if (occupant.kind === "human") occupant.lastSeen = now;
     syncSeats(r);
+
+    // Getting up mid-hand hands the chair to the computer, which carries on
+    // from exactly where the person left it; in the lobby it is simply free.
+    if (action.type === "leave") {
+      r.seats[seat] = { kind: "open" };
+      syncSeats(r, now);
+      return;
+    }
 
     if (action.type === "claim") {
       if (r.state.phase !== "claiming") throw new RoomError("Nothing to claim", 409);
@@ -212,6 +221,18 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     r.lastStepAt = now;
   });
   return viewFor(room, token);
+}
+
+/**
+ * Empty the whole room — every chair and the table's own place — from the seat
+ * picker, where nobody holds a token. It is the way back in when the table is
+ * marked in use by a device that is no longer there.
+ */
+export async function resetTable(id: string): Promise<RoomView> {
+  const room = await mutate(id, (r, now) => {
+    resetRoom(r, now, { keepTable: false });
+  });
+  return viewFor(room, null);
 }
 
 export type TableCommand =
