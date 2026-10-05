@@ -32,6 +32,8 @@ import { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS } from "./presence";
 
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
+/** The least a claimed set is left on show before its owner plays on. */
+export const CLAIM_BEAT_MS = 2_500;
 
 /**
  * How long each computer turn takes, slowest first. A whole round of three
@@ -420,9 +422,17 @@ export function drain(room: Room, now = Date.now()): boolean {
       if (room.claimDeadline !== null) {
         room.lastStepAt = Math.max(room.lastStepAt, Math.min(now, room.claimDeadline));
       }
+      const taken = state.lastDiscard?.tile.id;
       move(resolveClaims(state, decisions));
       room.claimResponses = {};
       room.claimDeadline = null;
+      // A claim is a move of its own: the table shows the discard landing and
+      // then crossing to its new set, so the claimant's next discard waits a
+      // further beat rather than arriving on top of it — never less than the
+      // table needs to show it, however fast the table is set.
+      if (taken && room.state.players.some((p) => p.melds.some((m) => m.claimedTileId === taken))) {
+        room.lastStepAt += Math.max(pace, CLAIM_BEAT_MS);
+      }
       continue;
     }
 

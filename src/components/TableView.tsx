@@ -3,7 +3,7 @@
 import type { PublicPlayer, RoomView } from "@/game/room";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { TileBack, TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, isFreshClaim } from "./SeatPanel";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, "top" | "right" | "bottom" | "left"> = {
@@ -71,7 +71,7 @@ function SeatBlock({
       {player.melds.length > 0 ? (
         <div className="seat__row">
           {player.melds.map((m, i) => (
-            <MeldRow key={i} meld={m} />
+            <MeldRow key={i} meld={m} fresh={isFreshClaim(m, view.lastPlayed?.tile.id)} />
           ))}
         </div>
       ) : null}
