@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   CLAIM_BEAT_MS,
   CLAIM_WINDOW_MS,
+  DEAL_MS,
   DEFAULT_ROOM_SETTINGS,
+  FLOWER_STEP_MS,
   HEARTBEAT_WRITE_MS,
   MORE_TIME_MS,
+  OPENING_TURN_BONUS_MS,
   SEAT_IDLE_MS,
   type Room,
   drain,
@@ -17,6 +20,7 @@ import {
   normalizeRoom,
   pendingHumanClaimants,
   returnToLobby,
+  robotName,
   shouldRegroup,
   startPlay,
   syncSeats,
@@ -443,11 +447,28 @@ describe("turn limit", () => {
     const drawn = room.state.drawnTileId;
     const t0 = room.lastStepAt;
 
-    expect(viewFor(room, "tok-0", t0 + 5_000).turnDeadlineIn).toBe(10_000);
-    drain(room, t0 + 14_999);
+    // The dealer's first turn of a hand carries an extra minute.
+    const limit = 15_000 + OPENING_TURN_BONUS_MS;
+    expect(viewFor(room, "tok-0", t0 + 5_000).turnDeadlineIn).toBe(limit - 5_000);
+    drain(room, t0 + limit - 1);
     expect(room.state.players[0].discards).toHaveLength(0);
-    drain(room, t0 + 15_000);
+    drain(room, t0 + limit);
     expect(room.state.players[0].discards.map((t) => t.id)).toContain(drawn);
+  });
+
+  it("gives only the opening turn of a hand the extra minute", () => {
+    const room = dealt("TEST", 5, [0, 1]);
+    room.settings.turnLimit = 15;
+    const t0 = room.lastStepAt;
+    expect(viewFor(room, "tok-0", t0).turnDeadlineIn).toBe(15_000 + OPENING_TURN_BONUS_MS);
+    // Seat 0 runs out of time; the table discards for them and seat 1 is up
+    // with the ordinary limit.
+    drain(room, t0 + 15_000 + OPENING_TURN_BONUS_MS);
+    drain(room, t0 + 15_000 + OPENING_TURN_BONUS_MS + CLAIM_WINDOW_MS);
+    expect(room.state.players[0].discards).toHaveLength(1);
+    if (room.state.turn === 1 && room.state.phase === "action") {
+      expect(viewFor(room, "tok-1", room.lastStepAt).turnDeadlineIn).toBe(15_000);
+    }
   });
 
   it("waits as long as it takes when there is no limit", () => {
@@ -467,12 +488,13 @@ describe("turn limit", () => {
 
     expect(grantMoreTime(room, 0)).toBeNull();
     expect(grantMoreTime(room, 0)).toMatch(/already/);
-    expect(viewFor(room, "tok-0", t0).turnDeadlineIn).toBe(15_000 + MORE_TIME_MS);
+    const limit = 15_000 + OPENING_TURN_BONUS_MS;
+    expect(viewFor(room, "tok-0", t0).turnDeadlineIn).toBe(limit + MORE_TIME_MS);
     expect(viewFor(room, "table", t0).turnExtended).toBe(true);
 
-    drain(room, t0 + 15_000);
+    drain(room, t0 + limit);
     expect(room.state.players[0].discards).toHaveLength(0);
-    drain(room, t0 + 15_000 + MORE_TIME_MS);
+    drain(room, t0 + limit + MORE_TIME_MS);
     expect(room.state.players[0].discards).toHaveLength(1);
     // The grant belonged to that turn and lapsed with it.
     expect(viewFor(room, "table").turnExtended).toBe(false);
@@ -490,6 +512,38 @@ describe("turn limit", () => {
   it("never shows a deadline on a computer's turn", () => {
     const room = dealt("TEST", 5, [2]);
     expect(viewFor(room, "tok-2").turnDeadlineIn).toBeNull();
+  });
+});
+
+describe("the deal", () => {
+  it("holds play while the tablet shows the deal and the opening flowers", () => {
+    const room = newRoom("TEST", undefined, 5);
+    room.seats[0] = { kind: "human", name: "Someone", token: "tok-0", lastSeen: Date.now() };
+    room.table = { token: "table", lastSeen: Date.now() };
+    const now = Date.now();
+    startPlay(room, now);
+    const flowers = room.state.players.reduce((n, p) => n + p.flowers.length, 0);
+    expect(room.lastStepAt).toBe(now + DEAL_MS + flowers * FLOWER_STEP_MS);
+  });
+
+  it("does not hold a game played on phones alone", () => {
+    const room = newRoom("TEST", undefined, 5);
+    room.seats[0] = { kind: "human", name: "Someone", token: "tok-0", lastSeen: Date.now() };
+    const now = Date.now();
+    startPlay(room, now);
+    expect(room.lastStepAt).toBe(now);
+  });
+
+  it("names the computer's seats after their chairs", () => {
+    const room = dealt("TEST", 5, [0]);
+    const view = viewFor(room, "tok-0");
+    expect(view.players.map((p) => p.occupant.name)).toEqual([
+      "Someone",
+      robotName(1),
+      robotName(2),
+      robotName(3),
+    ]);
+    expect(robotName(1)).toBe("Robot Louis");
   });
 });
 

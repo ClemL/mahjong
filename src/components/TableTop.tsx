@@ -11,6 +11,9 @@ import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileFace } from "./TileView";
+import { FaanBreakdown } from "./FaanBreakdown";
+import { ChipStack, DealOverlay, WinOverlay, chipsOf } from "./TableEffects";
+import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { MeldRow, isFreshClaim } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
@@ -31,18 +34,37 @@ const POND_CAPACITY = 24;
 /** Custom properties are not in React's style typing. */
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
 
+/** Who sits in a chair: a person's name, the computer's Robot name, or nobody yet. */
 function occupantName(player: PublicPlayer): string {
-  if (player.occupant.kind === "human") return player.occupant.name ?? "Player";
-  return player.occupant.kind === "ai" ? "Computer" : "Open";
+  return player.occupant.name ?? (player.occupant.kind === "open" ? "Open" : SEAT_NAMES[player.seat]);
 }
 
-/** Who a seat is in a sentence: a person by name, the computer by its wind. */
-function seatLabel(player: PublicPlayer): string {
-  return player.occupant.kind === "human" ? occupantName(player) : SEAT_NAMES[player.seat];
-}
-
-function signed(score: number): string {
-  return score > 0 ? `+${score}` : String(score);
+/**
+ * The opening flowers of a hand, in the order the table lays them down —
+ * dealer first, round the table — and the hand they belong to. Only a hand
+ * first seen before anything was thrown gets them, so a tablet reloaded mid-hand
+ * does not replay the start.
+ */
+function useOpening(view: RoomView): { dealKey: string | null; flowerOrder: Map<string, number> } {
+  const seen = useRef<{ hand: number; dealKey: string | null; flowerOrder: Map<string, number> }>({
+    hand: -1,
+    dealKey: null,
+    flowerOrder: new Map(),
+  });
+  if (seen.current.hand !== view.handNumber) {
+    const fresh =
+      view.phase === "action" &&
+      view.players.every((p) => p.discards.length === 0 && p.melds.length === 0);
+    const flowerOrder = new Map<string, number>();
+    if (fresh) {
+      for (let i = 0; i < 4; i++) {
+        const seat = ((view.dealer + i) % 4) as Seat;
+        for (const t of view.players[seat].flowers) flowerOrder.set(t.id, flowerOrder.size);
+      }
+    }
+    seen.current = { hand: view.handNumber, dealKey: fresh ? `deal-${view.handNumber}` : null, flowerOrder };
+  }
+  return seen.current;
 }
 
 /**
@@ -55,11 +77,13 @@ function Rack({
   view,
   layout,
   position,
+  flowerOrder,
 }: {
   player: PublicPlayer;
   view: RoomView;
   layout: TableLayout;
   position: number;
+  flowerOrder: Map<string, number>;
 }) {
   const seat = player.seat;
   const active = view.turn === seat && view.phase === "action";
@@ -99,10 +123,7 @@ function Rack({
           {view.dealer === seat ? <span className="seat__badge">Dealer</span> : null}
         </span>
         <span className="rack__meta">
-          {SEAT_NAMES[seat]} ·{" "}
-          <b className={score > 0 ? "seat__score--pos" : score < 0 ? "seat__score--neg" : ""}>
-            {signed(score)}
-          </b>
+          {SEAT_NAMES[seat]} · <ChipStack count={chipsOf(score)} />
         </span>
       </span>
       {/* A tile back with the count on it: how close this seat is to going
@@ -116,9 +137,21 @@ function Rack({
         ))}
         {player.flowers.length > 0 ? (
           <span className="meld rack__flowers">
-            {player.flowers.map((t) => (
-              <TileFace key={t.id} code={t.code} size="sm" />
-            ))}
+            {player.flowers.map((t) => {
+              const order = flowerOrder.get(t.id);
+              // An opening flower waits for the deal, then is laid down in its turn.
+              return order === undefined ? (
+                <TileFace key={t.id} code={t.code} size="sm" />
+              ) : (
+                <span
+                  key={t.id}
+                  className="flower-in"
+                  style={{ animationDelay: `${DEAL_MS + order * FLOWER_STEP_MS}ms` }}
+                >
+                  <TileFace code={t.code} size="sm" />
+                </span>
+              );
+            })}
           </span>
         ) : null}
       </div>
@@ -350,16 +383,15 @@ function Console({
           {view.result?.type === "win" && view.result.winner !== null && view.result.score ? (
             <>
               <strong className="console__headline">
-                {seatLabel(view.players[view.result.winner])} wins
+                {occupantName(view.players[view.result.winner])} wins
               </strong>
-              <span>
-                {view.result.score.faan} faan · {view.result.score.value} points
-              </span>
               <span className="seat__meta">
                 {view.result.from === null
                   ? "self-drawn 自摸"
-                  : `off ${seatLabel(view.players[view.result.from])}`}
+                  : `off ${occupantName(view.players[view.result.from])}`}{" "}
+                · +{view.result.payments[view.result.winner]} chips
               </span>
+              <FaanBreakdown score={view.result.score} />
             </>
           ) : (
             <strong className="console__headline">Washed-out hand 流局</strong>
@@ -399,9 +431,9 @@ function Console({
                 />
               </span>
               <span className="console__caption">
-                {SEAT_NAMES[played.from]} · {tileName(played.tile.code)}
+                {occupantName(view.players[played.from])} · {tileName(played.tile.code)}
                 {taker
-                  ? ` · ${MELD_VERB[taker.meld.type]} by ${SEAT_NAMES[taker.seat]}`
+                  ? ` · ${MELD_VERB[taker.meld.type]} by ${occupantName(view.players[taker.seat])}`
                   : claimed
                     ? " · claimed"
                     : ""}
@@ -409,7 +441,7 @@ function Console({
             </>
           ) : (
             <span className="console__caption">
-              {view.phase === "action" ? `${SEAT_NAMES[view.turn]} to play` : " "}
+              {view.phase === "action" ? `${occupantName(view.players[view.turn])} to play` : " "}
             </span>
           )}
         </div>
@@ -452,6 +484,11 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   });
   const lastId = view.lastPlayed?.tile.id;
   useClaimFlight(felt, view, position);
+  const opening = useOpening(view);
+  const won =
+    (view.phase === "handOver" || view.phase === "gameOver") && view.result?.type === "win"
+      ? view.result
+      : null;
 
   return (
     <div className="tabletop">
@@ -534,6 +571,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
                 view={view}
                 layout={layout}
                 position={position(seat)}
+                flowerOrder={opening.flowerOrder}
               />
             ))}
             {SEATS.map((seat) => (
@@ -546,6 +584,20 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
               />
             ))}
             <Console api={api} view={view} layout={layout} position={position} />
+            <DealOverlay
+              dealKey={opening.dealKey}
+              layout={layout}
+              dealer={view.dealer}
+              position={position}
+            />
+            <WinOverlay
+              winKey={won ? `win-${view.handNumber}` : null}
+              layout={layout}
+              winner={won?.winner ?? null}
+              payments={won?.payments ?? []}
+              faan={won?.score?.scoredFaan ?? 0}
+              position={position}
+            />
           </>
         ) : null}
       </div>

@@ -79,6 +79,12 @@ export const DEFAULT_FAAN: FaanTable = {
   noBonus: 1,
 };
 
+/**
+ * Chips each player sits down with at a table with a tablet. A chip is a
+ * point: the balance is this plus the running score.
+ */
+export const STARTING_CHIPS = 100;
+
 /** Classic Hong Kong doubling table, 3 faan minimum, 10 faan limit. */
 export const DEFAULT_PAYOUT_TABLE = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128];
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { RoomView } from "@/game/room";
+import { DEFAULT_NAMES, type RoomView } from "@/game/room";
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 
@@ -23,10 +23,10 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
     .map((p) => p.occupant.name)
     .filter((n): n is string => n !== null);
 
-  // Arrive with a name already in the box, so sitting down is one tap. It is
-  // seeded once per visit rather than per render, or every keystroke elsewhere
-  // in the form would deal a new one.
-  const [name, setName] = useState(() => suggestName(namesInUse));
+  // The box starts empty and sitting down is still one tap: a chair nobody
+  // names goes by its own default (Calvin, Louis, Hanna, Clem), shown as the
+  // placeholder. The dice button offers a suggestion instead.
+  const [name, setName] = useState("");
   const reroll = useMemo(
     () => () => setName(suggestName([...namesInUse, name])),
     [namesInUse, name],
@@ -91,7 +91,7 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
                 className="field__input"
                 value={name}
                 maxLength={16}
-                placeholder={`Seat ${(choice as number) + 1}`}
+                placeholder={DEFAULT_NAMES[choice as Seat]}
                 onChange={(e) => setName(e.target.value)}
               />
               <button

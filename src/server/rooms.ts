@@ -18,6 +18,7 @@ import {
   openClaimWindow,
   resetRoom,
   returnToLobby,
+  beginHand,
   startPlay,
   syncSeats,
   touch,
@@ -300,11 +301,11 @@ export async function control(
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
         r.state = nextHand(r.state);
-        r.lastStepAt = now;
+        beginHand(r, now);
         break;
       case "redeal":
         r.state = startHand({ ...r.state, phase: "handOver" });
-        r.lastStepAt = now;
+        beginHand(r, now);
         break;
       case "restart": {
         // Everyone keeps their chair and the scores go back to zero, but the
