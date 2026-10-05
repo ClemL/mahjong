@@ -1,8 +1,9 @@
 "use client";
 
-import { type CSSProperties, useRef } from "react";
+import { type CSSProperties, type RefObject, useLayoutEffect, useRef } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
+import type { Meld } from "@/game/melds";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -10,7 +11,7 @@ import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, isFreshClaim } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
 import type { SoundToggle } from "./TableView";
@@ -86,6 +87,7 @@ function Rack({
         .filter(Boolean)
         .join(" ")}
       style={style}
+      data-seat={seat}
       aria-label={`${SEAT_NAMES[seat]}: ${occupantName(player)}, ${player.handCount} tiles in hand`}
     >
       <span className="rack__wind" aria-hidden>
@@ -110,7 +112,7 @@ function Rack({
       </span>
       <div className="rack__open">
         {player.melds.map((meld, i) => (
-          <MeldRow key={i} meld={meld} />
+          <MeldRow key={i} meld={meld} fresh={isFreshClaim(meld, view.lastPlayed?.tile.id)} />
         ))}
         {player.flowers.length > 0 ? (
           <span className="meld rack__flowers">
@@ -159,6 +161,124 @@ function Discards({
   );
 }
 
+const MELD_VERB: Record<Meld["type"], string> = {
+  chow: "chowed",
+  pung: "punged",
+  kong: "konged",
+};
+
+/** Who took a discard, and into which set. */
+function claimantOf(view: RoomView, tileId: string): { seat: Seat; meld: Meld } | null {
+  for (const player of view.players) {
+    const meld = player.melds.find((m) => m.claimedTileId === tileId);
+    if (meld) return { seat: player.seat, meld };
+  }
+  return null;
+}
+
+/** Turn by the short way round, so a tile never spins a full circle in flight. */
+function shortestTurn(from: number, to: number): number {
+  return ((((to - from) % 360) + 540) % 360) - 180;
+}
+
+/**
+ * When a discard is claimed, fly a copy of it from the middle of the table to
+ * the set it now completes, turning to face its new owner, so everyone sees
+ * which tile went where. The set's own tile waits out the flight in CSS
+ * (`--anim-flight`) and appears as the copy lands.
+ */
+function useClaimFlight(
+  felt: RefObject<HTMLDivElement | null>,
+  view: RoomView,
+  position: (seat: Seat) => number,
+) {
+  const flown = useRef<string | null>(null);
+  const played = view.lastPlayed;
+  const taker = played ? claimantOf(view, played.tile.id) : null;
+  const key = played && taker ? played.tile.id : null;
+  // Read through a ref so a fresh poll mid-flight does not re-run the effect.
+  const latest = useRef({ played, taker, position });
+  latest.current = { played, taker, position };
+
+  useLayoutEffect(() => {
+    const root = felt.current;
+    const { played, taker, position } = latest.current;
+    if (!root || !key || !played || !taker || flown.current === key) return;
+    flown.current = key;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const spot = root.querySelector<HTMLElement>(".console__spot");
+    const source = spot?.querySelector<HTMLElement>(".tile");
+    const target = root.querySelector<HTMLElement>(
+      `.rack[data-seat="${taker.seat}"] .meld--fresh .meld__taken`,
+    );
+    const duration = parseFloat(getComputedStyle(root).getPropertyValue("--anim-flight"));
+    if (!spot || !source || !target || !(duration > 0) || typeof source.animate !== "function") {
+      return;
+    }
+    // The set's copy stays hidden until the flying one lands on it.
+    target.style.visibility = "hidden";
+    const reveal = () => {
+      target.style.visibility = "";
+    };
+
+    const fly = () => {
+      if (!root.isConnected || !target.isConnected) return reveal();
+      const box = root.getBoundingClientRect();
+      // The spot is not animated, so it is where the thrown tile comes to rest.
+      const a = spot.getBoundingClientRect();
+      const b = target.getBoundingClientRect();
+      const from = POSITION_ROTATION[position(played.from)];
+      const turn = shortestTurn(from, POSITION_ROTATION[position(taker.seat)]);
+      // offsetWidth is the untransformed size; the rects are the rotated boxes.
+      const scale = target.offsetWidth / source.offsetWidth;
+
+      const ghost = source.cloneNode(true) as HTMLElement;
+      ghost.className = ghost.className
+        .split(" ")
+        .filter((c) => !c.startsWith("tile--toss") && c !== "tile--dim")
+        .concat("tile--flying")
+        .join(" ");
+      ghost.style.setProperty("--tile-w", `${source.offsetWidth}px`);
+      ghost.style.left = `${a.left + a.width / 2 - box.left - source.offsetWidth / 2}px`;
+      ghost.style.top = `${a.top + a.height / 2 - box.top - source.offsetHeight / 2}px`;
+      root.appendChild(ghost);
+
+      const dx = b.left + b.width / 2 - (a.left + a.width / 2);
+      const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+      const animation = ghost.animate(
+        [
+          { transform: `translate(0, 0) rotate(${from}deg) scale(1)`, offset: 0 },
+          // Lift off the table first, so the eye catches it before it moves.
+          { transform: `translate(0, 0) rotate(${from}deg) scale(1.35)`, offset: 0.18 },
+          {
+            transform: `translate(${dx}px, ${dy}px) rotate(${from + turn}deg) scale(${scale})`,
+            offset: 1,
+          },
+        ],
+        { duration, easing: "cubic-bezier(0.45, 0, 0.25, 1)", fill: "forwards" },
+      );
+      // The middle keeps a faded copy, so it still says which tile was thrown.
+      spot.animate([{ opacity: 1 }, { opacity: 0.35 }], {
+        duration: duration * 0.3,
+        fill: "forwards",
+      });
+      const land = () => {
+        ghost.remove();
+        reveal();
+      };
+      animation.onfinish = land;
+      animation.oncancel = land;
+    };
+
+    // A computer claim arrives with the discard itself: let the throw land in
+    // the middle first, so the tile is seen arriving before it is seen taken.
+    Promise.all(source.getAnimations().map((anim) => anim.finished))
+      .catch(() => undefined)
+      .then(fly);
+  }, [felt, key]);
+}
+
 /**
  * The middle of the table, like the console of an automatic table: each
  * seat's wind on its own side, lit for whoever is to play, and the tile just
@@ -184,6 +304,7 @@ function Console({
   // A claimed discard has left its pond for somebody's meld.
   const claimed =
     played !== null && !view.players[played.from].discards.some((t) => t.id === played.tile.id);
+  const taker = claimed ? claimantOf(view, played.tile.id) : null;
   const over = view.phase === "handOver" || view.phase === "gameOver";
 
   return (
@@ -262,7 +383,11 @@ function Console({
               </span>
               <span className="console__caption">
                 {SEAT_NAMES[played.from]} · {tileName(played.tile.code)}
-                {claimed ? " · claimed" : ""}
+                {taker
+                  ? ` · ${MELD_VERB[taker.meld.type]} by ${SEAT_NAMES[taker.seat]}`
+                  : claimed
+                    ? " · claimed"
+                    : ""}
               </span>
             </>
           ) : (
@@ -309,6 +434,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
     }),
   });
   const lastId = view.lastPlayed?.tile.id;
+  useClaimFlight(felt, view, position);
 
   return (
     <div className="tabletop">

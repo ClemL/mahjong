@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  CLAIM_BEAT_MS,
   CLAIM_WINDOW_MS,
   DEFAULT_ROOM_SETTINGS,
   HEARTBEAT_WRITE_MS,
@@ -395,6 +396,32 @@ describe("pacing", () => {
     drain(room, t0 + 400);
     expect(discardsMade(room)).toBe(1);
     expect(room.lastStepAt).toBe(t0 + 400);
+  });
+
+  it("leaves a computer's claimed set on show for a beat before it plays on", () => {
+    const room = dealt("TEST", 5, [2]);
+    room.settings.speed = 5;
+    room.settings.turnLimit = 1;
+    let t = room.lastStepAt;
+    const claimedNow = () => {
+      const id = room.lastPlayed?.tile.id;
+      return room.state.players.find(
+        (p) => p.seat !== 2 && p.melds.some((m) => m.claimedTileId === id),
+      );
+    };
+    while (!claimedNow() && room.state.phase !== "handOver") {
+      t += 100;
+      drain(room, t);
+    }
+    expect(claimedNow()).toBeDefined();
+    const made = discardsMade(room);
+
+    // The claimed discard was thrown at most 100ms ago; a fast table would
+    // otherwise play on 400ms after it.
+    drain(room, t + CLAIM_BEAT_MS - 200);
+    expect(discardsMade(room)).toBe(made);
+    drain(room, t + CLAIM_BEAT_MS + 400);
+    expect(discardsMade(room)).toBe(made + 1);
   });
 
   it("keeps the newest discard after the next player has drawn", () => {
