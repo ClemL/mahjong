@@ -260,6 +260,11 @@ export function resetRoom(room: Room, seed = Date.now(), { keepTable = true } = 
   returnToLobby(room, fresh.state);
 }
 
+/** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's number. */
+export function seatName(name: string | undefined, seat: Seat): string {
+  return (name ?? "").trim().slice(0, 16) || `Seat ${seat + 1}`;
+}
+
 /** True when a seated player has gone quiet for long enough to be counted away. */
 export function isAway(occupant: Occupant, now: number): boolean {
   return occupant.kind === "human" && now - occupant.lastSeen > SEAT_IDLE_MS;

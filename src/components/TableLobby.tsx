@@ -127,7 +127,17 @@ export function TableLobby({
                   <span className="gather__wind">{tileGlyph(seatWind(seat))}</span>
 
                   {here ? (
-                    <span className="gather__seatname">{occupant.name}</span>
+                    isTable || view.you.seat === seat ? (
+                      <SeatRename
+                        seat={seat}
+                        name={occupant.name ?? ""}
+                        mine={view.you.seat === seat}
+                        busy={api.busy}
+                        onRename={(name) => void api.control({ type: "rename", seat, name })}
+                      />
+                    ) : (
+                      <span className="gather__seatname">{occupant.name}</span>
+                    )
                   ) : isTable ? (
                     <input
                       className="gather__nameinput"
@@ -266,5 +276,69 @@ export function TableLobby({
         )}
       </footer>
     </div>
+  );
+}
+
+/**
+ * A seated chair's name, with a way to change it. A typo on the phone, or a
+ * name the table typed for whoever scanned, should not mean leaving the chair
+ * and scanning in again.
+ */
+function SeatRename({
+  seat,
+  name,
+  mine,
+  busy,
+  onRename,
+}: {
+  seat: Seat;
+  name: string;
+  mine: boolean;
+  busy: boolean;
+  onRename: (name: string) => void;
+}) {
+  // The draft lives here rather than in the view: the lobby polls, and a poll
+  // landing mid-edit must not snatch the text out from under the person typing.
+  const [draft, setDraft] = useState<string | null>(null);
+
+  if (draft === null) {
+    return (
+      <span className="gather__namerow">
+        <span className="gather__seatname">{name}</span>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          disabled={busy}
+          aria-label={mine ? "Rename yourself" : `Rename seat ${seat + 1}`}
+          onClick={() => setDraft(name)}
+        >
+          ✎ Rename
+        </button>
+      </span>
+    );
+  }
+
+  const commit = () => {
+    const next = draft.trim();
+    setDraft(null);
+    if (next && next !== name) onRename(next);
+  };
+
+  return (
+    <input
+      className="gather__nameinput"
+      value={draft}
+      maxLength={16}
+      autoFocus
+      aria-label={`New name for seat ${seat + 1}`}
+      autoComplete="off"
+      spellCheck={false}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setDraft(null);
+      }}
+    />
   );
 }
