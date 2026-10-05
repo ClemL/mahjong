@@ -49,6 +49,11 @@ export interface RuleConfig {
   discarderPaysAll: boolean;
   /** When true a washed-out hand keeps the dealership in place (流局連莊). */
   dealerKeepsOnWashout: boolean;
+  /**
+   * When false the eight bonus tiles are left out of the set — 136 tiles —
+   * and nothing is scored for them, No Bonus Tiles included.
+   */
+  flowers: boolean;
   faan: FaanTable;
 }
 
@@ -89,13 +94,19 @@ export const STARTING_CHIPS = 100;
 export const DEFAULT_PAYOUT_TABLE = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128];
 
 export const DEFAULT_RULES: RuleConfig = {
-  minFaan: 0,
+  minFaan: 3,
   limitFaan: 10,
   payoutTable: DEFAULT_PAYOUT_TABLE,
   discarderPaysAll: true,
   dealerKeepsOnWashout: false,
+  flowers: true,
   faan: DEFAULT_FAAN,
 };
+
+/** Whether this table plays with the bonus tiles. A table saved before the option existed did. */
+export function flowersInPlay(config: Pick<RuleConfig, "flowers">): boolean {
+  return config.flowers !== false;
+}
 
 export interface RuleNote {
   title: string;
@@ -114,15 +125,20 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
   return [
     {
       title: "Tiles",
-      body:
-        "144 tiles: three suits of 1–9 (Characters 萬, Dots 筒, Bamboo 索) in four copies, " +
-        "four Winds and three Dragons in four copies, plus four Flowers and four Seasons as bonus tiles.",
+      body: flowersInPlay(config)
+        ? "144 tiles: three suits of 1–9 (Characters 萬, Dots 筒, Bamboo 索) in four copies, " +
+          "four Winds and three Dragons in four copies, plus four Flowers and four Seasons as bonus tiles."
+        : "136 tiles: three suits of 1–9 (Characters 萬, Dots 筒, Bamboo 索) in four copies, " +
+          "four Winds and three Dragons in four copies. This table plays without Flowers and Seasons, " +
+          "so no faan is scored for them.",
     },
     {
       title: "Dealing",
       body:
-        "Each player receives 13 tiles; the dealer (East) starts with 14 and discards first. " +
-        "Bonus tiles are revealed immediately and replaced from the back of the wall.",
+        "Each player receives 13 tiles; the dealer (East) starts with 14 and discards first." +
+        (flowersInPlay(config)
+          ? " Bonus tiles are revealed immediately and replaced from the back of the wall."
+          : ""),
     },
     {
       title: "Turn order",

@@ -5,7 +5,7 @@ import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay } from "@/game/rules";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
@@ -43,6 +43,11 @@ const WALL: ChoiceOption<OnOff>[] = [
   { value: "off", label: "Hide", hint: "A plain felt" },
 ];
 
+const FLOWERS: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "In play", hint: "144 tiles; Flowers and Seasons score as bonus tiles" },
+  { value: "off", label: "Left out", hint: "136 tiles; nothing is scored for bonus tiles" },
+];
+
 const SOUND: ChoiceOption<"on" | "off">[] = [
   { value: "on", label: "On", hint: "Clacks on discards, claims and wins" },
   { value: "off", label: "Off", hint: "Silent" },
@@ -63,6 +68,7 @@ export function TableSettings({
   /** This tablet's own display choices. */
   display?: TabletDisplay;
 }) {
+  const handLive = view.started && view.phase !== "handOver" && view.phase !== "gameOver";
   return (
     <>
       <section className="panel">
@@ -84,6 +90,16 @@ export function TableSettings({
                 ))}
               </select>
             </label>
+
+            {/* The tile set is fixed by the deal, so it only changes between hands. */}
+            <Choice
+              label="Flowers"
+              options={FLOWERS}
+              value={flowersInPlay(view.config) ? "on" : "off"}
+              disabled={api.busy || handLive}
+              note={handLive ? "Can be changed once this hand is over" : undefined}
+              onChange={(value) => void api.control({ type: "flowers", value: value === "on" })}
+            />
 
             <Choice
               label="Computer speed"

@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
-import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS } from "@/game/room";
+import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS, WALL_BUILD_MS } from "@/game/room";
 import type { Seat } from "@/game/tiles";
 import { createRng } from "@/game/rng";
 import { STARTING_CHIPS } from "@/game/rules";
@@ -52,8 +52,9 @@ export function ChipStack({ count, label }: { count: number; label?: string }) {
 }
 
 /**
- * The deal, played out on the felt: stacks of tile backs leave the middle for
- * each rack in turn, dealer first — three rounds of four, then one each — so
+ * The deal, played out on the felt once the wall is built: cubes of tile
+ * backs — two stacks of two, as they are lifted off a wall — leave it for each
+ * rack in turn, dealer first, three rounds of four and then one each, so
  * thirteen tiles are seen arriving in front of every player.
  */
 export function DealOverlay({
@@ -71,6 +72,7 @@ export function DealOverlay({
   origin: (stack: number) => { x: number; y: number };
 }) {
   if (!live) return null;
+  const tile = Math.round(layout.tile * 0.8);
   const stacks = Array.from({ length: DEAL_STACKS }, (_, i) => {
     const seat = ((dealer + (i % 4)) % 4) as Seat;
     const pos = position(seat);
@@ -78,15 +80,16 @@ export function DealOverlay({
     const from = origin(i);
     return {
       i,
-      size: i < 12 ? 4 : 1,
+      cube: i < 12,
       style: {
         left: from.x,
         top: from.y,
         "--dx": `${rack.cx - from.x}px`,
         "--dy": `${rack.cy - from.y}px`,
         "--turn": `${POSITION_ROTATION[pos]}deg`,
-        "--tile-w": `${Math.round(layout.tile * 0.8)}px`,
-        animationDelay: `${i * DEAL_STEP_MS}ms`,
+        "--tile-w": `${tile}px`,
+        "--lift": `${Math.round(tile * 0.3)}px`,
+        animationDelay: `${WALL_BUILD_MS + i * DEAL_STEP_MS}ms`,
         animationDuration: `${DEAL_FLIGHT_MS}ms`,
       } as Vars,
     };
@@ -94,10 +97,21 @@ export function DealOverlay({
   return (
     <div className="deal" aria-hidden>
       {stacks.map((s) => (
-        <span key={s.i} className="deal__stack" style={s.style}>
-          {Array.from({ length: s.size }, (_, k) => (
-            <span key={k} className="tile tile--back deal__tile" />
-          ))}
+        <span key={s.i} className={s.cube ? "deal__stack deal__stack--cube" : "deal__stack"} style={s.style}>
+          {s.cube ? (
+            <>
+              <span className="deal__layer">
+                <span className="tile tile--back deal__tile" />
+                <span className="tile tile--back deal__tile" />
+              </span>
+              <span className="deal__layer deal__layer--top">
+                <span className="tile tile--back deal__tile" />
+                <span className="tile tile--back deal__tile" />
+              </span>
+            </>
+          ) : (
+            <span className="tile tile--back deal__tile" />
+          )}
         </span>
       ))}
     </div>
@@ -160,10 +174,12 @@ export function Confetti({
   );
 }
 
-/** How long chips take to cross to the winner, the last one included. */
-const CHIP_FLIGHT_MS = 900;
-const CHIP_STEP_MS = 90;
-const CELEBRATION_MS = 5200;
+/** How long one chip takes to cross the table. */
+const CHIP_FLIGHT_MS = 1900;
+/** The gap between one chip leaving a seat and the next. */
+const CHIP_STEP_MS = 170;
+/** How long the confetti takes to go up and come down, its stragglers included. */
+const CONFETTI_MS = 3000;
 
 /**
  * The end of a won hand on the felt: chips leave every seat that pays and
@@ -185,32 +201,41 @@ export function WinOverlay({
   faan: number;
   position: (seat: Seat) => number;
 }) {
-  const live = useWindow(winKey, CELEBRATION_MS);
-  if (!live || winner === null) return null;
-  const to = layout.racks[position(winner)];
   const chips: { key: string; style: Vars }[] = [];
-  let order = 0;
-  for (let seat = 0; seat < 4; seat++) {
-    const paid = -(payments[seat] ?? 0);
-    if (seat === winner || paid <= 0) continue;
-    const from = layout.racks[position(seat as Seat)];
-    // One chip for every four points, so a big payment is a visibly longer stream.
-    const n = Math.max(3, Math.min(14, Math.round(paid / 4)));
-    for (let k = 0; k < n; k++) {
-      chips.push({
-        key: `${seat}-${k}`,
-        style: {
-          left: from.cx + ((k % 3) - 1) * 10,
-          top: from.cy,
-          "--dx": `${to.cx - from.cx}px`,
-          "--dy": `${to.cy - from.cy}px`,
-          animationDelay: `${order++ * CHIP_STEP_MS}ms`,
-          animationDuration: `${CHIP_FLIGHT_MS}ms`,
-        },
-      });
+  let last = 0;
+  if (winner !== null) {
+    const to = layout.racks[position(winner)];
+    let payer = 0;
+    for (let seat = 0; seat < 4; seat++) {
+      const paid = -(payments[seat] ?? 0);
+      if (seat === winner || paid <= 0) continue;
+      const from = layout.racks[position(seat as Seat)];
+      // One chip for every four points, so a big payment is a visibly longer
+      // stream. Every seat that pays starts at once, a beat apart, so the
+      // streams cross the table together rather than one after another.
+      const n = Math.max(3, Math.min(14, Math.round(paid / 4)));
+      for (let k = 0; k < n; k++) {
+        const delay = payer * 60 + k * CHIP_STEP_MS;
+        last = Math.max(last, delay);
+        chips.push({
+          key: `${seat}-${k}`,
+          style: {
+            left: from.cx + ((k % 3) - 1) * 10,
+            top: from.cy,
+            "--dx": `${to.cx - from.cx}px`,
+            "--dy": `${to.cy - from.cy}px`,
+            animationDelay: `${delay}ms`,
+            animationDuration: `${CHIP_FLIGHT_MS}ms`,
+          },
+        });
+      }
+      payer++;
     }
   }
-  const landed = order * CHIP_STEP_MS + CHIP_FLIGHT_MS * 0.6;
+  const landed = last + CHIP_FLIGHT_MS * 0.6;
+  const live = useWindow(winKey, Math.round(landed + CONFETTI_MS + 400));
+  if (!live || winner === null) return null;
+  const to = layout.racks[position(winner)];
   return (
     <div className="win-fx" aria-hidden>
       {chips.map((c) => (

@@ -102,16 +102,21 @@ export function sortTiles(tiles: Tile[]): Tile[] {
   return [...tiles].sort((a, b) => compareCodes(a.code, b.code) || a.id.localeCompare(b.id));
 }
 
-/** Build the full 144-tile set: 4 copies of each playable code + 1 of each bonus tile. */
-export function buildTileSet(): Tile[] {
+/**
+ * Build the tile set: 4 copies of each playable code, plus 1 of each bonus
+ * tile unless the table plays without them — 144 tiles, or 136.
+ */
+export function buildTileSet(withFlowers = true): Tile[] {
   const tiles: Tile[] = [];
   for (const code of PLAYABLE_CODES) {
     for (let copy = 0; copy < 4; copy++) {
       tiles.push({ id: `${code}#${copy}`, code });
     }
   }
-  for (const code of FLOWERS) {
-    tiles.push({ id: `${code}#0`, code });
+  if (withFlowers) {
+    for (const code of FLOWERS) {
+      tiles.push({ id: `${code}#0`, code });
+    }
   }
   return tiles;
 }

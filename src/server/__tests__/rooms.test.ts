@@ -228,10 +228,23 @@ describe("table control", () => {
     const id = await room();
     await claimSeat(id, { seat: 1, name: "Parth" });
     const { token } = await claimSeat(id, { seat: "table" });
-    expect((await control(id, token, { type: "minFaan", value: 3 })).config.minFaan).toBe(3);
+    expect((await control(id, token, { type: "minFaan", value: 5 })).config.minFaan).toBe(5);
     expect((await control(id, token, { type: "freeSeat", seat: 1 })).players[1].occupant.kind).toBe(
       "open",
     );
+  });
+
+  it("takes the flowers out of the set between hands, never during one", async () => {
+    const id = await room();
+    await claimSeat(id, { seat: 0 });
+    const { token } = await claimSeat(id, { seat: "table" });
+    expect((await control(id, token, { type: "flowers", value: false })).config.flowers).toBe(false);
+    const dealt = await control(id, token, { type: "deal" });
+    expect(dealt.wallCount + dealt.players.reduce((n, p) => n + p.handCount, 0)).toBe(136);
+    expect(dealt.players.every((p) => p.flowers.length === 0)).toBe(true);
+    await expect(control(id, token, { type: "flowers", value: true })).rejects.toMatchObject({
+      status: 409,
+    });
   });
 
   it("lets a player rename their own chair but nobody else's", async () => {

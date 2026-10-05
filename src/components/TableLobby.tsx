@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
+import { DEFAULT_NAMES, type RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { QrCode } from "./QrCode";
 import { positionOf } from "./tableLayout";
@@ -153,8 +153,9 @@ export function TableLobby({
                       className="gather__nameinput"
                       value={names[seat] ?? ""}
                       maxLength={16}
-                      // Nobody sitting here means the computer plays it, under this name.
-                      placeholder={robotName(seat)}
+                      // The chair's own name until somebody types one. It only
+                      // becomes Robot <name> if the deal finds nobody sitting here.
+                      placeholder={DEFAULT_NAMES[seat]}
                       aria-label={`Name for seat ${seat + 1}`}
                       autoComplete="off"
                       spellCheck={false}
@@ -162,7 +163,7 @@ export function TableLobby({
                     />
                   ) : (
                     <span className="gather__seatname gather__seatname--open">
-                      {robotName(seat)}
+                      {DEFAULT_NAMES[seat]}
                     </span>
                   )}
 
@@ -201,21 +202,35 @@ export function TableLobby({
         {/* The table setting belongs to whoever deals; everyone else just sees
             what it is once the hand starts. */}
         {view.canDeal ? (
-          <label className="field">
-            <span className="field__label">Min faan</span>
-            <select
-              className="field__select"
-              value={view.config.minFaan}
-              disabled={api.busy}
-              onChange={(e) => void api.control({ type: "minFaan", value: Number(e.target.value) })}
-            >
-              {MIN_FAAN_CHOICES.map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
+          <>
+            <label className="field">
+              <span className="field__label">Min faan</span>
+              <select
+                className="field__select"
+                value={view.config.minFaan}
+                disabled={api.busy}
+                onChange={(e) => void api.control({ type: "minFaan", value: Number(e.target.value) })}
+              >
+                {MIN_FAAN_CHOICES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span className="field__label">Flowers</span>
+              <select
+                className="field__select"
+                value={flowersInPlay(view.config) ? "on" : "off"}
+                disabled={api.busy}
+                onChange={(e) => void api.control({ type: "flowers", value: e.target.value === "on" })}
+              >
+                <option value="on">In play</option>
+                <option value="off">Left out</option>
+              </select>
+            </label>
+          </>
         ) : null}
 
         <span className="gather__count">

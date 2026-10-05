@@ -22,7 +22,7 @@ import {
 import { type Meld, chowPartners, removeTiles, takeTiles } from "./melds";
 import { analyzeShape, waitingTiles } from "./winning";
 import { type ScoreResult, scoreHand } from "./scoring";
-import { DEFAULT_RULES, type RuleConfig } from "./rules";
+import { DEFAULT_RULES, type RuleConfig, flowersInPlay } from "./rules";
 import { createRng, shuffle } from "./rng";
 
 export type Phase = "action" | "claiming" | "handOver" | "gameOver";
@@ -244,7 +244,7 @@ export function startHand(previous: GameState): GameState {
 
   state.handNumber += 1;
   state.rngSeed = (state.rngSeed ^ (state.handNumber * 0x85ebca6b)) >>> 0;
-  state.wall = shuffle(buildTileSet(), rng);
+  state.wall = shuffle(buildTileSet(flowersInPlay(state.config)), rng);
   state.phase = "action";
   state.drawnTileId = null;
   state.drawWasReplacement = false;
@@ -855,6 +855,22 @@ export function setMinFaan(previous: GameState, minFaan: number): GameState {
     minFaan <= 0
       ? "Table minimum set to 0 faan — chicken hands may win"
       : `Table minimum set to ${minFaan} faan`,
+  );
+  return state;
+}
+
+/**
+ * Play with or without the bonus tiles. The set is chosen as each hand is
+ * dealt, so this is only taken between hands — never with flowers already out.
+ */
+export function setFlowers(previous: GameState, flowers: boolean): GameState {
+  if (flowersInPlay(previous.config) === flowers) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, flowers };
+  log(
+    state,
+    null,
+    flowers ? "Flowers and Seasons are back in the set" : "Flowers and Seasons are taken out of the set",
   );
   return state;
 }

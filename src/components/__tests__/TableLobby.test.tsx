@@ -28,6 +28,18 @@ describe("TableLobby on the table", () => {
     expect(screen.getByText("1 of 4 seated", { exact: false })).toBeTruthy();
   });
 
+  it("greys in each empty chair's own name, without Robot, and offers the flowers rule", () => {
+    const view = tableView(lobby([0]));
+    const api = fakeApi(view);
+    render(<TableLobby api={api} view={view} sound={sound} />);
+
+    expect((screen.getByLabelText("Name for seat 2") as HTMLInputElement).placeholder).toBe("Louis");
+    expect((screen.getByLabelText("Name for seat 4") as HTMLInputElement).placeholder).toBe("Clem");
+
+    fireEvent.change(screen.getByLabelText("Flowers"), { target: { value: "off" } });
+    expect(api.control).toHaveBeenCalledWith({ type: "flowers", value: false });
+  });
+
   it("resets the table and clears the typed names once confirmed", () => {
     const view = tableView(lobby([0]));
     const api = fakeApi(view);

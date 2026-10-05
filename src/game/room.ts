@@ -51,16 +51,19 @@ export const SPEED_LEVELS = [
 export type SpeedLevel = (typeof SPEED_LEVELS)[number]["level"];
 
 /**
- * The tablet deals each hand on screen — 13 tiles to every seat in stacks of
- * four from the middle — then lays the opening flowers down one at a time.
- * Play holds until it has finished, so nobody's first move lands on top of it.
+ * The tablet opens each hand on screen: the tiles are pushed out of the middle
+ * into the four walls, then dealt from the wall — 13 tiles to every seat in
+ * cubes of four — and the opening flowers are laid down one at a time. Play
+ * holds until it has finished, so nobody's first move lands on top of it.
  */
-export const DEAL_STEP_MS = 220;
+export const WALL_BUILD_MS = 2400;
+export const DEAL_STEP_MS = 300;
 /** Sixteen stacks: three rounds of four tiles to each seat, then one each. */
 export const DEAL_STACKS = 16;
 /** How long one stack takes to reach its rack. */
-export const DEAL_FLIGHT_MS = 650;
-export const DEAL_MS = DEAL_STEP_MS * (DEAL_STACKS - 1) + DEAL_FLIGHT_MS;
+export const DEAL_FLIGHT_MS = 850;
+/** When the last stack of the deal lands, counted from the moment the hand is dealt. */
+export const DEAL_MS = WALL_BUILD_MS + DEAL_STEP_MS * (DEAL_STACKS - 1) + DEAL_FLIGHT_MS;
 export const FLOWER_STEP_MS = 700;
 
 /**
@@ -91,7 +94,7 @@ export interface RoomSettings {
   rotation: 0 | 1 | 2 | 3;
 }
 
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 3, turnLimit: 30, rotation: 0 };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 2, turnLimit: 30, rotation: 0 };
 
 export function turnMs(speed: SpeedLevel): number {
   return SPEED_LEVELS.find((s) => s.level === speed)?.turnMs ?? 1500;

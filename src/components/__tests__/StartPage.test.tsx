@@ -52,7 +52,7 @@ describe("StartPage", () => {
 describe("normalizePreferences", () => {
   it("keeps valid choices and replaces anything else with the default", () => {
     expect(
-      normalizePreferences({ minFaan: 5, speed: "warp", showHints: false, opponents: "random" }),
+      normalizePreferences({ version: 2, minFaan: 5, speed: "warp", showHints: false, opponents: "random" }),
     ).toEqual({
       minFaan: 5,
       speed: "normal",
@@ -61,7 +61,10 @@ describe("normalizePreferences", () => {
       opponents: "random",
       claimPrompt: "useful",
     });
-    expect(normalizePreferences(null).minFaan).toBe(0);
-    expect(normalizePreferences({ minFaan: 4 }).minFaan).toBe(0);
+    expect(normalizePreferences(null).minFaan).toBe(3);
+    // An older build saved its 0 default with every change; that is not a choice to keep.
+    expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(3);
+    expect(normalizePreferences({ version: 2, minFaan: 0 }).minFaan).toBe(0);
+    expect(normalizePreferences({ version: 2, minFaan: 4 }).minFaan).toBe(3);
   });
 });

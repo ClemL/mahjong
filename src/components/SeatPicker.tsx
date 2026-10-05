@@ -55,10 +55,12 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
             {taken(seat) ? (
               <span className="seat-card__state">{view.players[seat].occupant.name}</span>
             ) : (
-              // An open chair is played by the computer under this name until someone sits.
+              // An empty chair goes by its own name; it is only Robot <name>
+              // while the computer is actually playing it.
               <span className="seat-card__state seat-card__state--open">
-                {robotName(seat)}
-                {view.players[seat].occupant.kind === "ai" ? " — sit in" : ""}
+                {view.players[seat].occupant.kind === "ai"
+                  ? `${robotName(seat)} — sit in`
+                  : DEFAULT_NAMES[seat]}
               </span>
             )}
           </button>

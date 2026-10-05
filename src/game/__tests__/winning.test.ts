@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   analyzeShape,
+  arrangeWinningHand,
   completesHand,
   countsFromCodes,
   decompose,
@@ -103,5 +104,45 @@ describe("waits", () => {
     const concealed = "m1 m2 m3 p4 p5 p6 s7 s8 s9 we we we dg".split(" ");
     expect(completesHand(concealed, [], "dg")).toBe(true);
     expect(completesHand(concealed, [], "dr")).toBe(false);
+  });
+});
+
+describe("arrangeWinningHand", () => {
+  const ambiguous = "m1 m1 m1 m2 m2 m2 m3 m3 m3 s1 s2 s3 dr dr".split(" ");
+
+  it("splits a winning hand into sets of three and a pair", () => {
+    const layout = arrangeWinningHand("m1 m2 m3 m4 m5 m6 p1 p2 p3 s7 s8 s9 dr dr".split(" "), []);
+    expect(layout.sets.map((s) => s.codes.join(" "))).toEqual([
+      "m1 m2 m3",
+      "m4 m5 m6",
+      "p1 p2 p3",
+      "s7 s8 s9",
+    ]);
+    expect(layout.pair).toBe("dr");
+    expect(layout.loose).toEqual([]);
+  });
+
+  it("reads an ambiguous hand the way it was scored", () => {
+    expect(arrangeWinningHand(ambiguous, []).sets.map((s) => s.type)).toEqual([
+      "pung",
+      "pung",
+      "pung",
+      "chow",
+    ]);
+    expect(arrangeWinningHand(ambiguous, [], true).sets.every((s) => s.type === "chow")).toBe(true);
+  });
+
+  it("only needs sets for what is not already laid open", () => {
+    const layout = arrangeWinningHand("m1 m1 m1 p5 p5 p5 s9 s9 s9 dg dg".split(" "), [pungMeld("we")]);
+    expect(layout.sets).toHaveLength(3);
+    expect(layout.pair).toBe("dg");
+  });
+
+  it("leaves a special hand whole", () => {
+    const orphans = "m1 m9 p1 p9 s1 s9 we ws ww wn dr dg dw dw".split(" ");
+    const layout = arrangeWinningHand(orphans, []);
+    expect(layout.sets).toEqual([]);
+    expect(layout.pair).toBeNull();
+    expect(layout.loose).toHaveLength(14);
   });
 });
