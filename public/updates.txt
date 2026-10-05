@@ -62,3 +62,4 @@
 2026-10-04T18:00:00Z - Players can leave the table: Leave seat on the waiting screen, and Leave the table in the phone's settings during a game — the computer carries on with the hand
 2026-10-04T18:00:00Z - Reset table on the Take a seat page empties the room, table screen included, so a table stuck on a device that has gone can be taken back
 2026-10-05T13:30:00Z - The app opens on a start page: game options (min faan, speed, hints, sound, opponents, claim prompts), phone layout and tile designs, then Play solo, Multiplayer, Tablet mode or Reset multiplayer table. Settings are remembered on the device; the solo game moved to /solo
+2026-10-05T13:34:14Z - Seated players can be renamed from the lobby: the table can rename any chair, and a phone can rename its own

@@ -79,6 +79,50 @@ describe("TableLobby on the table", () => {
   });
 });
 
+describe("renaming a seated chair", () => {
+  it("lets the table rename anyone who has sat down", () => {
+    const view = tableView(lobby([0, 2]));
+    const api = fakeApi(view);
+    render(<TableLobby api={api} view={view} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename seat 3" }));
+    const input = screen.getByLabelText("New name for seat 3");
+    fireEvent.change(input, { target: { value: "Sherman" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    expect(api.control).toHaveBeenCalledWith({ type: "rename", seat: 2, name: "Sherman" });
+    expect(screen.queryByLabelText("New name for seat 3")).toBeNull();
+  });
+
+  it("sends nothing when the edit is cancelled or unchanged", () => {
+    const view = tableView(lobby([0]));
+    const api = fakeApi(view);
+    render(<TableLobby api={api} view={view} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Rename seat 1" }));
+    fireEvent.change(screen.getByLabelText("New name for seat 1"), { target: { value: "Thanh" } });
+    fireEvent.keyDown(screen.getByLabelText("New name for seat 1"), { key: "Escape" });
+    fireEvent.click(screen.getByRole("button", { name: "Rename seat 1" }));
+    fireEvent.blur(screen.getByLabelText("New name for seat 1"));
+
+    expect(api.control).not.toHaveBeenCalled();
+  });
+
+  it("lets a phone rename only its own chair", () => {
+    const view = playerView(lobby([0, 1]), 1);
+    const api = fakeApi(view);
+    render(<TableLobby api={api} view={view} sound={sound} />);
+
+    expect(screen.queryByRole("button", { name: "Rename seat 1" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Rename yourself" }));
+    const input = screen.getByLabelText("New name for seat 2");
+    fireEvent.change(input, { target: { value: "Teja" } });
+    fireEvent.blur(input);
+
+    expect(api.control).toHaveBeenCalledWith({ type: "rename", seat: 1, name: "Teja" });
+  });
+});
+
 describe("TableLobby on a phone", () => {
   it("offers no reset and no per-seat codes to a seated player", () => {
     const view = playerView(lobby([0, 1]), 1);

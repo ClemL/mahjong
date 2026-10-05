@@ -2338,6 +2338,13 @@ a.btn {
   font-size: clamp(16px, 2.6vh, 26px);
 }
 
+.gather__namerow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .gather__seatmeta {
   font-size: clamp(11px, 1.4vh, 13px);
   color: var(--ink-dim);
