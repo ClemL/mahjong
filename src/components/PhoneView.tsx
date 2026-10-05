@@ -51,6 +51,33 @@ function useKeepAwake() {
  * A claim drawn where its meld would land — among your own open sets — but
  * faint, so what is on offer reads at a glance before anything is chosen.
  */
+/**
+ * Where an element sits inside a box, in the box's own frame. The controller
+ * can be turned on its side with a transform, so screen rectangles would point
+ * the wrong way; offsets are measured before any transform.
+ */
+function offsetWithin(el: HTMLElement, box: HTMLElement): { x: number; y: number } | null {
+  let x = 0;
+  let y = 0;
+  let node: HTMLElement | null = el;
+  while (node && node !== box) {
+    x += node.offsetLeft;
+    y += node.offsetTop;
+    const parent = node.offsetParent as HTMLElement | null;
+    // Offsets ignore scrolling, so a scrolled hand would put the tile elsewhere.
+    for (let a: HTMLElement | null = node.parentElement; a; a = a.parentElement) {
+      x -= a.scrollLeft;
+      y -= a.scrollTop;
+      if (a === parent) break;
+    }
+    node = parent;
+  }
+  return node === box ? { x, y } : null;
+}
+
+/** A discard on its way from this phone up to the table. */
+type Sent = { id: string; code: TileCode; x: number; y: number; w: number; h: number };
+
 function GhostMeld({
   option,
   discard,
@@ -113,6 +140,8 @@ export function PhoneView({
   // Face down for when the phone is set on the table or someone is looking over.
   const [hidden, setHidden] = useState(false);
   const keepAwake = useKeepAwake();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [sent, setSent] = useState<Sent | null>(null);
   // The claim being pressed or hovered, whose tiles the hand lifts.
   const [preview, setPreview] = useState<ClaimOption | null>(null);
   useEffect(() => {
@@ -196,11 +225,25 @@ export function PhoneView({
     setDragging(null);
   };
 
+  // With a tablet on the table the discard is seen leaving the phone, thrown
+  // up off the top edge towards the table, where it lands a moment later.
+  const discard = (tileId: string) => {
+    setArmed(null);
+    const root = rootRef.current;
+    const el = handRef.current?.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`);
+    const tile = me.hand.find((t) => t.id === tileId);
+    const at = root && el ? offsetWithin(el, root) : null;
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (landscape && tile && el && at && !still) {
+      setSent({ id: tileId, code: tile.code, ...at, w: el.offsetWidth, h: el.offsetHeight });
+    }
+    void api.act({ type: "discard", tileId });
+  };
+
   const tapTile = (tileId: string) => {
     if (justDragged.current || !yourTurn || api.busy) return;
     if (armed === tileId) {
-      setArmed(null);
-      void api.act({ type: "discard", tileId });
+      discard(tileId);
     } else {
       setArmed(tileId);
     }
@@ -322,6 +365,7 @@ export function PhoneView({
         .filter(Boolean)
         .join(" ")}
       onPointerDownCapture={landscape ? onFirstTouch : undefined}
+      ref={rootRef}
     >
       <header className="phone__bar">
         <span className="phone__seat">
@@ -450,10 +494,7 @@ export function PhoneView({
               type="button"
               className="btn btn--win"
               disabled={api.busy}
-              onClick={() => {
-                setArmed(null);
-                void api.act({ type: "discard", tileId: armedTile.id });
-              }}
+              onClick={() => discard(armedTile.id)}
             >
               Discard
             </button>
@@ -506,6 +547,27 @@ export function PhoneView({
           )}
         </div>
       </div>
+      {sent ? (
+        <span
+          key={sent.id}
+          className="phone__sent"
+          aria-hidden
+          style={
+            {
+              left: sent.x,
+              top: sent.y,
+              "--tile-lg": `${sent.w}px`,
+              "--send-rise": `${sent.y + sent.h + 24}px`,
+            } as CSSProperties
+          }
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget) setSent(null);
+          }}
+        >
+          <TileFace code={sent.code} size="lg" />
+          <span className="phone__sent-label">To the table</span>
+        </span>
+      ) : null}
     </div>
   );
 }

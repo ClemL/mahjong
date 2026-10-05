@@ -65,3 +65,4 @@
 2026-10-05T13:34:14Z - Seated players can be renamed from the lobby: the table can rename any chair, and a phone can rename its own
 2026-10-05T13:37:58Z - Phone: double-tap or double-click a tile to discard it, hide your hand, keep the screen awake, and ask once per turn for 30 more seconds
 2026-10-05T13:58:19Z - Claims are animated: the taken discard flies from the middle of the table to its new set, the set is named (Pung, Chow, Kong) until the next discard, and the tablet moves slower so you can follow each tile
+2026-10-05T21:45:00Z - A discard thrown from a phone now flies up off the phone and drops onto the table from that player's edge with a landing ring; every table and phone animation runs half a second slower at each speed

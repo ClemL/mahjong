@@ -2197,36 +2197,36 @@ a.btn {
  * longer-settling motion lets four people see what just changed.
  */
 .app--paced {
-  --anim-toss: 900ms;
-  --anim-claim: 950ms;
-  --anim-draw: 650ms;
-  --anim-gather: 650ms;
+  --anim-toss: 1400ms;
+  --anim-claim: 1450ms;
+  --anim-draw: 1150ms;
+  --anim-gather: 1150ms;
 }
 
 /* The table's computer speed paces the animations too, so a slow table is
    slow to watch as well as to play. Level 3 is the default above. */
-.app--paced[data-speed="1"] { --anim-toss: 1500ms; --anim-claim: 1550ms; --anim-draw: 1000ms; --anim-gather: 1000ms; }
-.app--paced[data-speed="2"] { --anim-toss: 1150ms; --anim-claim: 1200ms; --anim-draw: 800ms; --anim-gather: 800ms; }
-.app--paced[data-speed="4"] { --anim-toss: 600ms; --anim-claim: 650ms; --anim-draw: 450ms; --anim-gather: 450ms; }
-.app--paced[data-speed="5"] { --anim-toss: 340ms; --anim-claim: 380ms; --anim-draw: 260ms; --anim-gather: 300ms; }
+.app--paced[data-speed="1"] { --anim-toss: 2000ms; --anim-claim: 2050ms; --anim-draw: 1500ms; --anim-gather: 1500ms; }
+.app--paced[data-speed="2"] { --anim-toss: 1650ms; --anim-claim: 1700ms; --anim-draw: 1300ms; --anim-gather: 1300ms; }
+.app--paced[data-speed="4"] { --anim-toss: 1100ms; --anim-claim: 1150ms; --anim-draw: 950ms; --anim-gather: 950ms; }
+.app--paced[data-speed="5"] { --anim-toss: 840ms; --anim-claim: 880ms; --anim-draw: 760ms; --anim-gather: 800ms; }
 
 /*
  * The tablet lies in the middle of the table and is watched from an arm's
  * length away by four people at once, so it moves slower again and over a
  * longer distance: a tile has to be seen leaving one place and arriving in
- * another. Each level still stays inside its turn time, so the next move does
- * not land on top of the last one.
+ * another. At the faster levels a throw now outlasts the computer's turn; a
+ * tile seen arriving matters more than the next one waiting for it.
  */
 .app--table.app--paced {
-  --anim-toss: 1300ms;
-  --anim-claim: 1200ms;
-  --anim-gather: 850ms;
-  --anim-flight: 1100ms;
+  --anim-toss: 1800ms;
+  --anim-claim: 1700ms;
+  --anim-gather: 1350ms;
+  --anim-flight: 1600ms;
 }
-.app--table.app--paced[data-speed="1"] { --anim-toss: 2000ms; --anim-claim: 1800ms; --anim-gather: 1200ms; --anim-flight: 2000ms; }
-.app--table.app--paced[data-speed="2"] { --anim-toss: 1600ms; --anim-claim: 1500ms; --anim-gather: 1000ms; --anim-flight: 1700ms; }
-.app--table.app--paced[data-speed="4"] { --anim-toss: 800ms; --anim-claim: 750ms; --anim-gather: 550ms; --anim-flight: 800ms; }
-.app--table.app--paced[data-speed="5"] { --anim-toss: 420ms; --anim-claim: 420ms; --anim-gather: 320ms; --anim-flight: 450ms; }
+.app--table.app--paced[data-speed="1"] { --anim-toss: 2500ms; --anim-claim: 2300ms; --anim-gather: 1700ms; --anim-flight: 2500ms; }
+.app--table.app--paced[data-speed="2"] { --anim-toss: 2100ms; --anim-claim: 2000ms; --anim-gather: 1500ms; --anim-flight: 2200ms; }
+.app--table.app--paced[data-speed="4"] { --anim-toss: 1300ms; --anim-claim: 1250ms; --anim-gather: 1050ms; --anim-flight: 1300ms; }
+.app--table.app--paced[data-speed="5"] { --anim-toss: 920ms; --anim-claim: 920ms; --anim-gather: 820ms; --anim-flight: 950ms; }
 
 /* On the felt a discard is thrown from its owner's rack, not from just beside
    the pond, so it travels far enough to follow. Tiles are drawn in their
@@ -2244,6 +2244,53 @@ a.btn {
 
 @media (prefers-reduced-motion: reduce) {
   .felt .tile--toss-bottom {
+    animation: none;
+  }
+}
+
+/* A person's discard comes from the phone in their hand, above the felt, so
+   it drops onto the table from over their edge instead of sliding off the
+   rack: it starts large, as if close to the eye, and settles flat. */
+@keyframes arrive-from-phone {
+  0%   { transform: translateY(calc(var(--tile-w) * 9)) scale(2.6) rotate(-8deg); opacity: 0; }
+  20%  { opacity: 1; }
+  72%  { transform: translateY(-4px) scale(1.1) rotate(1deg); opacity: 1; }
+  84%  { transform: translateY(0) scale(0.94) rotate(0deg); }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+.felt .from-phone .tile--toss-bottom {
+  animation-name: arrive-from-phone;
+}
+
+/* Where it touches down, a ring spreads out across the felt. */
+@keyframes phone-landing {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+
+.console__spot.from-phone {
+  position: relative;
+}
+
+.console__spot.from-phone::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--tile-lg) * 1.4);
+  height: calc(var(--tile-lg) * 1.4);
+  border: 3px solid var(--gold);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  /* Hidden through the delay, while the tile is still on its way down. */
+  animation: phone-landing calc(var(--anim-toss) * 0.45) ease-out calc(var(--anim-toss) * 0.72) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .felt .from-phone .tile--toss-bottom,
+  .console__spot.from-phone::after {
     animation: none;
   }
 }
@@ -3570,6 +3617,56 @@ body:has(.app--handset) {
     "controls controls"
     "hand hand";
   gap: 6px 10px;
+}
+
+/* The ghost of a discard is placed in the controller's own frame. */
+.phone--landscape {
+  position: relative;
+}
+
+/* A discard leaves the phone the way it would leave a hand: lifted, then
+   thrown up and away over the top edge, towards the table. */
+@keyframes send-to-table {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  22%  { transform: translateY(-14px) scale(1.18) rotate(-3deg); opacity: 1; }
+  100% { transform: translateY(calc(var(--send-rise) * -1)) scale(0.55) rotate(4deg); opacity: 0.2; }
+}
+
+@keyframes sent-label {
+  0%, 15% { opacity: 0; transform: translate(-50%, 4px); }
+  35%, 70% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+
+.phone__sent {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  animation: send-to-table var(--anim-toss) cubic-bezier(0.5, 0, 0.75, 0.4) both;
+}
+
+.phone__sent .tile {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--gold) 70%, transparent),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.phone__sent-label {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  animation: sent-label var(--anim-toss) ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__sent {
+    display: none;
+  }
 }
 
 .phone--landscape .phone__bar {
