@@ -2503,6 +2503,14 @@ a.btn {
   font-size: clamp(16px, 2.6vh, 26px);
 }
 
+/* The name a chair goes by until somebody sits in it: greyed, like a placeholder. */
+.gather__seatname--open,
+.seat-card__state--open {
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-style: italic;
+}
+
 .gather__namerow {
   display: flex;
   align-items: center;
@@ -4413,4 +4421,173 @@ body:has(.app--handset) {
   .chip-delta {
     animation: none;
   }
+}
+
+/* ============================================== the wall, the pond, the log == */
+
+/* The tiles still to be drawn, faint under everything else on the felt. Each
+   stack is two tiles high: the top one sits a little up the screen, which is
+   how a stacked wall reads when the table is seen at an angle. */
+.wall {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.16;
+}
+
+.wall__stack {
+  position: absolute;
+}
+
+.wall__tile {
+  position: absolute;
+  inset: 1px;
+  border-radius: 3px;
+  background: linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+
+.wall__tile--top {
+  transform: translateY(calc(var(--lift) * -1));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tile-back) 80%, white), var(--tile-back));
+}
+
+@keyframes wall-leave {
+  to { opacity: 0; }
+}
+
+.wall__tile--leaving {
+  animation: wall-leave 200ms ease-in forwards;
+}
+
+.wall-draws {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 25;
+}
+
+/* A drawn tile leaves its stack for the hand that took it. */
+@keyframes wall-draw {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 0.25; }
+  20%  { transform: translate(-50%, calc(-50% - 8px)) scale(1.15); opacity: 0.9; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.8); opacity: 0; }
+}
+
+.wall-draw {
+  position: absolute;
+  border-radius: 3px;
+  background: linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  animation: wall-draw var(--anim-draw) cubic-bezier(0.45, 0, 0.25, 1) both;
+}
+
+/* Whoever is to play has their discard area lit a little, as well as their rack. */
+.discards--turn {
+  --pond-wash: color-mix(in srgb, var(--gold) 12%, var(--shade-1) 40%);
+  box-shadow:
+    0 0 0 6px var(--pond-wash),
+    0 0 24px 6px color-mix(in srgb, var(--gold) 14%, transparent);
+  transition: background-color 300ms ease, box-shadow 300ms ease;
+}
+
+/* The hand that went out, face up, ringed in gold — and its rack with it. */
+.rack--winner {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 0 32px color-mix(in srgb, var(--gold) 60%, transparent);
+}
+
+.rack__hand {
+  flex-wrap: nowrap;
+}
+
+.rack__hand--winner {
+  padding: 3px;
+  border-radius: 6px;
+  outline: 2px solid var(--gold);
+  background: color-mix(in srgb, var(--gold) 22%, transparent);
+}
+
+/* ---- the phone's play log, beside the buttons ---- */
+
+.phone--landscape .phone__controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  align-content: center;
+}
+
+.phone--landscape .phone__controls > :not(.playlog) {
+  grid-column: 2;
+}
+
+.playlog {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  justify-self: start;
+  align-self: center;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  line-height: 1.2;
+  --tile-sm: 18px;
+}
+
+.playlog__row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.playlog__row--empty {
+  color: var(--ink-dim);
+}
+
+.playlog__who {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 11em;
+}
+
+.playlog__verb {
+  color: var(--ink-dim);
+}
+
+.playlog__tiles {
+  display: inline-flex;
+  gap: 1px;
+}
+
+/* A claimed set is boxed, so it reads as one thing. */
+.playlog__tiles--set {
+  padding: 1px 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--gold) 20%, transparent);
+}
+
+/* ---- the phone's size: everything but the hand scales a little ---- */
+
+.phone--size-compact { --ui-zoom: 0.88; }
+.phone--size-comfy { --ui-zoom: 1.15; }
+
+.phone--landscape .phone__status,
+.phone--landscape .phone__melds,
+.phone--landscape .phone__controls {
+  zoom: var(--ui-zoom, 1);
+}
+
+/* The header is already full across a phone, so it only ever shrinks. */
+.phone--landscape .phone__bar {
+  zoom: min(var(--ui-zoom, 1), 1);
 }

@@ -18,6 +18,8 @@ import { ChipStack, Confetti, chipsOf, confettiCount } from "./TableEffects";
 import type { SoundToggle } from "./TableView";
 import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
+import { PlayLog } from "./PlayLog";
+import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
@@ -131,6 +133,7 @@ export function PhoneView({
   const appearance = useAppearance();
   const fullscreen = useFullscreen("landscape");
   const layout = useCompactLayout();
+  const display = usePhoneDisplay();
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
@@ -373,7 +376,12 @@ export function PhoneView({
 
   return (
     <div
-      className={["phone", landscape ? "phone--landscape" : "", compact ? "phone--compact" : ""]
+      className={[
+        "phone",
+        landscape ? "phone--landscape" : "",
+        compact ? "phone--compact" : "",
+        landscape ? `phone--size-${display.size}` : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       onPointerDownCapture={landscape ? onFirstTouch : undefined}
@@ -463,6 +471,7 @@ export function PhoneView({
               appearance={appearance}
               fullscreenHint={landscape && !fullscreen.supported}
               layout={landscape ? layout : undefined}
+              display={landscape ? display : undefined}
               sort={order}
               onLeave={() => void api.leave()}
             />
@@ -514,6 +523,9 @@ export function PhoneView({
       )}
 
       <div className="phone__controls">
+        {landscape && display.playLog === "on" ? (
+          <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
+        ) : null}
         {armedTile && yourTurn ? (
           <div className="confirm-bar" role="status">
             <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>

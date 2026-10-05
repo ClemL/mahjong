@@ -6,6 +6,7 @@ import {
   type RoomView,
   drain,
   newRoom,
+  notePlayed,
   pendingHumanClaimants,
   startPlay,
   syncSeats,
@@ -54,6 +55,8 @@ export function claimable(): { room: Room; claimer: Seat } {
       const next = discard(room.state, dealer, tile.id);
       if (next.phase !== "claiming") continue;
       room.state = next;
+      // As the room does after every move: the table shows the newest discard.
+      notePlayed(room);
       room.claimDeadline = Date.now() + CLAIM_WINDOW_MS;
       const waiting = pendingHumanClaimants(room);
       if (waiting.length > 0) return { room, claimer: waiting[0] };

@@ -53,15 +53,42 @@ describe("TableTop", () => {
     expect(container.querySelectorAll(".seat__badge")).toHaveLength(1);
   });
 
-  it("drops a person's discards in from their phone and a computer's from its rack", () => {
+  it("keeps the newest discard in the middle, dropped in from a phone, until the next one", () => {
+    feltSize();
+    const { room } = claimable();
+    const view = tableView(room);
+    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    const discard = view.lastDiscard!;
+    // Everyone in this deal is a person, so the tile arrives from a phone.
+    expect(container.querySelector(".console__spot.from-phone")).not.toBeNull();
+    const pond = container.querySelector(`.discards[data-seat="${discard.from}"]`)!;
+    expect(pond.querySelectorAll(".tile")).toHaveLength(view.players[discard.from].discards.length - 1);
+  });
+
+  it("lights the discard area of the seat to play", () => {
     feltSize();
     const view = tableView(dealt([0, 2]));
     const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const lit = Array.from(container.querySelectorAll(".discards--turn"));
+    expect(lit.map((p) => p.getAttribute("data-seat"))).toEqual([String(view.turn)]);
+  });
 
-    const ponds = Array.from(container.querySelectorAll(".discards"));
-    expect(ponds.map((p) => p.classList.contains("from-phone"))).toEqual(
-      view.players.map((p) => p.seat === 0 || p.seat === 2),
-    );
+  it("turns every hand face up at the end and rings the winner's", () => {
+    feltSize();
+    const room = dealt([0, 2]);
+    room.state = { ...room.state, phase: "handOver" };
+    const view = tableView(room);
+    const over = {
+      ...view,
+      result: { type: "win" as const, winner: 2 as const, from: null, score: null, payments: [0, 0, 0, 0], dealerKeeps: false },
+    };
+    const { container } = render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
+    const hands = Array.from(container.querySelectorAll(".rack__hand"));
+    expect(hands).toHaveLength(4);
+    expect(container.querySelectorAll(".rack__hand .tile--back")).toHaveLength(0);
+    expect(container.querySelector(".rack--winner")!.getAttribute("data-seat")).toBe("2");
+    expect(container.querySelectorAll(".rack__hand--winner")).toHaveLength(1);
   });
 
   it("shows each seat's chips, starting from 100", () => {
@@ -124,10 +151,9 @@ describe("TableTop", () => {
 
     const discard = view.lastDiscard!;
     expect(container.querySelector(".console__caption")!.textContent).toBe(
-      `${SEAT_NAMES[discard.from]} · ${tileName(discard.tile.code)}`,
+      `${view.players[discard.from].occupant.name} · ${tileName(discard.tile.code)}`,
     );
     expect(container.querySelectorAll(".rack--deciding")).toHaveLength(view.awaitingClaimSeats.length);
-    expect(container.querySelectorAll(".discards .tile--just-discarded")).toHaveLength(1);
 
     fireEvent.click(screen.getByRole("button", { name: `Skip waiting (${view.awaitingClaimSeats.length})` }));
     expect(api.control).toHaveBeenCalledWith({ type: "forcePass" });

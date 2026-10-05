@@ -3,6 +3,7 @@
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { CompactLayout } from "@/hooks/useCompactLayout";
+import type { OnOff, PhoneDisplay, PhoneSize } from "@/hooks/useLocalSetting";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
@@ -21,6 +22,17 @@ const LAYOUT: ChoiceOption<"standard" | "compact">[] = [
     label: "Compact",
     hint: "One header line and slimmer buttons, so the hand tiles get larger",
   },
+];
+
+const SIZE: ChoiceOption<PhoneSize>[] = [
+  { value: "compact", label: "Compact", hint: "Smaller header, prompt and buttons" },
+  { value: "standard", label: "Standard", hint: "The usual size" },
+  { value: "comfy", label: "Comfy", hint: "Larger header, prompt and buttons, easier to tap" },
+];
+
+const PLAY_LOG: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "Show", hint: "The last four plays: discards, chows, pungs and kongs" },
+  { value: "off", label: "Hide", hint: "Just the prompt" },
 ];
 
 const SORT: ChoiceOption<SortMode>[] = [
@@ -44,6 +56,7 @@ export function PhoneSettings({
   appearance,
   fullscreenHint = false,
   layout,
+  display,
   sort,
   onLeave,
 }: {
@@ -54,6 +67,8 @@ export function PhoneSettings({
   fullscreenHint?: boolean;
   /** Only the controller has a density to choose. */
   layout?: CompactLayout;
+  /** The controller's size and play log. */
+  display?: PhoneDisplay;
   /** How the hand is laid out; absent where there is no hand yet. */
   sort?: HandOrder;
   /** Give up the seat. */
@@ -85,6 +100,17 @@ export function PhoneSettings({
               value={layout.compact ? "compact" : "standard"}
               onChange={(value) => layout.setCompact(value === "compact")}
             />
+          ) : null}
+          {display ? (
+            <>
+              <Choice label="Size" options={SIZE} value={display.size} onChange={display.setSize} />
+              <Choice
+                label="Play log"
+                options={PLAY_LOG}
+                value={display.playLog}
+                onChange={display.setPlayLog}
+              />
+            </>
           ) : null}
           {fullscreenHint ? (
             <p className="seat__meta">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DEFAULT_NAMES, type RoomView } from "@/game/room";
+import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 
@@ -52,13 +52,15 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
           >
             <span className="seat-card__wind">{tileGlyph(seatWind(seat))}</span>
             <span className="seat-card__name">{SEAT_NAMES[seat]}</span>
-            <span className="seat-card__state">
-              {taken(seat)
-                ? view.players[seat].occupant.name
-                : view.players[seat].occupant.kind === "ai"
-                  ? "Computer — sit in"
-                  : "Open"}
-            </span>
+            {taken(seat) ? (
+              <span className="seat-card__state">{view.players[seat].occupant.name}</span>
+            ) : (
+              // An open chair is played by the computer under this name until someone sits.
+              <span className="seat-card__state seat-card__state--open">
+                {robotName(seat)}
+                {view.players[seat].occupant.kind === "ai" ? " — sit in" : ""}
+              </span>
+            )}
           </button>
         ))}
         <button

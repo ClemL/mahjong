@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
-import { DEAL_FLIGHT_MS, DEAL_MS, DEAL_STACKS, DEAL_STEP_MS } from "@/game/room";
+import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS } from "@/game/room";
 import type { Seat } from "@/game/tiles";
 import { createRng } from "@/game/rng";
 import { STARTING_CHIPS } from "@/game/rules";
@@ -18,7 +18,7 @@ function prefersStillness(): boolean {
 }
 
 /** True for `ms` after `key` first changes to a non-null value, then false. */
-function useWindow(key: string | null, ms: number): boolean {
+export function useWindow(key: string | null, ms: number): boolean {
   const [live, setLive] = useState<string | null>(null);
   useEffect(() => {
     if (key === null || prefersStillness()) return;
@@ -57,31 +57,33 @@ export function ChipStack({ count, label }: { count: number; label?: string }) {
  * thirteen tiles are seen arriving in front of every player.
  */
 export function DealOverlay({
-  dealKey,
+  live,
   layout,
   dealer,
   position,
+  origin,
 }: {
-  dealKey: string | null;
+  live: boolean;
   layout: TableLayout;
   dealer: Seat;
   position: (seat: Seat) => number;
+  /** Where on the felt the ith stack is taken from. */
+  origin: (stack: number) => { x: number; y: number };
 }) {
-  const live = useWindow(dealKey, DEAL_MS + 100);
   if (!live) return null;
-  const from = layout.console;
   const stacks = Array.from({ length: DEAL_STACKS }, (_, i) => {
     const seat = ((dealer + (i % 4)) % 4) as Seat;
     const pos = position(seat);
     const rack = layout.racks[pos];
+    const from = origin(i);
     return {
       i,
       size: i < 12 ? 4 : 1,
       style: {
-        left: from.cx,
-        top: from.cy,
-        "--dx": `${rack.cx - from.cx}px`,
-        "--dy": `${rack.cy - from.cy}px`,
+        left: from.x,
+        top: from.y,
+        "--dx": `${rack.cx - from.x}px`,
+        "--dy": `${rack.cy - from.y}px`,
         "--turn": `${POSITION_ROTATION[pos]}deg`,
         "--tile-w": `${Math.round(layout.tile * 0.8)}px`,
         animationDelay: `${i * DEAL_STEP_MS}ms`,
