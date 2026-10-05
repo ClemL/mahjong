@@ -53,6 +53,9 @@ export type SpeedLevel = (typeof SPEED_LEVELS)[number]["level"];
 /** Seconds a person may take over a discard before the table makes it; 0 is no limit. */
 export const TURN_LIMITS = [0, 15, 30, 60, 120] as const;
 
+/** What one "more time" request adds to a person's turn. One per turn. */
+export const MORE_TIME_MS = 30_000;
+
 export interface RoomSettings {
   speed: SpeedLevel;
   /** Seconds; one of TURN_LIMITS. */
@@ -119,6 +122,12 @@ export interface Room {
    * playing is before anyone could have seen it.
    */
   lastPlayed: { tile: Tile; from: Seat; hand: number } | null;
+  /**
+   * The turn that has been given more time, named by the `lastStepAt` it
+   * started from. Every move moves `lastStepAt`, so the grant lapses on its own
+   * when the turn ends and nothing has to remember to clear it.
+   */
+  moreTime: { seat: Seat; from: number } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -173,6 +182,8 @@ export interface RoomView {
   lastPlayed: { tile: Tile; from: Seat } | null;
   /** Time left for the person whose turn it is, when the table has a limit. */
   turnDeadlineIn: number | null;
+  /** The person on turn has already had their extra time this turn. */
+  turnExtended: boolean;
 }
 
 const HIDDEN: TileCode = "back";
@@ -202,6 +213,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     settings: { ...DEFAULT_ROOM_SETTINGS },
     lastStepAt: Date.now(),
     lastPlayed: null,
+    moreTime: null,
   };
 }
 
@@ -210,6 +222,7 @@ export function normalizeRoom(room: Room): Room {
   room.settings = { ...DEFAULT_ROOM_SETTINGS, ...(room.settings ?? {}) };
   room.lastStepAt ??= room.updatedAt ?? Date.now();
   room.lastPlayed ??= null;
+  room.moreTime ??= null;
   return room;
 }
 
@@ -260,6 +273,31 @@ export function resetRoom(room: Room, seed = Date.now(), { keepTable = true } = 
   room.settings = fresh.settings;
   room.lastPlayed = null;
   returnToLobby(room, fresh.state);
+}
+
+/** Whether the seat on turn has had its extra time for this turn. */
+export function turnExtended(room: Room): boolean {
+  const grant = room.moreTime;
+  return grant !== null && grant.seat === room.state.turn && grant.from === room.lastStepAt;
+}
+
+/** How long the current person's turn runs, extra time included; 0 is no limit. */
+export function turnAllowanceMs(room: Room): number {
+  const limit = room.settings.turnLimit * 1000;
+  if (limit <= 0) return 0;
+  return limit + (turnExtended(room) ? MORE_TIME_MS : 0);
+}
+
+/**
+ * Give the seat on turn one helping of extra time, or say why not. Only a
+ * limited turn can be extended, and only once.
+ */
+export function grantMoreTime(room: Room, seat: Seat): string | null {
+  if (room.state.turn !== seat || room.state.phase !== "action") return "It is not your turn";
+  if (room.settings.turnLimit <= 0) return "This table has no turn limit";
+  if (turnExtended(room)) return "You already have extra time this turn";
+  room.moreTime = { seat, from: room.lastStepAt };
+  return null;
 }
 
 /** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's number. */
@@ -404,7 +442,6 @@ export function drain(room: Room, now = Date.now()): boolean {
     }
   };
   const pace = turnMs(room.settings.speed);
-  const limit = room.settings.turnLimit * 1000;
 
   for (let guard = 0; guard < 400; guard += 1) {
     const state = room.state;
@@ -449,8 +486,9 @@ export function drain(room: Room, now = Date.now()): boolean {
     if (isHumanSeat(room, state.turn, now)) {
       // A person's turn waits for them — unless the table has a time limit
       // and it has run out, in which case the table discards for them.
-      if (limit <= 0) break;
-      const due = room.lastStepAt + limit;
+      const allowance = turnAllowanceMs(room);
+      if (allowance <= 0) break;
+      const due = room.lastStepAt + allowance;
       if (now < due) break;
       const tileId = autoDiscardChoice(state, state.turn, rng);
       if (!tileId) break;
@@ -599,8 +637,9 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       state.phase === "action" &&
       state.lastDiscard === null &&
       isHumanSeat(room, state.turn, now)
-        ? Math.max(0, room.lastStepAt + room.settings.turnLimit * 1000 - now)
+        ? Math.max(0, room.lastStepAt + turnAllowanceMs(room) - now)
         : null,
+    turnExtended: turnExtended(room),
   };
 }
 

@@ -4,9 +4,11 @@ import {
   CLAIM_WINDOW_MS,
   DEFAULT_ROOM_SETTINGS,
   HEARTBEAT_WRITE_MS,
+  MORE_TIME_MS,
   SEAT_IDLE_MS,
   type Room,
   drain,
+  grantMoreTime,
   identify,
   isHumanSeat,
   mayDeal,
@@ -455,6 +457,34 @@ describe("turn limit", () => {
     drain(room, room.lastStepAt + SEAT_IDLE_MS - 1);
     expect(room.state.players[0].discards).toHaveLength(0);
     expect(viewFor(room, "tok-0").turnDeadlineIn).toBeNull();
+  });
+
+  it("adds extra time to the turn once, visible to the table", () => {
+    const room = dealt("TEST", 5, [0]);
+    room.settings.turnLimit = 15;
+    room.table = { token: "table", lastSeen: Date.now() };
+    const t0 = room.lastStepAt;
+
+    expect(grantMoreTime(room, 0)).toBeNull();
+    expect(grantMoreTime(room, 0)).toMatch(/already/);
+    expect(viewFor(room, "tok-0", t0).turnDeadlineIn).toBe(15_000 + MORE_TIME_MS);
+    expect(viewFor(room, "table", t0).turnExtended).toBe(true);
+
+    drain(room, t0 + 15_000);
+    expect(room.state.players[0].discards).toHaveLength(0);
+    drain(room, t0 + 15_000 + MORE_TIME_MS);
+    expect(room.state.players[0].discards).toHaveLength(1);
+    // The grant belonged to that turn and lapsed with it.
+    expect(viewFor(room, "table").turnExtended).toBe(false);
+  });
+
+  it("refuses extra time off turn or with no limit", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    room.settings.turnLimit = 15;
+    expect(grantMoreTime(room, 2)).toMatch(/not your turn/);
+    room.settings.turnLimit = 0;
+    expect(grantMoreTime(room, 0)).toMatch(/no turn limit/);
+    expect(room.moreTime).toBeNull();
   });
 
   it("never shows a deadline on a computer's turn", () => {

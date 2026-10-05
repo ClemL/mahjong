@@ -4078,3 +4078,34 @@ body:has(.app--handset) {
   color: inherit;
   text-decoration: none;
 }
+
+/* The hand turned face down. It is a button, so it drops the button chrome
+   and keeps the hand's own frame. */
+.phone__hand--hidden {
+  position: relative;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.phone__hidden-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+.phone__toggle[aria-pressed="true"] {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.phone__more-time {
+  flex: none;
+}

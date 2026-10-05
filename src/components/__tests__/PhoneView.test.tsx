@@ -50,11 +50,13 @@ describe("PhoneView", () => {
     expect(seatName(container).textContent).toBe(SEAT_NAMES[seat]);
   });
 
-  it("discards on a single click with a mouse", () => {
+  it("discards on a double-click with a mouse, never a single one", () => {
     const { seat, view } = onTurn();
     const api = fakeApi(view);
     const { container } = render(<PhoneView api={api} view={view} sound={sound} />);
 
+    fireEvent.click(handButtons(container)[0]);
+    expect(api.act).not.toHaveBeenCalled();
     fireEvent.click(handButtons(container)[0]);
     expect(api.act).toHaveBeenCalledWith({
       type: "discard",
@@ -95,6 +97,37 @@ describe("PhoneView", () => {
     expect(screen.getByText(`Discard ${tileName(first.code)}?`)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
     expect(api.act).toHaveBeenCalledWith({ type: "discard", tileId: first.id });
+  });
+
+  it("turns the hand face down and back up", () => {
+    const { seat, view } = onTurn();
+    const api = fakeApi(view);
+    const { container } = render(<PhoneView api={api} view={view} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide hand" }));
+    expect(container.querySelectorAll(".phone__hand .tile--back")).toHaveLength(
+      view.players[seat].hand.length,
+    );
+    expect(container.querySelector(".phone__hand [data-tile-id]")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Hand hidden/ }));
+    expect(container.querySelector(".phone__hand .tile--back")).toBeNull();
+    expect(handButtons(container)).toHaveLength(view.players[seat].hand.length);
+  });
+
+  it("asks for more time once, while the turn clock runs", () => {
+    const { view } = onTurn();
+    const timed = { ...view, turnDeadlineIn: 12_000, turnExtended: false };
+    const api = fakeApi(timed);
+    const { rerender } = render(<PhoneView api={api} view={timed} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^More time/ }));
+    expect(api.act).toHaveBeenCalledWith({ type: "moreTime" });
+
+    const extended = { ...timed, turnDeadlineIn: 41_000, turnExtended: true };
+    rerender(<PhoneView api={api} view={extended} sound={sound} />);
+    expect(screen.queryByRole("button", { name: /^More time/ })).toBeNull();
+    expect(screen.getByRole("timer").textContent).toBe("41s");
   });
 
   it("keeps the hand locked when it is somebody else's turn", () => {

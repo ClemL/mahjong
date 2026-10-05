@@ -2,7 +2,7 @@
 
 import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from "react";
 import type { ClaimOption } from "@/game/engine";
-import type { RoomView } from "@/game/room";
+import { MORE_TIME_MS, type RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { useAppearance } from "@/hooks/useAppearance";
@@ -11,7 +11,8 @@ import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useHandOrder } from "@/hooks/useHandOrder";
-import { TileButton, TileFace } from "./TileView";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import type { SoundToggle } from "./TableView";
 import { SettingsMenu } from "./SettingsMenu";
@@ -20,6 +21,31 @@ import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
 const DRAG_THRESHOLD = 10;
+
+const KEEP_AWAKE_KEY = "hk-mahjong.keepAwake";
+
+/** Keep-awake is remembered per device: whoever wanted it once wants it every game. */
+function useKeepAwake() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    try {
+      setOn(window.localStorage.getItem(KEEP_AWAKE_KEY) === "1");
+    } catch {
+      // Storage can be blocked; the toggle still works for this visit.
+    }
+  }, []);
+  const state = useWakeLock(on);
+  const toggle = () => {
+    const next = !on;
+    setOn(next);
+    try {
+      window.localStorage.setItem(KEEP_AWAKE_KEY, next ? "1" : "0");
+    } catch {
+      // As above.
+    }
+  };
+  return { on, state, toggle };
+}
 
 /**
  * A claim drawn where its meld would land — among your own open sets — but
@@ -81,9 +107,12 @@ export function PhoneView({
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
   const compact = landscape && layout.compact;
-  // On touch a tile is armed by the first tap and thrown by the second; with a
-  // mouse the click discards directly.
+  // A tile is armed by the first tap or click and thrown by the second, so a
+  // double-click or double-tap discards and a single stray touch never does.
   const [armed, setArmed] = useState<string | null>(null);
+  // Face down for when the phone is set on the table or someone is looking over.
+  const [hidden, setHidden] = useState(false);
+  const keepAwake = useKeepAwake();
   // The claim being pressed or hovered, whose tiles the hand lifts.
   const [preview, setPreview] = useState<ClaimOption | null>(null);
   useEffect(() => {
@@ -169,10 +198,6 @@ export function PhoneView({
 
   const tapTile = (tileId: string) => {
     if (justDragged.current || !yourTurn || api.busy) return;
-    if (!coarse) {
-      void api.act({ type: "discard", tileId });
-      return;
-    }
     if (armed === tileId) {
       setArmed(null);
       void api.act({ type: "discard", tileId });
@@ -217,14 +242,28 @@ export function PhoneView({
     </span>
   ) : null;
 
+  const allowance = view.settings.turnLimit * 1000 + (view.turnExtended ? MORE_TIME_MS : 0);
   const timerStyle: CSSProperties & { "--left": number } = {
-    "--left": turnLeft !== null ? Math.min(1, turnLeft / (view.settings.turnLimit * 1000)) : 1,
+    "--left": turnLeft !== null ? Math.min(1, turnLeft / allowance) : 1,
   };
   const turnTimer =
     turnLeft !== null ? (
-      <span className="phone__timer" style={timerStyle} role="timer" aria-label="Time left to discard">
-        {Math.ceil(turnLeft / 1000)}s
-      </span>
+      <>
+        <span className="phone__timer" style={timerStyle} role="timer" aria-label="Time left to discard">
+          {Math.ceil(turnLeft / 1000)}s
+        </span>
+        {view.turnExtended ? null : (
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost phone__more-time"
+            disabled={api.busy}
+            aria-label={`More time: add ${MORE_TIME_MS / 1000} seconds, once per turn`}
+            onClick={() => void api.act({ type: "moreTime" })}
+          >
+            +{MORE_TIME_MS / 1000}s
+          </button>
+        )}
+      </>
     ) : null;
 
   const promptLine = (
@@ -235,8 +274,9 @@ export function PhoneView({
 
   // Ghosts of every set the discard on offer would complete, laid out where
   // claimed sets go.
+  // Hidden too when the hand is: a ghost is drawn from the tiles in it.
   const ghosts =
-    view.claim && view.lastDiscard
+    view.claim && view.lastDiscard && !hidden
       ? view.claim.options.map((option) => (
           <GhostMeld
             key={option.id}
@@ -311,6 +351,39 @@ export function PhoneView({
             {compact ? "⛶" : "Full screen"}
           </button>
         ) : null}
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost phone__toggle"
+          aria-pressed={hidden}
+          aria-label={hidden ? "Show hand" : "Hide hand"}
+          onClick={() => {
+            setArmed(null);
+            setHidden((h) => !h);
+          }}
+        >
+          {hidden ? "Show" : "Hide"}
+          {compact ? null : " hand"}
+        </button>
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost phone__toggle"
+          aria-pressed={keepAwake.on}
+          aria-label="Keep screen awake"
+          disabled={keepAwake.state === "unsupported"}
+          title={
+            keepAwake.state === "unsupported"
+              ? "This browser cannot keep the screen on"
+              : keepAwake.state === "denied"
+                ? "The browser refused; low battery mode can block it"
+                : keepAwake.on
+                  ? "The screen stays on while this page is open"
+                  : "Let the screen sleep as usual"
+          }
+          onClick={keepAwake.toggle}
+        >
+          {compact ? "Awake" : "Keep awake"}
+          {keepAwake.on && keepAwake.state === "held" ? " ✓" : null}
+        </button>
         {sound ? (
           <SettingsMenu>
             <PhoneSettings
@@ -336,22 +409,38 @@ export function PhoneView({
 
       {exposedInHeader ? null : exposed}
 
-      <div
-        ref={handRef}
-        className={`phone__hand${dragging ? " phone__hand--dragging" : ""}`}
-        onPointerDown={onHandPointerDown}
-        onPointerMove={onHandPointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
-        {order.drawn ? (
-          <>
-            <span className="hand__gap" aria-hidden />
-            {handTile(order.drawn, true)}
-          </>
-        ) : null}
-      </div>
+      {hidden ? (
+        <button
+          type="button"
+          className="phone__hand phone__hand--hidden"
+          aria-label={`Hand hidden, ${me.hand.length} tiles. Show hand`}
+          onClick={() => setHidden(false)}
+        >
+          {me.hand.map((t) => (
+            <TileBack key={t.id} size="lg" />
+          ))}
+          <span className="phone__hidden-label" aria-hidden>
+            Tap to show
+          </span>
+        </button>
+      ) : (
+        <div
+          ref={handRef}
+          className={`phone__hand${dragging ? " phone__hand--dragging" : ""}`}
+          onPointerDown={onHandPointerDown}
+          onPointerMove={onHandPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+        >
+          {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
+          {order.drawn ? (
+            <>
+              <span className="hand__gap" aria-hidden />
+              {handTile(order.drawn, true)}
+            </>
+          ) : null}
+        </div>
+      )}
 
       <div className="phone__controls">
         {armedTile && yourTurn ? (

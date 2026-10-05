@@ -63,4 +63,5 @@
 2026-10-04T18:00:00Z - Reset table on the Take a seat page empties the room, table screen included, so a table stuck on a device that has gone can be taken back
 2026-10-05T13:30:00Z - The app opens on a start page: game options (min faan, speed, hints, sound, opponents, claim prompts), phone layout and tile designs, then Play solo, Multiplayer, Tablet mode or Reset multiplayer table. Settings are remembered on the device; the solo game moved to /solo
 2026-10-05T13:34:14Z - Seated players can be renamed from the lobby: the table can rename any chair, and a phone can rename its own
+2026-10-05T13:37:58Z - Phone: double-tap or double-click a tile to discard it, hide your hand, keep the screen awake, and ask once per turn for 30 more seconds
 2026-10-05T13:58:19Z - Claims are animated: the taken discard flies from the middle of the table to its new set, the set is named (Pung, Chow, Kong) until the next discard, and the tablet moves slower so you can follow each tile
