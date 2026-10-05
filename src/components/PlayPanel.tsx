@@ -2,7 +2,7 @@
 
 import type { ClaimPrompt } from "@/game/controller";
 import type { StrategyName } from "@/game/ai";
-import type { MahjongApi } from "@/hooks/useMahjong";
+import type { GameSettings } from "@/hooks/usePreferences";
 import { Choice, type ChoiceOption } from "./Choice";
 
 const OPPONENTS: ChoiceOption<StrategyName>[] = [
@@ -16,7 +16,7 @@ const CLAIM_PROMPTS: ChoiceOption<ClaimPrompt>[] = [
   { value: "wins", label: "Wins only", hint: "Never interrupts except to declare a win" },
 ];
 
-export function PlayPanel({ api }: { api: MahjongApi }) {
+export function PlayPanel({ api }: { api: GameSettings }) {
   return (
     <section className="panel">
       <details open>

@@ -80,6 +80,8 @@ export function fakeApi(view: RoomView, busy = false): RoomApi {
     setToken: vi.fn(),
     act: vi.fn(async () => {}),
     control: vi.fn(async () => {}),
+    leave: vi.fn(async () => {}),
+    resetTable: vi.fn(async () => {}),
     resume: vi.fn(),
     refresh: vi.fn(),
   };

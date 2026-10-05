@@ -1,6 +1,6 @@
 "use client";
 
-import type { MahjongApi, Speed } from "@/hooks/useMahjong";
+import type { GameSettings, Speed } from "@/hooks/usePreferences";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { Choice, type ChoiceOption } from "./Choice";
 
@@ -26,7 +26,7 @@ const SOUND = ON_OFF.map((o) => ({
 }));
 
 /** Everything about how the game plays that is not a move in it. */
-export function GamePanel({ api }: { api: MahjongApi }) {
+export function GamePanel({ api, note }: { api: GameSettings; note?: string }) {
   return (
     <section className="panel">
       <details open>
@@ -45,6 +45,7 @@ export function GamePanel({ api }: { api: MahjongApi }) {
                 </option>
               ))}
             </select>
+            {note ? <span className="choice__hint">{note}</span> : null}
           </label>
 
           <Choice

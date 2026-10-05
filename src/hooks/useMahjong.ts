@@ -17,21 +17,21 @@ import {
   waitsAfterDiscard,
 } from "@/game/engine";
 import {
-  type ClaimPrompt,
   awaitingHumanClaim,
   needsTurnAdvance,
   resolveWithAi,
   shouldPromptClaim,
   stepTable,
 } from "@/game/controller";
-import { STRATEGIES, type StrategyName } from "@/game/ai";
+import { STRATEGIES } from "@/game/ai";
 import { type Rng, createRng } from "@/game/rng";
 import { type SoundName, playSound, primeAudio } from "@/game/sound";
+import { type GameSettings, type Speed, readPreferences, usePreferences } from "@/hooks/usePreferences";
 import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
 import { DEFAULT_RULES } from "@/game/rules";
 
-export type Speed = "slow" | "normal" | "fast";
+export type { Speed };
 
 const DELAYS: Record<Speed, number> = { slow: 1200, normal: 650, fast: 260 };
 
@@ -43,7 +43,7 @@ const IDLE_ACTIONS: TurnActions = {
   waits: [],
 };
 
-export interface MahjongApi {
+export interface MahjongApi extends GameSettings {
   state: GameState | null;
   humanSeat: Seat;
   /** What the player may do on their own turn. */
@@ -53,10 +53,6 @@ export interface MahjongApi {
   awaitingClaim: boolean;
   /** Ids of hand tiles whose discard would leave the hand ready (聽牌). */
   readyDiscards: Set<string>;
-  showHints: boolean;
-  setShowHints: (value: boolean) => void;
-  speed: Speed;
-  setSpeed: (value: Speed) => void;
   paused: boolean;
   setPaused: (value: boolean) => void;
   discard: (tileId: string) => void;
@@ -66,27 +62,13 @@ export interface MahjongApi {
   pass: () => void;
   nextHand: () => void;
   newGame: () => void;
-  /** Table faan minimum, and a setter that applies mid-hand. */
-  minFaan: number;
-  setMinFaan: (value: number) => void;
-  muted: boolean;
-  setMuted: (value: boolean) => void;
-  /** Which opponent strategy is playing the other three seats. */
-  opponents: StrategyName;
-  setOpponents: (value: StrategyName) => void;
-  /** How often the table stops to ask about a claim. */
-  claimPrompt: ClaimPrompt;
-  setClaimPrompt: (value: ClaimPrompt) => void;
 }
 
 export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const [state, setState] = useState<GameState | null>(null);
-  const [speed, setSpeed] = useState<Speed>("normal");
+  const settings = usePreferences();
+  const { speed, showHints, muted, opponents, claimPrompt } = settings;
   const [paused, setPaused] = useState(false);
-  const [showHints, setShowHints] = useState(true);
-  const [muted, setMutedState] = useState(false);
-  const [opponents, setOpponents] = useState<StrategyName>("greedy");
-  const [claimPrompt, setClaimPrompt] = useState<ClaimPrompt>("useful");
   const rngRef = useRef<Rng>(createRng(1));
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
@@ -94,7 +76,10 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const start = useCallback(() => {
     const seed = Math.floor(Math.random() * 0xffffffff);
     rngRef.current = createRng(seed ^ 0x5bf03635);
-    setState(createGame({ seed, humanSeat }));
+    // Read straight from storage: this runs on mount, before the hook's own
+    // copy of the stored choices has landed in state.
+    const { minFaan } = readPreferences();
+    setState(createGame({ seed, humanSeat, config: { ...DEFAULT_RULES, minFaan } }));
   }, [humanSeat]);
 
   // Deal on the client so the server render stays deterministic.
@@ -140,11 +125,6 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     }
     for (const cue of cues) playSound(cue);
   }, [state]);
-
-  const setMuted = useCallback((value: boolean) => {
-    setMutedState(value);
-    if (!value) primeAudio();
-  }, []);
 
   const strategy = STRATEGIES[opponents];
 
@@ -243,21 +223,23 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     setState((current) => (current ? nextHandOf(current) : current));
   }, []);
 
-  const setMinFaan = useCallback((value: number) => {
-    setState((current) => (current ? setMinFaanOf(current, value) : current));
-  }, []);
+  const rememberMinFaan = settings.setMinFaan;
+  const setMinFaan = useCallback(
+    (value: number) => {
+      rememberMinFaan(value);
+      setState((current) => (current ? setMinFaanOf(current, value) : current));
+    },
+    [rememberMinFaan],
+  );
 
   return {
+    ...settings,
     state,
     humanSeat,
     actions,
     claimOptions,
     awaitingClaim,
     readyDiscards,
-    showHints,
-    setShowHints,
-    speed,
-    setSpeed,
     paused,
     setPaused,
     discard,
@@ -269,11 +251,5 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     newGame: start,
     minFaan: state?.config.minFaan ?? DEFAULT_RULES.minFaan,
     setMinFaan,
-    muted,
-    setMuted,
-    opponents,
-    setOpponents,
-    claimPrompt,
-    setClaimPrompt,
   };
 }
