@@ -27,8 +27,8 @@ interface GroupState {
  */
 const groupCache = new Map<string, GroupState[]>();
 
-function enumerateGroup(slice: number[], allowRuns: boolean): GroupState[] {
-  const key = (allowRuns ? "r" : "h") + slice.join("");
+function enumerateGroup(slice: number[], allowRuns: boolean, allowPungs = true): GroupState[] {
+  const key = (allowRuns ? "r" : "h") + (allowPungs ? "" : "c") + slice.join("");
   const cached = groupCache.get(key);
   if (cached) return cached;
 
@@ -54,7 +54,7 @@ function enumerateGroup(slice: number[], allowRuns: boolean): GroupState[] {
       visit(i + 1, sets, partials, pair);
       return;
     }
-    if (work[i] >= 3) {
+    if (allowPungs && work[i] >= 3) {
       work[i] -= 3;
       visit(i, sets + 1, partials, pair);
       work[i] += 3;
@@ -104,13 +104,14 @@ function enumerateGroup(slice: number[], allowRuns: boolean): GroupState[] {
  * Blocks are counted as `8 - 2×sets - partials`, where a hand may hold at most
  * five blocks in total. A hand holding five blocks with no pair among them
  * costs one extra step, since one of those blocks has to become the pair.
+ * Without pungs it is the distance to a hand of runs only (平糊).
  */
-export function standardShanten(counts: CountVector, meldCount: number): number {
+export function standardShanten(counts: CountVector, meldCount: number, allowPungs = true): number {
   const groups = [
-    enumerateGroup(counts.slice(0, 9), true),
-    enumerateGroup(counts.slice(9, 18), true),
-    enumerateGroup(counts.slice(18, 27), true),
-    enumerateGroup(counts.slice(27, 34), false),
+    enumerateGroup(counts.slice(0, 9), true, allowPungs),
+    enumerateGroup(counts.slice(9, 18), true, allowPungs),
+    enumerateGroup(counts.slice(18, 27), true, allowPungs),
+    enumerateGroup(counts.slice(27, 34), false, allowPungs),
   ];
 
   // Combine the groups with a small table over (sets, partials, pair).
