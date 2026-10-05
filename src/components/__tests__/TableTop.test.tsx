@@ -128,4 +128,33 @@ describe("TableTop", () => {
     fireEvent.click(next[1]);
     expect(api.control).toHaveBeenCalledWith({ type: "nextHand" });
   });
+
+  it("names a claimed set and who took the discard until the next tile is thrown", () => {
+    feltSize();
+    const { room, claimer } = claimable();
+    const discard = room.state.lastDiscard!;
+    room.lastPlayed = { ...discard, hand: room.state.handNumber };
+    // Resolve the claim by hand: the tile leaves the pond for a pung.
+    const pond = room.state.players[discard.from].discards;
+    pond.splice(pond.findIndex((t) => t.id === discard.tile.id), 1);
+    const twins = room.state.players[claimer].hand.filter((t) => t.code === discard.tile.code).slice(0, 2);
+    room.state.players[claimer].melds.push({
+      type: "pung",
+      tiles: [...twins, discard.tile],
+      concealed: false,
+      claimedFrom: discard.from,
+      claimedTileId: discard.tile.id,
+    });
+    const view = tableView(room);
+    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    const fresh = container.querySelectorAll(".meld--fresh");
+    expect(fresh).toHaveLength(1);
+    expect(fresh[0].closest(".rack")!.getAttribute("data-seat")).toBe(String(claimer));
+    expect(fresh[0].querySelector(".meld__tag")!.textContent).toBe("Pung 碰");
+    expect(fresh[0].querySelector(".meld__taken")!.getAttribute("title")).toBe(tileName(discard.tile.code));
+    expect(container.querySelector(".console__caption")!.textContent).toBe(
+      `${SEAT_NAMES[discard.from]} · ${tileName(discard.tile.code)} · punged by ${SEAT_NAMES[claimer]}`,
+    );
+  });
 });

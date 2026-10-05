@@ -5,7 +5,19 @@ import { SEAT_NAMES, type Seat, tileGlyph, seatWind } from "@/game/tiles";
 import type { Meld } from "@/game/melds";
 import { TileBack, TileFace } from "./TileView";
 
-export function MeldRow({ meld }: { meld: Meld }) {
+const MELD_TAG: Record<Meld["type"], string> = {
+  chow: "Chow 上",
+  pung: "Pung 碰",
+  kong: "Kong 槓",
+};
+
+/**
+ * One laid-open set. `fresh` marks the set just made from the newest discard:
+ * its tiles gather in from the hand, the claimed one lands last, and the set
+ * keeps a named tag until the next tile is thrown so a glance shows who took
+ * what.
+ */
+export function MeldRow({ meld, fresh = false }: { meld: Meld; fresh?: boolean }) {
   // A concealed kong is shown face down on the ends, as it is on a real table.
   if (meld.type === "kong" && meld.concealed) {
     return (
@@ -18,17 +30,31 @@ export function MeldRow({ meld }: { meld: Meld }) {
     );
   }
   return (
-    <span className="meld">
-      {meld.tiles.map((t) => (
-        <TileFace
-          key={t.id}
-          code={t.code}
-          size="sm"
-          entry={t.id === meld.claimedTileId ? "claim" : null}
-        />
-      ))}
+    <span className={fresh ? "meld meld--fresh" : "meld"}>
+      {fresh ? (
+        <span className="meld__tag" aria-hidden>
+          {MELD_TAG[meld.type]}
+        </span>
+      ) : null}
+      {meld.tiles.map((t) => {
+        const taken = t.id === meld.claimedTileId;
+        return (
+          <TileFace
+            key={t.id}
+            code={t.code}
+            size="sm"
+            entry={taken ? "claim" : null}
+            className={fresh ? (taken ? "meld__taken" : "meld__gathered") : ""}
+          />
+        );
+      })}
     </span>
   );
+}
+
+/** Whether a meld was just made from this discard. */
+export function isFreshClaim(meld: Meld, lastPlayedId: string | undefined): boolean {
+  return lastPlayedId !== undefined && meld.claimedTileId === lastPlayedId;
 }
 
 interface Props {
