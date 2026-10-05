@@ -4,6 +4,7 @@ import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS } from "@/gam
 import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
+import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
@@ -28,6 +29,20 @@ const LIMITS: ChoiceOption<string>[] = TURN_LIMITS.map((seconds) => ({
 
 const EDGES = ["bottom", "right", "top", "left"];
 
+const TURN_GLOW: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "On", hint: "The discard area of whoever is to play is lit a little" },
+  { value: "off", label: "Off", hint: "Only the rack shows whose turn it is" },
+];
+
+const WALL: ChoiceOption<OnOff>[] = [
+  {
+    value: "on",
+    label: "Show",
+    hint: "The tiles still to be drawn, faint under the table; draws leave from it",
+  },
+  { value: "off", label: "Hide", hint: "A plain felt" },
+];
+
 const SOUND: ChoiceOption<"on" | "off">[] = [
   { value: "on", label: "On", hint: "Clacks on discards, claims and wins" },
   { value: "off", label: "Off", hint: "Silent" },
@@ -39,11 +54,14 @@ export function TableSettings({
   view,
   sound,
   appearance,
+  display,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
   appearance: AppearanceApi;
+  /** This tablet's own display choices. */
+  display?: TabletDisplay;
 }) {
   return (
     <>
@@ -106,6 +124,18 @@ export function TableSettings({
                 value={sound.muted ? "off" : "on"}
                 onChange={(value) => sound.setMuted(value === "off")}
               />
+            ) : null}
+
+            {display ? (
+              <>
+                <Choice
+                  label="Turn light"
+                  options={TURN_GLOW}
+                  value={display.turnGlow}
+                  onChange={display.setTurnGlow}
+                />
+                <Choice label="Wall" options={WALL} value={display.wall} onChange={display.setWall} />
+              </>
             ) : null}
           </div>
         </details>

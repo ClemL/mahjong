@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_RULES } from "@/game/rules";
-import { DEFAULT_ROOM_SETTINGS } from "@/game/room";
+import { DEFAULT_ROOM_SETTINGS, turnMs } from "@/game/room";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -176,11 +176,23 @@ describe("playing", () => {
       expect(view.turn).toBe(0);
       const wallBefore = view.wallCount;
       await act(id, token, { type: "discard", tileId: view.players[0].hand[0].id });
-      // Computer turns are paced; let ten seconds pass, which covers three of
-      // them at the default speed and stays inside seat 0's own time limit.
+      // Computer turns are paced, and a claimed set is left on show for a beat
+      // before its owner plays on, so how long the table takes to come back
+      // depends on how many claims the deal throws up — two computers can pung
+      // each other's discards more than once. Let time pass a turn at a time
+      // and stop as soon as seat 0 is wanted, well inside a minute.
+      const start = Date.now();
+      const pending = (v: typeof view) =>
+        v.phase === "handOver" ||
+        v.phase === "gameOver" ||
+        v.turn === 0 ||
+        v.awaitingClaimSeats.includes(0);
       vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(Date.now() + 10_000);
-      view = await readRoom(id, token);
+      for (let step = 1; step <= 40; step += 1) {
+        vi.setSystemTime(start + step * turnMs(DEFAULT_ROOM_SETTINGS.speed));
+        view = await readRoom(id, token);
+        if (pending(view)) break;
+      }
       vi.useRealTimers();
 
       // The property that matters: the table never parks on a chair nobody is

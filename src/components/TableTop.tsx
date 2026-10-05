@@ -10,9 +10,11 @@ import { useCountdown } from "@/hooks/useCountdown";
 import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
 import { FaanBreakdown } from "./FaanBreakdown";
-import { ChipStack, DealOverlay, WinOverlay, chipsOf } from "./TableEffects";
+import { ChipStack, DealOverlay, WinOverlay, chipsOf, useWindow } from "./TableEffects";
+import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { MeldRow, isFreshClaim } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
@@ -45,7 +47,11 @@ function occupantName(player: PublicPlayer): string {
  * first seen before anything was thrown gets them, so a tablet reloaded mid-hand
  * does not replay the start.
  */
-function useOpening(view: RoomView): { dealKey: string | null; flowerOrder: Map<string, number> } {
+function useOpening(view: RoomView): {
+  dealKey: string | null;
+  flowerOrder: Map<string, number>;
+  live: boolean;
+} {
   const seen = useRef<{ hand: number; dealKey: string | null; flowerOrder: Map<string, number> }>({
     hand: -1,
     dealKey: null,
@@ -64,7 +70,12 @@ function useOpening(view: RoomView): { dealKey: string | null; flowerOrder: Map<
     }
     seen.current = { hand: view.handNumber, dealKey: fresh ? `deal-${view.handNumber}` : null, flowerOrder };
   }
-  return seen.current;
+  // The deal and the opening flowers together, the time the room holds play for.
+  const live = useWindow(
+    seen.current.dealKey,
+    DEAL_MS + seen.current.flowerOrder.size * FLOWER_STEP_MS + 700,
+  );
+  return { ...seen.current, live };
 }
 
 /**
@@ -87,6 +98,9 @@ function Rack({
 }) {
   const seat = player.seat;
   const active = view.turn === seat && view.phase === "action";
+  // The hand is only ever sent face up once it is over.
+  const shown = player.hand.some((t) => t.code !== "back");
+  const winner = view.result?.type === "win" && view.result.winner === seat;
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
   // Only the seat to play has a clock running, and only when the table set one.
@@ -107,7 +121,12 @@ function Rack({
 
   return (
     <section
-      className={["rack", active ? "rack--active" : "", deciding ? "rack--deciding" : ""]
+      className={[
+        "rack",
+        active ? "rack--active" : "",
+        deciding ? "rack--deciding" : "",
+        winner ? "rack--winner" : "",
+      ]
         .filter(Boolean)
         .join(" ")}
       style={style}
@@ -132,6 +151,16 @@ function Rack({
         {player.handCount}
       </span>
       <div className="rack__open">
+        {shown ? (
+          <span
+            className={`meld rack__hand${winner ? " rack__hand--winner" : ""}`}
+            aria-label={`${occupantName(player)}'s hand`}
+          >
+            {player.hand.map((t) => (
+              <TileFace key={t.id} code={t.code} size="sm" />
+            ))}
+          </span>
+        ) : null}
         {player.melds.map((meld, i) => (
           <MeldRow key={i} meld={meld} fresh={isFreshClaim(meld, view.lastPlayed?.tile.id)} />
         ))}
@@ -162,24 +191,30 @@ function Rack({
 
 /**
  * A person plays from a phone in their hand; the computer plays from its rack.
- * Away is ignored on purpose: the class swaps the pond's animation, and a
- * swap would replay every tile already in it.
+ * Away is ignored on purpose: a tile already arriving would change how it
+ * arrives halfway through.
  */
 function playsFromPhone(player: PublicPlayer): boolean {
   return player.occupant.kind === "human";
 }
 
-/** A seat's discards, laid in front of them and facing them. */
+/**
+ * A seat's discards, laid in front of them and facing them. The newest tile
+ * on the table stays in the middle until the next one is thrown or it is
+ * claimed, so it is left out here while it is there.
+ */
 function Discards({
   player,
   layout,
   position,
-  lastId,
+  centreId,
+  lit,
 }: {
   player: PublicPlayer;
   layout: TableLayout;
   position: number;
-  lastId: string | undefined;
+  centreId: string | null;
+  lit: boolean;
 }) {
   const style: Vars = {
     ...placementStyle(layout.ponds[position]),
@@ -188,23 +223,82 @@ function Discards({
   };
   return (
     <div
-      className={playsFromPhone(player) ? "discards from-phone" : "discards"}
+      className={lit ? "discards discards--turn" : "discards"}
       style={style}
+      data-seat={player.seat}
       aria-label={`${SEAT_NAMES[player.seat]} discards`}
     >
-      {player.discards.map((t) => (
-        <TileFace
-          key={t.id}
-          code={t.code}
-          size="md"
-          // Drawn in the owner's frame, so "bottom" is always their side.
-          entry="toss"
-          tossFrom="bottom"
-          justDiscarded={t.id === lastId}
-        />
-      ))}
+      {player.discards
+        .filter((t) => t.id !== centreId)
+        .map((t) => (
+          <TileFace key={t.id} code={t.code} size="md" />
+        ))}
     </div>
   );
+}
+
+/**
+ * When the next tile is thrown, the one it replaces in the middle crosses to
+ * its owner's pond, so the eye can follow it there rather than finding it
+ * already filed away.
+ */
+function usePondArrival(
+  felt: RefObject<HTMLDivElement | null>,
+  view: RoomView,
+  position: (seat: Seat) => number,
+) {
+  const previous = useRef<{ id: string; from: Seat; hand: number } | null>(null);
+  const played = view.lastPlayed;
+  const key = played ? played.tile.id : null;
+  const latest = useRef({ view, position });
+  latest.current = { view, position };
+
+  useLayoutEffect(() => {
+    const before = previous.current;
+    const { view, position } = latest.current;
+    previous.current = view.lastPlayed
+      ? { id: view.lastPlayed.tile.id, from: view.lastPlayed.from, hand: view.handNumber }
+      : null;
+    const root = felt.current;
+    if (!root || !before || !key || before.id === key || before.hand !== view.handNumber) return;
+    // A claimed tile went to a set instead; the claim flight shows that.
+    if (!view.players[before.from].discards.some((t) => t.id === before.id)) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+
+    const pond = root.querySelector<HTMLElement>(`.discards[data-seat="${before.from}"]`);
+    const target = pond?.lastElementChild as HTMLElement | null;
+    const middle = root.querySelector<HTMLElement>(".console__middle");
+    const duration = parseFloat(getComputedStyle(root).getPropertyValue("--anim-gather"));
+    if (!target || !middle || !(duration > 0) || typeof target.animate !== "function") return;
+
+    const box = root.getBoundingClientRect();
+    const a = middle.getBoundingClientRect();
+    const b = target.getBoundingClientRect();
+    const turn = POSITION_ROTATION[position(before.from)];
+    const ghost = target.cloneNode(true) as HTMLElement;
+    ghost.classList.add("tile--flying");
+    ghost.style.setProperty("--tile-w", `${target.offsetWidth}px`);
+    ghost.style.left = `${a.left + a.width / 2 - box.left - target.offsetWidth / 2}px`;
+    ghost.style.top = `${a.top + a.height / 2 - box.top - target.offsetHeight / 2}px`;
+    root.appendChild(ghost);
+    target.style.visibility = "hidden";
+
+    const dx = b.left + b.width / 2 - (a.left + a.width / 2);
+    const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const animation = ghost.animate(
+      [
+        { transform: `translate(0, 0) rotate(${turn}deg)` },
+        { transform: `translate(${dx}px, ${dy}px) rotate(${turn}deg)` },
+      ],
+      { duration, easing: "cubic-bezier(0.45, 0, 0.25, 1)", fill: "forwards" },
+    );
+    const land = () => {
+      ghost.remove();
+      target.style.visibility = "";
+    };
+    animation.onfinish = land;
+    animation.oncancel = land;
+  }, [felt, key]);
 }
 
 const MELD_VERB: Record<Meld["type"], string> = {
@@ -460,6 +554,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   const wakeLock = useWakeLock(true);
   const appearance = useAppearance();
   const fullscreen = useFullscreen();
+  const display = useTabletDisplay();
   const felt = useRef<HTMLDivElement>(null);
   const size = useElementSize(felt);
 
@@ -473,18 +568,27 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
     width: size.width,
     height: size.height,
     capacity: Math.max(POND_CAPACITY, ...view.players.map((p) => p.discards.length)),
+    // A hand turned face up at the end needs room on its rack too.
     revealed: bySeatAtPosition((seat) => {
       const p = view.players[seat];
-      return p.melds.reduce((n, m) => n + m.tiles.length, 0) + p.flowers.length;
+      const shown = p.hand.some((t) => t.code !== "back") ? p.hand.length : 0;
+      return p.melds.reduce((n, m) => n + m.tiles.length, 0) + p.flowers.length + shown;
     }),
     groups: bySeatAtPosition((seat) => {
       const p = view.players[seat];
-      return p.melds.length + (p.flowers.length > 0 ? 1 : 0);
+      const shown = p.hand.some((t) => t.code !== "back") ? 1 : 0;
+      return p.melds.length + (p.flowers.length > 0 ? 1 : 0) + shown;
     }),
   });
-  const lastId = view.lastPlayed?.tile.id;
+  const over = view.phase === "handOver" || view.phase === "gameOver";
+  // The tile in the middle; it joins its pond when the next one is thrown.
+  const centreId = !over && view.lastPlayed ? view.lastPlayed.tile.id : null;
   useClaimFlight(felt, view, position);
+  usePondArrival(felt, view, position);
   const opening = useOpening(view);
+  const dealing = useWindow(opening.dealKey, DEAL_MS + 100);
+  const wall = wallGeometry(layout);
+  const brk = wallBreak(position(view.dealer), view.handNumber);
   const won =
     (view.phase === "handOver" || view.phase === "gameOver") && view.result?.type === "win"
       ? view.result
@@ -555,7 +659,13 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
             </button>
           ) : null}
           <SettingsMenu>
-            <TableSettings api={api} view={view} sound={sound} appearance={appearance} />
+            <TableSettings
+              api={api}
+              view={view}
+              sound={sound}
+              appearance={appearance}
+              display={display}
+            />
           </SettingsMenu>
         </div>
       </header>
@@ -564,6 +674,9 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         {/* Nothing is placed until the felt has a size to solve against. */}
         {size.width > 0 ? (
           <>
+            {display.wall === "on" ? (
+              <TableWall geometry={wall} brk={brk} view={view} dealing={opening.live} />
+            ) : null}
             {SEATS.map((seat) => (
               <Rack
                 key={seat}
@@ -580,15 +693,27 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
                 player={view.players[seat]}
                 layout={layout}
                 position={position(seat)}
-                lastId={lastId}
+                centreId={centreId}
+                lit={display.turnGlow === "on" && view.phase === "action" && view.turn === seat}
               />
             ))}
             <Console api={api} view={view} layout={layout} position={position} />
             <DealOverlay
-              dealKey={opening.dealKey}
+              live={dealing}
               layout={layout}
               dealer={view.dealer}
               position={position}
+              origin={(i) => headPoint(wall, brk, i < 12 ? i * 4 : 48 + (i - 12))}
+            />
+            <WallDraws
+              geometry={wall}
+              brk={brk}
+              view={view}
+              rackCentre={(seat) => {
+                const r = layout.racks[position(seat)];
+                return { x: r.cx, y: r.cy };
+              }}
+              enabled={display.wall === "on" && !opening.live}
             />
             <WinOverlay
               winKey={won ? `win-${view.handNumber}` : null}

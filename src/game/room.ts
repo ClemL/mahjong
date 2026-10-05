@@ -618,8 +618,9 @@ function hiddenTiles(seat: number, count: number): Tile[] {
 
 /**
  * The room as one viewer is allowed to see it. Concealed hands and the wall
- * never leave the server: a player sees only their own tiles, and the table
- * device — a screen everyone can see — sees none of them.
+ * never leave the server while a hand is live: a player sees only their own
+ * tiles, and the table device — a screen everyone can see — sees none of them.
+ * When the hand is over, every hand is shown to everyone.
  */
 export function viewFor(room: Room, token: string | null, now = Date.now()): RoomView {
   const you = identify(room, token);
@@ -628,8 +629,11 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
   // Before the deal an unclaimed seat is genuinely open; after it, it is the
   // computer's, though still claimable by a latecomer.
   const playing = room.started;
+  // Once a hand is settled every hand goes face up, as at a real table: there
+  // is nothing left to hide, and the winner's tiles are what everyone wants to see.
+  const settled = state.phase === "handOver" || state.phase === "gameOver";
   const players: PublicPlayer[] = state.players.map((p) => {
-    const own = you.role === "player" && you.seat === p.seat;
+    const own = (you.role === "player" && you.seat === p.seat) || settled;
     return {
       seat: p.seat,
       handCount: p.hand.length,

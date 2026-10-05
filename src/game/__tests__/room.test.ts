@@ -107,6 +107,22 @@ describe("redaction", () => {
     );
   });
 
+  it("shows every hand to everyone once the hand is over, and never before", () => {
+    for (const token of ["tok-0", "tok-table", null]) {
+      expect(viewFor(room, token).players[1].hand.every((t) => t.code === "back")).toBe(true);
+    }
+    room.state = { ...room.state, phase: "handOver" };
+    for (const token of ["tok-0", "tok-table", null]) {
+      const view = viewFor(room, token);
+      for (const player of view.players) {
+        expect(player.hand.map((t) => t.code)).toEqual(
+          room.state.players[player.seat].hand.map((t) => t.code),
+        );
+      }
+      expect(JSON.stringify(view)).not.toContain('"wall"');
+    }
+  });
+
   it("never sends the wall", () => {
     for (const token of ["tok-0", "tok-table", null]) {
       const view = viewFor(room, token);

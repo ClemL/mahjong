@@ -76,10 +76,21 @@ export interface HandRecord {
   scores: number[];
 }
 
+/** A move worth showing in a play log, with the tiles it involved. */
+export interface PlayNote {
+  kind: "discard" | "chow" | "pung" | "kong" | "win";
+  /** The discard, the completed set, or the winning tile. */
+  tiles: TileCode[];
+  hand: number;
+  /** Whose discard a claim or a win took. */
+  from?: Seat;
+}
+
 export interface LogEntry {
   id: number;
   seat: Seat | null;
   text: string;
+  play?: PlayNote;
 }
 
 export interface GameState {
@@ -132,9 +143,18 @@ function clone(state: GameState): GameState {
   return structuredClone(state);
 }
 
-function log(state: GameState, seat: Seat | null, text: string): void {
+function log(
+  state: GameState,
+  seat: Seat | null,
+  text: string,
+  play?: Omit<PlayNote, "hand">,
+): void {
   state.logSeq += 1;
-  state.log.push({ id: state.logSeq, seat, text });
+  state.log.push(
+    play
+      ? { id: state.logSeq, seat, text, play: { ...play, hand: state.handNumber } }
+      : { id: state.logSeq, seat, text },
+  );
   if (state.log.length > 200) state.log.splice(0, state.log.length - 200);
 }
 
@@ -430,7 +450,10 @@ export function discard(previous: GameState, seat: Seat, tileId: string): GameSt
   state.lastDiscard = { tile, from: seat };
   state.drawnTileId = null;
   state.drawWasReplacement = false;
-  log(state, seat, `${SEAT_NAMES[seat]} discards ${tileName(tile.code)}`);
+  log(state, seat, `${SEAT_NAMES[seat]} discards ${tileName(tile.code)}`, {
+    kind: "discard",
+    tiles: [tile.code],
+  });
 
   state.pendingClaims = collectClaims(state, tile, seat);
   state.phase = state.pendingClaims.length > 0 ? "claiming" : "action";
@@ -446,7 +469,10 @@ export function declareConcealedKong(previous: GameState, seat: Seat, code: Tile
   if (!tiles) return state;
   p.hand = removeTiles(p.hand, tiles);
   p.melds.push({ type: "kong", tiles, concealed: true });
-  log(state, seat, `${SEAT_NAMES[seat]} declares a concealed kong of ${tileName(code)}`);
+  log(state, seat, `${SEAT_NAMES[seat]} declares a concealed kong of ${tileName(code)}`, {
+    kind: "kong",
+    tiles: tiles.map((t) => t.code),
+  });
   drawTile(state, seat, true);
   return state;
 }
@@ -476,7 +502,10 @@ export function declareAddedKong(previous: GameState, seat: Seat, code: TileCode
   pung.tiles.push(tiles[0]);
   pung.fromAddedKong = true;
   pung.claimedTileId = tiles[0].id;
-  log(state, seat, `${SEAT_NAMES[seat]} adds to the kong of ${tileName(code)}`);
+  log(state, seat, `${SEAT_NAMES[seat]} adds to the kong of ${tileName(code)}`, {
+    kind: "kong",
+    tiles: pung.tiles.map((t) => t.code),
+  });
   drawTile(state, seat, true);
   return state;
 }
@@ -702,6 +731,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
     state,
     winner.seat,
     `${SEAT_NAMES[winner.seat]} claims ${tileName(tile.code)} for a ${winner.option.type}`,
+    { kind: meld.type, tiles: meld.tiles.map((t) => t.code), from: discarder },
   );
 
   state.lastDiscard = null;
@@ -771,6 +801,11 @@ function settleWin(
     state,
     winner,
     `${SEAT_NAMES[winner]} wins ${score.faan} faan (${value} points) ${selfDrawn ? "self-drawn" : `off ${SEAT_NAMES[from!]}`}`,
+    {
+      kind: "win",
+      tiles: !selfDrawn && state.lastDiscard ? [state.lastDiscard.tile.code] : [],
+      from: selfDrawn ? undefined : (from ?? undefined),
+    },
   );
 }
 

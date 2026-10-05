@@ -137,10 +137,11 @@ describe("PhoneView", () => {
     const view = playerView(room, other);
     const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
+    // Locked, not disabled: a disabled button would swallow the drags that reorder the hand.
     for (const button of handButtons(container)) {
-      expect((button as HTMLButtonElement).disabled).toBe(true);
+      expect(button.getAttribute("aria-disabled")).toBe("true");
     }
-    expect(screen.getByText(`Waiting for ${SEAT_NAMES[room.state.turn]}…`)).toBeTruthy();
+    expect(screen.getByText(`Waiting for ${view.players[room.state.turn].occupant.name}…`)).toBeTruthy();
   });
 
   it("offers the claims on a discard and sends the one chosen", () => {
@@ -160,16 +161,25 @@ describe("PhoneView", () => {
     expect(api.act).toHaveBeenCalledWith({ type: "claim", optionId: option.id });
   });
 
-  it("shows the last discard only when the phone is the whole table", () => {
+  it("shows the newest discard and a play log on the controller", () => {
     const { room, claimer } = claimable();
     const view = playerView(room, claimer);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
 
-    const { container, unmount } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
-    expect(container.querySelector(".phone__discard")).not.toBeNull();
-    unmount();
+    const discard = view.lastDiscard!;
+    expect(container.querySelector(".phone__last")).not.toBeNull();
+    const rows = Array.from(container.querySelectorAll(".playlog__row"));
+    expect(rows.at(-1)!.getAttribute("title")).toBe(
+      `${view.players[discard.from].occupant.name} discarded ${tileName(discard.tile.code)}`,
+    );
+  });
 
-    const landscape = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
-    expect(landscape.container.querySelector(".phone__discard")).toBeNull();
+  it("hides the play log when the phone's settings say so", () => {
+    window.localStorage.setItem("hk-mahjong.play-log", "off");
+    const { view } = onTurn();
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
+    expect(container.querySelector(".playlog")).toBeNull();
+    window.localStorage.removeItem("hk-mahjong.play-log");
   });
 });
 

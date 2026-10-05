@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { RoomView } from "@/game/room";
+import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
+import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { QrCode } from "./QrCode";
@@ -37,6 +38,8 @@ export function TableLobby({
 }) {
   const appearance = useAppearance();
   const layout = useCompactLayout();
+  const tabletDisplay = useTabletDisplay();
+  const phoneDisplay = usePhoneDisplay();
 
   // The join link has to be built in the browser — a statically exported page
   // has no idea what host it will be served from.
@@ -97,7 +100,13 @@ export function TableLobby({
             be settled while people are still sitting down. */}
         <SettingsMenu>
           {isTable ? (
-            <TableSettings api={api} view={view} sound={sound} appearance={appearance} />
+            <TableSettings
+              api={api}
+              view={view}
+              sound={sound}
+              appearance={appearance}
+              display={tabletDisplay}
+            />
           ) : (
             <PhoneSettings
               sound={sound}
@@ -105,6 +114,7 @@ export function TableLobby({
               appearance={appearance}
               // The controller layout only exists once a tablet is the table.
               layout={view.tablePresent ? layout : undefined}
+              display={view.tablePresent ? phoneDisplay : undefined}
               onLeave={() => void api.leave()}
             />
           )}
@@ -143,14 +153,17 @@ export function TableLobby({
                       className="gather__nameinput"
                       value={names[seat] ?? ""}
                       maxLength={16}
-                      placeholder="Name (optional)"
+                      // Nobody sitting here means the computer plays it, under this name.
+                      placeholder={robotName(seat)}
                       aria-label={`Name for seat ${seat + 1}`}
                       autoComplete="off"
                       spellCheck={false}
                       onChange={(e) => setNames((n) => ({ ...n, [seat]: e.target.value }))}
                     />
                   ) : (
-                    <span className="gather__seatname">Waiting…</span>
+                    <span className="gather__seatname gather__seatname--open">
+                      {robotName(seat)}
+                    </span>
                   )}
 
                   <span className="gather__seatmeta">
@@ -330,6 +343,7 @@ function SeatRename({
       value={draft}
       maxLength={16}
       autoFocus
+      placeholder={DEFAULT_NAMES[seat]}
       aria-label={`New name for seat ${seat + 1}`}
       autoComplete="off"
       spellCheck={false}
