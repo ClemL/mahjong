@@ -36,6 +36,17 @@ describe("scoreHand", () => {
     expect(result?.value).toBe(8);
   });
 
+  it("scores nothing for bonus tiles at a table that plays without them", () => {
+    const result = scoreHand(
+      ctx({
+        concealed: tiles("m1 m2 m3 m5 m6 m7 p4 p5 p6 s7 s8 s9 p2 p2"),
+        config: { ...DEFAULT_RULES, flowers: false },
+      }),
+    );
+    expect(keys(result)).toEqual(["allChows", "concealedHand"]);
+    expect(result?.faan).toBe(2);
+  });
+
   it("counts self draw instead of a concealed hand", () => {
     const result = scoreHand(
       ctx({ concealed: tiles("m1 m2 m3 m5 m6 m7 p4 p5 p6 s7 s8 s9 p2 p2"), selfDrawn: true }),

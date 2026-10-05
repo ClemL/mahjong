@@ -16,6 +16,7 @@ import { TableResult } from "./TableResult";
 import { ChipStack, DealOverlay, WinOverlay, chipsOf, useWindow } from "./TableEffects";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
+import { flowersInPlay } from "@/game/rules";
 import { MeldRow, isFreshClaim } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
@@ -574,8 +575,8 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   usePondArrival(felt, view, position);
   const opening = useOpening(view);
   const dealing = useWindow(opening.dealKey, DEAL_MS + 100);
-  const wall = wallGeometry(layout);
-  const brk = wallBreak(position(view.dealer), view.handNumber);
+  const wall = wallGeometry(layout, flowersInPlay(view.config) ? 144 : 136, view.handNumber);
+  const brk = wallBreak(wall, position(view.dealer), view.handNumber);
   const won =
     (view.phase === "handOver" || view.phase === "gameOver") && view.result?.type === "win"
       ? view.result
@@ -669,9 +670,13 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         {/* Nothing is placed until the felt has a size to solve against. */}
         {size.width > 0 ? (
           <>
-            {display.wall === "on" ? (
-              <TableWall geometry={wall} brk={brk} view={view} dealing={opening.live} />
-            ) : null}
+            <TableWall
+              geometry={wall}
+              brk={brk}
+              view={view}
+              opening={opening.live}
+              hidden={display.wall === "off"}
+            />
             {SEATS.map((seat) => (
               <Rack
                 key={seat}

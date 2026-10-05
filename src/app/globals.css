@@ -4070,6 +4070,22 @@ body:has(.app--handset) {
   cursor: grabbing;
 }
 
+/* Turned up by its owner: the face-down row tips over to show the tiles. */
+@keyframes hand-turn-up {
+  from { transform: perspective(700px) rotateX(75deg); opacity: 0.4; }
+  to   { transform: none; opacity: 1; }
+}
+
+.phone__hand:not(.phone__hand--hidden) {
+  animation: hand-turn-up 320ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__hand:not(.phone__hand--hidden) {
+    animation: none;
+  }
+}
+
 /* On your turn a tile can be flicked up off the hand, so the hand keeps every
    direction of a touch that starts on it, upright as well as on its side. */
 .phone__hand--throw {
@@ -4337,6 +4353,23 @@ body:has(.app--handset) {
   --tile-w: inherit;
 }
 
+/* Four tiles lifted off the wall together: two stacks of two, the top pair
+   sitting a little up the screen like the wall's own top layer. */
+.deal__stack--cube {
+  display: grid;
+}
+
+.deal__layer {
+  grid-area: 1 / 1;
+  display: flex;
+  gap: 1px;
+}
+
+.deal__layer--top {
+  transform: translateY(calc(var(--lift) * -1));
+  filter: brightness(1.12);
+}
+
 /* An opening flower is held back until the deal is done, then laid down. */
 @keyframes flower-in {
   0%   { transform: translateY(-18px) scale(1.8); opacity: 0; }
@@ -4594,7 +4627,8 @@ body:has(.app--handset) {
 
   .flower-in,
   .chip-delta,
-  .result-sheet {
+  .result-sheet,
+  .wall__stack--building {
     animation: none;
   }
 }
@@ -4611,22 +4645,58 @@ body:has(.app--handset) {
   opacity: 0.16;
 }
 
+/* Built and dealt from in plain sight when a hand opens, then faded back so
+   it sits under the play. Hidden in the settings, it goes once the deal is done. */
+.wall--opening {
+  opacity: 0.55;
+}
+
+.wall {
+  transition: opacity 900ms ease;
+}
+
+.wall--hidden {
+  opacity: 0;
+}
+
+/* A stack is placed by its centre; its tiles are turned with the wall, and the
+   top one is lifted straight up the screen whatever the wall's angle, which is
+   how a two-high wall reads seen from the side of the table. */
 .wall__stack {
   position: absolute;
+  width: 0;
+  height: 0;
 }
 
 .wall__tile {
   position: absolute;
-  inset: 1px;
+  left: calc(var(--w) / -2);
+  top: calc(var(--h) / -2);
+  width: calc(var(--w) - 2px);
+  height: calc(var(--h) - 2px);
   border-radius: 3px;
   background: linear-gradient(160deg, var(--tile-back), var(--tile-back-2));
   border: 1px solid rgba(0, 0, 0, 0.5);
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  transform: rotate(var(--rot));
 }
 
 .wall__tile--top {
-  transform: translateY(calc(var(--lift) * -1));
+  transform: translateY(calc(var(--lift) * -1)) rotate(var(--rot));
   background: linear-gradient(160deg, color-mix(in srgb, var(--tile-back) 80%, white), var(--tile-back));
+}
+
+/* Pushed out of the heap in the middle to its place in the wall. */
+@keyframes wall-build {
+  0%   { transform: translate(var(--heap-x), var(--heap-y)) rotate(var(--heap-spin)); opacity: 0; }
+  15%  { opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+
+.wall__stack--building {
+  animation-name: wall-build;
+  animation-timing-function: cubic-bezier(0.3, 0.1, 0.25, 1);
+  animation-fill-mode: backwards;
 }
 
 @keyframes wall-leave {

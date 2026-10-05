@@ -12,11 +12,16 @@ export function Choice<T extends string>({
   options,
   value,
   onChange,
+  disabled = false,
+  note,
 }: {
   label: string;
   options: ChoiceOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  disabled?: boolean;
+  /** Said in place of the active option's hint — why it cannot be changed now, say. */
+  note?: string;
 }) {
   const active = options.find((o) => o.value === value);
   return (
@@ -29,6 +34,7 @@ export function Choice<T extends string>({
             type="button"
             className={`choice__btn${option.value === value ? " choice__btn--on" : ""}`}
             aria-pressed={option.value === value}
+            disabled={disabled}
             title={option.hint}
             onClick={() => onChange(option.value)}
           >
@@ -36,7 +42,7 @@ export function Choice<T extends string>({
           </button>
         ))}
       </div>
-      {active ? <span className="choice__hint">{active.hint}</span> : null}
+      {note || active ? <span className="choice__hint">{note ?? active!.hint}</span> : null}
     </div>
   );
 }

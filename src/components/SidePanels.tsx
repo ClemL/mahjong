@@ -2,7 +2,7 @@
 
 import type { GameState } from "@/game/engine";
 import { SEAT_NAMES, type Seat, tileGlyph, seatWind } from "@/game/tiles";
-import { DEFAULT_RULES, type RuleConfig, ruleNotes } from "@/game/rules";
+import { DEFAULT_RULES, type RuleConfig, flowersInPlay, ruleNotes } from "@/game/rules";
 
 export function ScorePanel({ state }: { state: GameState }) {
   return (
@@ -65,6 +65,14 @@ export function RulesPanel({ config }: { config: RuleConfig }) {
   );
 }
 
+/** Rows that only count when the bonus tiles are in the set. */
+const BONUS_ROWS = new Set([
+  "Own Flower or Season (each)",
+  "No Bonus Tiles",
+  "Complete Set of Flowers or Seasons",
+  "All Eight Bonus Tiles",
+]);
+
 const FAAN_ROWS: [string, string, number][] = [
   ["平糊", "All Sequences", DEFAULT_RULES.faan.allChows],
   ["自摸", "Self Draw", DEFAULT_RULES.faan.selfDraw],
@@ -112,7 +120,7 @@ export function FaanPanel({ config }: { config: RuleConfig }) {
             </tr>
           </thead>
           <tbody>
-            {FAAN_ROWS.map(([chinese, name, faan]) => (
+            {FAAN_ROWS.filter(([, name]) => flowersInPlay(config) || !BONUS_ROWS.has(name)).map(([chinese, name, faan]) => (
               <tr key={name}>
                 <td>
                   {chinese} · {name}

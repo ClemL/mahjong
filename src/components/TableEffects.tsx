@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
-import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS } from "@/game/room";
+import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS, WALL_BUILD_MS } from "@/game/room";
 import type { Seat } from "@/game/tiles";
 import { createRng } from "@/game/rng";
 import { STARTING_CHIPS } from "@/game/rules";
@@ -52,8 +52,9 @@ export function ChipStack({ count, label }: { count: number; label?: string }) {
 }
 
 /**
- * The deal, played out on the felt: stacks of tile backs leave the middle for
- * each rack in turn, dealer first — three rounds of four, then one each — so
+ * The deal, played out on the felt once the wall is built: cubes of tile
+ * backs — two stacks of two, as they are lifted off a wall — leave it for each
+ * rack in turn, dealer first, three rounds of four and then one each, so
  * thirteen tiles are seen arriving in front of every player.
  */
 export function DealOverlay({
@@ -71,6 +72,7 @@ export function DealOverlay({
   origin: (stack: number) => { x: number; y: number };
 }) {
   if (!live) return null;
+  const tile = Math.round(layout.tile * 0.8);
   const stacks = Array.from({ length: DEAL_STACKS }, (_, i) => {
     const seat = ((dealer + (i % 4)) % 4) as Seat;
     const pos = position(seat);
@@ -78,15 +80,16 @@ export function DealOverlay({
     const from = origin(i);
     return {
       i,
-      size: i < 12 ? 4 : 1,
+      cube: i < 12,
       style: {
         left: from.x,
         top: from.y,
         "--dx": `${rack.cx - from.x}px`,
         "--dy": `${rack.cy - from.y}px`,
         "--turn": `${POSITION_ROTATION[pos]}deg`,
-        "--tile-w": `${Math.round(layout.tile * 0.8)}px`,
-        animationDelay: `${i * DEAL_STEP_MS}ms`,
+        "--tile-w": `${tile}px`,
+        "--lift": `${Math.round(tile * 0.3)}px`,
+        animationDelay: `${WALL_BUILD_MS + i * DEAL_STEP_MS}ms`,
         animationDuration: `${DEAL_FLIGHT_MS}ms`,
       } as Vars,
     };
@@ -94,10 +97,21 @@ export function DealOverlay({
   return (
     <div className="deal" aria-hidden>
       {stacks.map((s) => (
-        <span key={s.i} className="deal__stack" style={s.style}>
-          {Array.from({ length: s.size }, (_, k) => (
-            <span key={k} className="tile tile--back deal__tile" />
-          ))}
+        <span key={s.i} className={s.cube ? "deal__stack deal__stack--cube" : "deal__stack"} style={s.style}>
+          {s.cube ? (
+            <>
+              <span className="deal__layer">
+                <span className="tile tile--back deal__tile" />
+                <span className="tile tile--back deal__tile" />
+              </span>
+              <span className="deal__layer deal__layer--top">
+                <span className="tile tile--back deal__tile" />
+                <span className="tile tile--back deal__tile" />
+              </span>
+            </>
+          ) : (
+            <span className="tile tile--back deal__tile" />
+          )}
         </span>
       ))}
     </div>

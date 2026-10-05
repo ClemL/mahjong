@@ -29,6 +29,13 @@ export const DEFAULT_PREFERENCES: Preferences = {
 
 const STORAGE_KEY = "hk-mahjong.prefs";
 
+/**
+ * Stamped on every save. Builds before version 2 wrote their 0 faan default
+ * alongside whatever was actually changed, so a minimum stored by one of them
+ * is not a choice anybody made, and the current default replaces it.
+ */
+const PREFS_VERSION = 2;
+
 function pick<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
 }
@@ -38,7 +45,10 @@ export function normalizePreferences(raw: unknown): Preferences {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
   const d = DEFAULT_PREFERENCES;
   return {
-    minFaan: pick(r.minFaan, MIN_FAAN_CHOICES as readonly number[], d.minFaan),
+    minFaan:
+      r.version === PREFS_VERSION
+        ? pick(r.minFaan, MIN_FAAN_CHOICES as readonly number[], d.minFaan)
+        : d.minFaan,
     speed: pick<Speed>(r.speed as Speed, ["slow", "normal", "fast"], d.speed),
     showHints: typeof r.showHints === "boolean" ? r.showHints : d.showHints,
     muted: typeof r.muted === "boolean" ? r.muted : d.muted,
@@ -62,7 +72,7 @@ export function readPreferences(): Preferences {
 
 function writePreferences(prefs: Preferences): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...prefs, version: PREFS_VERSION }));
   } catch {
     // A preference that cannot be saved still applies for this session.
   }

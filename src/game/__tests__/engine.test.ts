@@ -6,6 +6,7 @@ import {
   discard,
   nextHand,
   resolveClaims,
+  setFlowers,
   setMinFaan,
   turnActions,
 } from "../engine";
@@ -33,10 +34,10 @@ function allTiles(state: GameState): Tile[] {
   ];
 }
 
-function expectTileConservation(state: GameState): void {
+function expectTileConservation(state: GameState, count = 144): void {
   const tiles = allTiles(state);
-  expect(tiles).toHaveLength(144);
-  expect(new Set(tiles.map((t) => t.id)).size).toBe(144);
+  expect(tiles).toHaveLength(count);
+  expect(new Set(tiles.map((t) => t.id)).size).toBe(count);
 }
 
 describe("dealing", () => {
@@ -210,6 +211,39 @@ describe("turn actions", () => {
       before.players.map((p) => p.hand.length),
     );
     expect(setMinFaan(after, 0)).toBe(after);
+  });
+});
+
+describe("playing without flowers", () => {
+  const FLOWER_KEYS = ["noBonus", "ownFlower", "ownSeason", "flowerSet", "seasonSet", "allEightBonus"];
+
+  it("deals from 136 tiles with no bonus tiles in them", () => {
+    const state = createGame({ seed: 4, config: { ...DEFAULT_RULES, flowers: false } });
+    expectTileConservation(state, 136);
+    expect(allTiles(state).some((t) => isFlower(t.code))).toBe(false);
+  });
+
+  it("plays 60 hands to completion with nothing scored for bonus tiles", () => {
+    for (let seed = 0; seed < 60; seed++) {
+      const game = createGame({ seed, config: { ...DEFAULT_RULES, flowers: false } });
+      for (const p of game.players) p.isHuman = false;
+      const { state } = autoPlayHand(game, createRng(seed * 31 + 7));
+      expect(state.phase, `seed ${seed} stalled`).toBe("handOver");
+      expectTileConservation(state, 136);
+      expect(state.players.every((p) => p.flowers.length === 0)).toBe(true);
+      const hit = state.result?.score?.patterns.find((p) => FLOWER_KEYS.includes(p.key));
+      expect(hit, `seed ${seed} scored ${hit?.key}`).toBeUndefined();
+    }
+  });
+
+  it("takes effect from the next deal", () => {
+    const before = createGame({ seed: 8 });
+    const after = setFlowers(before, false);
+    expect(after.config.flowers).toBe(false);
+    expect(before.config.flowers).toBe(true);
+    expectTileConservation(after, 144);
+    const next = nextHand({ ...after, phase: "handOver", result: { type: "washout", winner: null, from: null, score: null, payments: [0, 0, 0, 0], dealerKeeps: true } });
+    expectTileConservation(next, 136);
   });
 });
 

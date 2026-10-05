@@ -19,7 +19,7 @@ import {
 } from "./tiles";
 import type { Meld } from "./melds";
 import { type Decomposition, analyzeShape } from "./winning";
-import type { RuleConfig } from "./rules";
+import { type RuleConfig, flowersInPlay } from "./rules";
 
 export interface PatternHit {
   key: string;
@@ -83,6 +83,8 @@ function allTileCodes(sets: SetUnit[], pair: TileCode): TileCode[] {
 }
 
 function scoreFlowers(ctx: WinContext, hits: PatternHit[]): void {
+  // Without bonus tiles in the set there is nothing to score — not even for having none.
+  if (!flowersInPlay(ctx.config)) return;
   const codes = ctx.flowers.map((t) => t.code);
   const hasAllFlowers = FLOWER_SET.every((c) => codes.includes(c));
   const hasAllSeasons = SEASON_SET.every((c) => codes.includes(c));

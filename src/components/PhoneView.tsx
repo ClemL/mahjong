@@ -176,8 +176,13 @@ export function PhoneView({
     const timer = window.setTimeout(() => setFlung(null), 3000);
     return () => window.clearTimeout(timer);
   }, [flung]);
-  // Face down for when the phone is set on the table or someone is looking over.
-  const [hidden, setHidden] = useState(false);
+  // Face down for when the phone is set on the table or someone is looking
+  // over — and at every deal, so a hand is turned up by its owner, not
+  // shown to whoever is next to the phone when the tiles arrive.
+  const [hidden, setHidden] = useState(true);
+  useEffect(() => {
+    setHidden(true);
+  }, [view.handNumber]);
   const keepAwake = useKeepAwake();
   const rootRef = useRef<HTMLDivElement>(null);
   const [sent, setSent] = useState<Sent | null>(null);

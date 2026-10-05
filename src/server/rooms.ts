@@ -33,6 +33,7 @@ import {
   declareSelfDraw,
   discard,
   nextHand,
+  setFlowers,
   setMinFaan,
   startHand,
 } from "@/game/engine";
@@ -255,6 +256,7 @@ export type TableCommand =
   | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
+  | { type: "flowers"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
@@ -323,6 +325,14 @@ export async function control(
         break;
       case "minFaan":
         r.state = setMinFaan(r.state, command.value);
+        break;
+      // The tile set is fixed when a hand is dealt, so it can only change
+      // between hands: before the first, or once one is over.
+      case "flowers":
+        if (r.started && r.state.phase !== "handOver" && r.state.phase !== "gameOver") {
+          throw new RoomError("Flowers can be changed between hands", 409);
+        }
+        r.state = setFlowers(r.state, command.value === true);
         break;
       case "speed":
         if (!SPEED_LEVELS.some((s) => s.level === command.value)) {
