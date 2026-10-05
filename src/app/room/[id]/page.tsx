@@ -11,6 +11,7 @@ import { FullRoomView } from "@/components/FullRoomView";
 import { ResumeGate } from "@/components/ResumeGate";
 import { RegroupBanner } from "@/components/RegroupBanner";
 import { primeAudio } from "@/game/sound";
+import { readPreferences } from "@/hooks/usePreferences";
 import type { Seat } from "@/game/tiles";
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
@@ -23,6 +24,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // Set while a scanned seat code is being redeemed, so the seat picker does
   // not flash up on the way to the chair the scan already chose.
   const [joining, setJoining] = useState<Seat | null>(null);
+  const [joiningTable, setJoiningTable] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
   const claim = useCallback(
@@ -48,12 +50,38 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // again.
   const redeemed = useRef(false);
   useEffect(() => {
-    if (redeemed.current || !view || view.you.role !== "spectator") return;
+    if (redeemed.current || !view) return;
     const url = new URL(window.location.href);
     const asked = url.searchParams.get("seat");
     if (asked === null) return;
 
     redeemed.current = true;
+    // Already sitting somewhere: the link has nothing to add, and must not
+    // fire later if this device leaves its seat.
+    if (view.you.role !== "spectator") {
+      url.searchParams.delete("seat");
+      url.searchParams.delete("name");
+      window.history.replaceState(null, "", url.pathname + url.search);
+      return;
+    }
+    if (asked === "table") {
+      url.searchParams.delete("seat");
+      window.history.replaceState(null, "", url.pathname + url.search);
+      if (view.tablePresent) {
+        setJoinError(
+          "The table is already open on another device. Reset the table below if that device has gone.",
+        );
+        return;
+      }
+      setJoiningTable(true);
+      void claim("table", "")
+        // The start page's house minimum goes onto a table that has not dealt
+        // yet; once tiles are out, the table's own settings are the ones to use.
+        .then(() => (view.started ? undefined : api.control({ type: "minFaan", value: readPreferences().minFaan })))
+        .catch((error: Error) => setJoinError(error.message))
+        .finally(() => setJoiningTable(false));
+      return;
+    }
     const name = url.searchParams.get("name") ?? "";
     url.searchParams.delete("seat");
     url.searchParams.delete("name");
@@ -68,7 +96,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     void claim(seat as Seat, name)
       .catch((error: Error) => setJoinError(error.message))
       .finally(() => setJoining(null));
-  }, [view, claim]);
+  }, [view, claim, api]);
 
   if (!view) {
     return (
@@ -79,10 +107,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   }
 
   if (view.you.role === "spectator") {
-    if (joining !== null) {
+    if (joining !== null || joiningTable) {
       return (
         <main className="app">
-          <div className="panel">Taking seat {joining + 1}…</div>
+          <div className="panel">
+            {joiningTable ? "Opening the table…" : `Taking seat ${(joining ?? 0) + 1}…`}
+          </div>
         </main>
       );
     }
