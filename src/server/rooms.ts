@@ -5,6 +5,7 @@ import {
   type Room,
   type RoomView,
   drain,
+  grantMoreTime,
   hasAnyPlayer,
   identify,
   isHumanSeat,
@@ -167,6 +168,7 @@ export type PlayerAction =
   | { type: "kong"; kind: "concealed" | "added"; code: string }
   | { type: "win" }
   | { type: "claim"; optionId: string | null }
+  | { type: "moreTime" }
   | { type: "leave" };
 
 export async function act(id: string, token: string, action: PlayerAction): Promise<RoomView> {
@@ -194,6 +196,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
         throw new RoomError("That claim is not available", 409);
       }
       r.claimResponses[String(seat)] = action.optionId;
+      return;
+    }
+
+    // Returns before the clock is restarted below: the extra time is added to
+    // the turn already running, not a fresh one.
+    if (action.type === "moreTime") {
+      const refused = grantMoreTime(r, seat);
+      if (refused) throw new RoomError(refused, 409);
       return;
     }
 

@@ -70,7 +70,7 @@ function Rack({
     ? "deciding…"
     : active
       ? left !== null
-        ? `to play · ${Math.ceil(left / 1000)}s`
+        ? `to play · ${Math.ceil(left / 1000)}s${view.turnExtended ? " · more time" : ""}`
         : "to play"
       : player.occupant.away
         ? "away"
