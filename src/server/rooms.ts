@@ -8,6 +8,7 @@ import {
   grantMoreTime,
   hasAnyPlayer,
   identify,
+  seatName,
   isHumanSeat,
   mayDeal,
   mayRegroup,
@@ -154,7 +155,7 @@ export async function claimSeat(
     if (occupant.kind === "human") throw new RoomError("That seat is taken", 409);
     r.seats[input.seat] = {
       kind: "human",
-      name: (input.name ?? "").trim().slice(0, 16) || `Seat ${input.seat + 1}`,
+      name: seatName(input.name, input.seat),
       token,
       lastSeen: now,
     };
@@ -257,12 +258,14 @@ export type TableCommand =
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
   | { type: "freeSeat"; seat: Seat }
+  | { type: "rename"; seat: Seat; name: string }
   | { type: "forcePass" };
 
 /**
  * Commands the table device issues. The one exception is the opening deal,
  * which a seated player may press when there is no tablet in the room —
- * otherwise a group playing on phones alone could never start.
+ * otherwise a group playing on phones alone could never start. A seated
+ * player may also rename their own chair.
  */
 export async function control(
   id: string,
@@ -274,7 +277,8 @@ export async function control(
     if (isTable) r.table!.lastSeen = now;
     else if (
       !(command.type === "deal" && mayDeal(r, token)) &&
-      !(command.type === "regroup" && mayRegroup(r, token))
+      !(command.type === "regroup" && mayRegroup(r, token)) &&
+      !(command.type === "rename" && identify(r, token).seat === command.seat)
     ) {
       throw new RoomError("Not the table", 403);
     }
@@ -342,6 +346,12 @@ export async function control(
         r.seats[command.seat] = { kind: "open" };
         syncSeats(r);
         break;
+      case "rename": {
+        const occupant = r.seats[command.seat];
+        if (occupant?.kind !== "human") throw new RoomError("Nobody is sitting there", 409);
+        occupant.name = seatName(command.name, command.seat);
+        break;
+      }
       case "forcePass":
         for (const claim of r.state.pendingClaims) {
           if (isHumanSeat(r, claim.seat) && !(String(claim.seat) in r.claimResponses)) {
