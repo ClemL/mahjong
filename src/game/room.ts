@@ -50,6 +50,33 @@ export const SPEED_LEVELS = [
 
 export type SpeedLevel = (typeof SPEED_LEVELS)[number]["level"];
 
+/**
+ * The tablet deals each hand on screen — 13 tiles to every seat in stacks of
+ * four from the middle — then lays the opening flowers down one at a time.
+ * Play holds until it has finished, so nobody's first move lands on top of it.
+ */
+export const DEAL_STEP_MS = 220;
+/** Sixteen stacks: three rounds of four tiles to each seat, then one each. */
+export const DEAL_STACKS = 16;
+/** How long one stack takes to reach its rack. */
+export const DEAL_FLIGHT_MS = 650;
+export const DEAL_MS = DEAL_STEP_MS * (DEAL_STACKS - 1) + DEAL_FLIGHT_MS;
+export const FLOWER_STEP_MS = 700;
+
+/**
+ * The first turn of a hand runs longer: everyone is looking at their tiles
+ * for the first time, the dealer included.
+ */
+export const OPENING_TURN_BONUS_MS = 60_000;
+
+/** Who sits in each chair when nobody typed a name. */
+export const DEFAULT_NAMES = ["Calvin", "Louis", "Hanna", "Clem"] as const;
+
+/** A computer seat goes by the chair's name, so it reads as a player and not a slot. */
+export function robotName(seat: Seat): string {
+  return `Robot ${DEFAULT_NAMES[seat]}`;
+}
+
 /** Seconds a person may take over a discard before the table makes it; 0 is no limit. */
 export const TURN_LIMITS = [0, 15, 30, 60, 120] as const;
 
@@ -184,6 +211,8 @@ export interface RoomView {
   turnDeadlineIn: number | null;
   /** The person on turn has already had their extra time this turn. */
   turnExtended: boolean;
+  /** The whole of the current turn's time, extra time and the opening minute included; 0 is no limit. */
+  turnAllowance: number;
 }
 
 const HIDDEN: TileCode = "back";
@@ -244,8 +273,30 @@ export function startPlay(room: Room, now = Date.now()): void {
   room.claimResponses = {};
   room.claimDeadline = null;
   room.state = startHand(room.state);
-  room.lastStepAt = now;
+  beginHand(room, now);
   syncSeats(room, now);
+}
+
+/** How long the table needs to show a fresh deal and its opening flowers. */
+export function openingHoldMs(room: Room): number {
+  // Only the tablet animates the deal; phones on their own go straight in.
+  if (!room.table) return 0;
+  const flowers = room.state.players.reduce((n, p) => n + p.flowers.length, 0);
+  return DEAL_MS + flowers * FLOWER_STEP_MS;
+}
+
+/** A hand has just been dealt: the clock starts once the table has shown it. */
+export function beginHand(room: Room, now = Date.now()): void {
+  room.lastStepAt = now + openingHoldMs(room);
+}
+
+/** No tile has been thrown yet this hand: the dealer's first turn. */
+export function isOpeningTurn(state: GameState): boolean {
+  return (
+    state.phase === "action" &&
+    state.turn === state.dealer &&
+    state.players.every((p) => p.discards.length === 0 && p.melds.every((m) => m.concealed))
+  );
 }
 
 /** Back to the gathering screen with the same people, ready to deal again. */
@@ -285,7 +336,11 @@ export function turnExtended(room: Room): boolean {
 export function turnAllowanceMs(room: Room): number {
   const limit = room.settings.turnLimit * 1000;
   if (limit <= 0) return 0;
-  return limit + (turnExtended(room) ? MORE_TIME_MS : 0);
+  return (
+    limit +
+    (turnExtended(room) ? MORE_TIME_MS : 0) +
+    (isOpeningTurn(room.state) ? OPENING_TURN_BONUS_MS : 0)
+  );
 }
 
 /**
@@ -300,9 +355,9 @@ export function grantMoreTime(room: Room, seat: Seat): string | null {
   return null;
 }
 
-/** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's number. */
+/** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's default. */
 export function seatName(name: string | undefined, seat: Seat): string {
-  return (name ?? "").trim().slice(0, 16) || `Seat ${seat + 1}`;
+  return (name ?? "").trim().slice(0, 16) || DEFAULT_NAMES[seat];
 }
 
 /** True when a seated player has gone quiet for long enough to be counted away. */
@@ -544,13 +599,16 @@ export function openClaimWindow(room: Room, now = Date.now()): void {
  */
 function occupantSummary(
   occupant: Occupant,
+  seat: Seat,
   playing: boolean,
   now: number,
 ): PublicPlayer["occupant"] {
   if (occupant.kind === "human") {
     return { kind: "human", name: occupant.name, away: isAway(occupant, now) };
   }
-  return { kind: playing ? "ai" : "open", name: null, away: false };
+  return playing
+    ? { kind: "ai", name: robotName(seat), away: false }
+    : { kind: "open", name: null, away: false };
 }
 
 /** Opaque stand-ins for tiles the viewer is not entitled to see. */
@@ -579,7 +637,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       melds: p.melds,
       flowers: p.flowers,
       discards: p.discards,
-      occupant: occupantSummary(room.seats[p.seat], playing, now),
+      occupant: occupantSummary(room.seats[p.seat], p.seat, playing, now),
     };
   });
 
@@ -640,6 +698,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         ? Math.max(0, room.lastStepAt + turnAllowanceMs(room) - now)
         : null,
     turnExtended: turnExtended(room),
+    turnAllowance: turnAllowanceMs(room),
   };
 }
 

@@ -75,10 +75,10 @@ describe("claiming seats", () => {
     await expect(claimSeat(id, { seat: "table" })).rejects.toMatchObject({ status: 409 });
   });
 
-  it("falls back to a seat label when no name is given", async () => {
+  it("falls back to the chair's default name when no name is given", async () => {
     const id = await room();
     const { view } = await claimSeat(id, { seat: 3, name: "   " });
-    expect(view.players[3].occupant.name).toBe("Seat 4");
+    expect(view.players[3].occupant.name).toBe("Clem");
   });
 });
 
@@ -236,13 +236,13 @@ describe("table control", () => {
 
   it("lets the table rename any seated chair, and only a seated one", async () => {
     const id = await room();
-    await claimSeat(id, { seat: 2, name: "Seat 3" });
+    await claimSeat(id, { seat: 2, name: "Teja" });
     const { token } = await claimSeat(id, { seat: "table" });
     const view = await control(id, token, { type: "rename", seat: 2, name: "A very long name indeed" });
     expect(view.players[2].occupant.name).toBe("A very long name");
-    // A blank name falls back to the chair's number rather than an empty card.
+    // A blank name falls back to the chair's default rather than an empty card.
     expect((await control(id, token, { type: "rename", seat: 2, name: " " })).players[2].occupant.name).toBe(
-      "Seat 3",
+      "Hanna",
     );
     await expect(control(id, token, { type: "rename", seat: 3, name: "Ghost" })).rejects.toMatchObject({
       status: 409,

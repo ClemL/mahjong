@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { SEAT_IDLE_MS, drain } from "@/game/room";
+import { SEAT_IDLE_MS, drain, robotName } from "@/game/room";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
 import { TableTop } from "../TableTop";
 import { NAMES, claimable, dealt, fakeApi, sound, tableView } from "./fixtures";
@@ -45,7 +45,7 @@ describe("TableTop", () => {
     expect(racks(container).map((r) => r.getAttribute("aria-label"))).toEqual(
       view.players.map(
         (p) =>
-          `${SEAT_NAMES[p.seat]}: ${p.seat === 0 || p.seat === 2 ? NAMES[p.seat] : "Computer"}, ${p.handCount} tiles in hand`,
+          `${SEAT_NAMES[p.seat]}: ${p.seat === 0 || p.seat === 2 ? NAMES[p.seat] : robotName(p.seat)}, ${p.handCount} tiles in hand`,
       ),
     );
     const dealerRack = racks(container)[view.dealer];
@@ -64,6 +64,39 @@ describe("TableTop", () => {
     );
   });
 
+  it("shows each seat's chips, starting from 100", () => {
+    feltSize();
+    const view = tableView(dealt([0, 2]));
+    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    expect(racks(container).map((r) => r.querySelector(".chipstack__count")!.textContent)).toEqual(
+      view.scores.map((s) => String(100 + s)),
+    );
+  });
+
+  it("names the winner and lists the faan their hand scored", () => {
+    feltSize();
+    const view = tableView(dealt([0, 2]));
+    const score = {
+      faan: 4,
+      scoredFaan: 4,
+      value: 16,
+      limitReached: false,
+      patterns: [
+        { key: "allPungs", chinese: "對對糊", name: "All Pungs", faan: 3 },
+        { key: "dragon", chinese: "中", name: "Red Dragon", faan: 1 },
+      ],
+    };
+    const over = {
+      ...view,
+      phase: "handOver" as const,
+      result: { type: "win" as const, winner: 2 as const, from: 1 as const, score, payments: [0, -16, 16, 0], dealerKeeps: false },
+    };
+    const { container } = render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
+    expect(container.querySelector(".console__headline")!.textContent).toBe(`${NAMES[2]} wins`);
+    const rows = Array.from(container.querySelectorAll(".faan-list__row")).map((r) => r.textContent);
+    expect(rows).toEqual(["All Pungs 對對糊3", "Red Dragon 中1", "Total4"]);
+  });
+
   it("never draws a concealed tile, only counts", () => {
     feltSize();
     const view = tableView(dealt());
@@ -74,8 +107,9 @@ describe("TableTop", () => {
       (n, p) => n + p.discards.length + p.flowers.length + p.melds.reduce((m, meld) => m + meld.tiles.length, 0),
       0,
     );
-    expect(container.querySelectorAll(".felt .tile")).toHaveLength(open);
-    expect(container.querySelector(".felt .tile--back")).toBeNull();
+    // The deal animation's stacks are tile backs with nothing behind them.
+    expect(container.querySelectorAll(".felt .tile:not(.deal__tile)")).toHaveLength(open);
+    expect(container.querySelector(".felt .tile--back:not(.deal__tile)")).toBeNull();
     for (const [i, rack] of racks(container).entries()) {
       expect(rack.querySelector(".rack__count")!.textContent).toBe(String(view.players[i].handCount));
     }
@@ -165,7 +199,7 @@ describe("TableTop", () => {
     expect(fresh[0].querySelector(".meld__tag")!.textContent).toBe("Pung 碰");
     expect(fresh[0].querySelector(".meld__taken")!.getAttribute("title")).toBe(tileName(discard.tile.code));
     expect(container.querySelector(".console__caption")!.textContent).toBe(
-      `${SEAT_NAMES[discard.from]} · ${tileName(discard.tile.code)} · punged by ${SEAT_NAMES[claimer]}`,
+      `${view.players[discard.from].occupant.name} · ${tileName(discard.tile.code)} · punged by ${view.players[claimer].occupant.name}`,
     );
   });
 });

@@ -4,7 +4,7 @@ import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } fr
 import type { ClaimOption } from "@/game/engine";
 import { MORE_TIME_MS, type RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
-import { SEAT_NAMES, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
@@ -14,6 +14,7 @@ import { useHandOrder } from "@/hooks/useHandOrder";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
+import { ChipStack, Confetti, chipsOf, confettiCount } from "./TableEffects";
 import type { SoundToggle } from "./TableView";
 import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
@@ -261,13 +262,23 @@ export function PhoneView({
       .filter(Boolean)
       .join(" ");
 
+  const result = view.result;
+  const over = view.phase === "handOver" || view.phase === "gameOver";
+  // What this hand paid or cost you, shown beside the chips once it is settled.
+  const settled = over && result ? (result.payments[seat] ?? 0) : null;
+  const youWon = over && result?.type === "win" && result.winner === seat && result.score;
+  const nameOf = (s: Seat) => view.players[s].occupant.name ?? SEAT_NAMES[s];
+  const winText =
+    result?.type === "win" && result.winner !== null && result.score
+      ? `${result.winner === seat ? "You win" : `${nameOf(result.winner)} wins`} with ${result.score.scoredFaan} faan.`
+      : "Washed-out hand.";
   let prompt: string;
-  if (view.phase === "gameOver") prompt = "The round is over.";
-  else if (view.phase === "handOver") prompt = "Hand finished — the table deals the next one.";
-  else if (view.claim) prompt = `${SEAT_NAMES[view.lastDiscard!.from]} discarded ${tileName(view.lastDiscard!.tile.code)}`;
+  if (view.phase === "gameOver") prompt = `${winText} The round is over.`;
+  else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
+  else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
   else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;
   else if (yourTurn) prompt = "Your turn — discard a tile.";
-  else prompt = `Waiting for ${SEAT_NAMES[view.turn]}…`;
+  else prompt = `Waiting for ${nameOf(view.turn)}…`;
 
   // The newest discard at the table, with the wind of whoever threw it — just
   // enough to know what went out without looking up at the shared screen.
@@ -275,17 +286,18 @@ export function PhoneView({
   const lastPlayed = played ? (
     <span
       className="phone__last"
-      title={`Last played: ${tileName(played.tile.code)} from ${SEAT_NAMES[played.from]}`}
+      title={`Last played: ${tileName(played.tile.code)} from ${nameOf(played.from)}`}
     >
       <span className="phone__last-from" aria-hidden>
         {tileGlyph(seatWind(played.from))}
       </span>
       <TileFace key={played.tile.id} code={played.tile.code} size="sm" entry="toss" tossFrom="top" />
-      <span className="sr-only">from {SEAT_NAMES[played.from]}</span>
+      <span className="sr-only">from {nameOf(played.from)}</span>
     </span>
   ) : null;
 
-  const allowance = view.settings.turnLimit * 1000 + (view.turnExtended ? MORE_TIME_MS : 0);
+  const allowance =
+    view.turnAllowance || view.settings.turnLimit * 1000 + (view.turnExtended ? MORE_TIME_MS : 0);
   const timerStyle: CSSProperties & { "--left": number } = {
     "--left": turnLeft !== null ? Math.min(1, turnLeft / allowance) : 1,
   };
@@ -372,13 +384,28 @@ export function PhoneView({
           <span className="phone__wind" aria-hidden>
             {tileGlyph(seatWind(seat))}
           </span>
-          {/* The wind glyph says it already; compact keeps the name for screen readers only. */}
-          <span className={compact ? "sr-only" : undefined}>{SEAT_NAMES[seat]}</span>
+          <span className="phone__name">{nameOf(seat)}</span>
+          {/* The wind glyph says it already; compact keeps the wind's name for screen readers only. */}
+          <span className={compact ? "sr-only" : undefined}> · {SEAT_NAMES[seat]}</span>
           {view.dealer === seat ? " · dealer" : ""}
         </span>
-        <span className="phone__score">
-          {view.scores[seat] > 0 ? `+${view.scores[seat]}` : view.scores[seat]}
-        </span>
+        {view.tablePresent ? (
+          <span className="phone__score phone__chips">
+            <ChipStack count={chipsOf(view.scores[seat])} label="Your chips" />
+            {settled !== null && settled !== 0 ? (
+              <span
+                key={`delta-${view.handNumber}`}
+                className={`chip-delta ${settled > 0 ? "chip-delta--up" : "chip-delta--down"}`}
+              >
+                {settled > 0 ? `+${settled}` : settled}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="phone__score">
+            {view.scores[seat] > 0 ? `+${view.scores[seat]}` : view.scores[seat]}
+          </span>
+        )}
         <span className="phone__wall">{view.wallCount} left</span>
         {/* Compact folds the last tile, the prompt and the open melds into this one line. */}
         {compact ? lastPlayed : null}
@@ -547,6 +574,15 @@ export function PhoneView({
           )}
         </div>
       </div>
+      {landscape && youWon && result?.score ? (
+        <Confetti
+          key={`confetti-${view.handNumber}`}
+          count={confettiCount(result.score.scoredFaan)}
+          seed={view.handNumber * 7919 + seat}
+          spread={260}
+          style={{ left: "50%", top: "45%" }}
+        />
+      ) : null}
       {sent ? (
         <span
           key={sent.id}

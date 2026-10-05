@@ -21,7 +21,7 @@ function touchScreen() {
 
 /** The seat name beside the wind glyph in the header bar. */
 function seatName(container: HTMLElement) {
-  return container.querySelector(".phone__seat > span:not(.phone__wind)") as HTMLElement;
+  return container.querySelector(".phone__seat > span:not(.phone__wind):not(.phone__name)") as HTMLElement;
 }
 
 function handButtons(container: HTMLElement) {
@@ -47,7 +47,8 @@ describe("PhoneView", () => {
       view.drawnTileId ? 1 : 0,
     );
     expect(screen.getByText("Your turn — discard a tile.")).toBeTruthy();
-    expect(seatName(container).textContent).toBe(SEAT_NAMES[seat]);
+    expect(seatName(container).textContent).toBe(` · ${SEAT_NAMES[seat]}`);
+    expect(container.querySelector(".phone__name")!.textContent).toBe(view.players[seat].occupant.name);
   });
 
   it("discards on a double-click with a mouse, never a single one", () => {
@@ -149,7 +150,9 @@ describe("PhoneView", () => {
     render(<PhoneView api={api} view={view} sound={sound} />);
 
     const discard = view.lastDiscard!;
-    expect(screen.getByText(`${SEAT_NAMES[discard.from]} discarded ${tileName(discard.tile.code)}`)).toBeTruthy();
+    expect(
+      screen.getByText(`${view.players[discard.from].occupant.name} discarded ${tileName(discard.tile.code)}`),
+    ).toBeTruthy();
     const group = screen.getByRole("group", { name: `Claim ${tileName(discard.tile.code)}?` });
     const option = view.claim!.options[0];
 
