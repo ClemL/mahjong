@@ -222,6 +222,33 @@ describe("table control", () => {
     );
   });
 
+  it("lets a player rename their own chair but nobody else's", async () => {
+    const id = await room();
+    const mine = (await claimSeat(id, { seat: 0, name: "Chris" })).token;
+    await claimSeat(id, { seat: 1, name: "Srini" });
+    const view = await control(id, mine, { type: "rename", seat: 0, name: "  Kris  " });
+    expect(view.players[0].occupant.name).toBe("Kris");
+    await expect(control(id, mine, { type: "rename", seat: 1, name: "Nope" })).rejects.toMatchObject({
+      status: 403,
+    });
+    expect((await readRoom(id, null)).players[1].occupant.name).toBe("Srini");
+  });
+
+  it("lets the table rename any seated chair, and only a seated one", async () => {
+    const id = await room();
+    await claimSeat(id, { seat: 2, name: "Seat 3" });
+    const { token } = await claimSeat(id, { seat: "table" });
+    const view = await control(id, token, { type: "rename", seat: 2, name: "A very long name indeed" });
+    expect(view.players[2].occupant.name).toBe("A very long name");
+    // A blank name falls back to the chair's number rather than an empty card.
+    expect((await control(id, token, { type: "rename", seat: 2, name: " " })).players[2].occupant.name).toBe(
+      "Seat 3",
+    );
+    await expect(control(id, token, { type: "rename", seat: 3, name: "Ghost" })).rejects.toMatchObject({
+      status: 409,
+    });
+  });
+
   it("restarts back to the lobby while keeping everyone seated", async () => {
     const { id, table } = await dealtRoom([0]);
     await claimSeat(id, { seat: 1, name: "Kris" });
