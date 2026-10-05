@@ -53,6 +53,17 @@ describe("TableTop", () => {
     expect(container.querySelectorAll(".seat__badge")).toHaveLength(1);
   });
 
+  it("drops a person's discards in from their phone and a computer's from its rack", () => {
+    feltSize();
+    const view = tableView(dealt([0, 2]));
+    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    const ponds = Array.from(container.querySelectorAll(".discards"));
+    expect(ponds.map((p) => p.classList.contains("from-phone"))).toEqual(
+      view.players.map((p) => p.seat === 0 || p.seat === 2),
+    );
+  });
+
   it("never draws a concealed tile, only counts", () => {
     feltSize();
     const view = tableView(dealt());

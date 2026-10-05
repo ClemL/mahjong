@@ -127,6 +127,15 @@ function Rack({
   );
 }
 
+/**
+ * A person plays from a phone in their hand; the computer plays from its rack.
+ * Away is ignored on purpose: the class swaps the pond's animation, and a
+ * swap would replay every tile already in it.
+ */
+function playsFromPhone(player: PublicPlayer): boolean {
+  return player.occupant.kind === "human";
+}
+
 /** A seat's discards, laid in front of them and facing them. */
 function Discards({
   player,
@@ -145,7 +154,11 @@ function Discards({
     gap: layout.gap,
   };
   return (
-    <div className="discards" style={style} aria-label={`${SEAT_NAMES[player.seat]} discards`}>
+    <div
+      className={playsFromPhone(player) ? "discards from-phone" : "discards"}
+      style={style}
+      aria-label={`${SEAT_NAMES[player.seat]} discards`}
+    >
       {player.discards.map((t) => (
         <TileFace
           key={t.id}
@@ -369,7 +382,11 @@ function Console({
           {played ? (
             <>
               <span
-                className="console__spot"
+                className={
+                  playsFromPhone(view.players[played.from])
+                    ? "console__spot from-phone"
+                    : "console__spot"
+                }
                 key={played.tile.id}
                 style={{ transform: `rotate(${POSITION_ROTATION[position(played.from)]}deg)` }}
               >
