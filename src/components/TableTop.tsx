@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type RefObject, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
@@ -12,7 +12,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
-import { FaanBreakdown } from "./FaanBreakdown";
+import { TableResult } from "./TableResult";
 import { ChipStack, DealOverlay, WinOverlay, chipsOf, useWindow } from "./TableEffects";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
@@ -426,15 +426,16 @@ function useClaimFlight(
  * as the ponds — the middle says which tile, not that it matters more.
  */
 function Console({
-  api,
   view,
   layout,
   position,
+  sheetOpen,
 }: {
-  api: RoomApi;
   view: RoomView;
   layout: TableLayout;
   position: (seat: Seat) => number;
+  /** The full result is laid over the felt, so the middle need not repeat it through it. */
+  sheetOpen: boolean;
 }) {
   const style: Vars = {
     ...placementStyle(layout.console),
@@ -473,34 +474,20 @@ function Console({
       )}
 
       {over ? (
-        <div className="console__result" role="status">
-          {view.result?.type === "win" && view.result.winner !== null && view.result.score ? (
+        // The full account is laid over the felt; the middle keeps the gist
+        // for when that is put aside.
+        <div className="console__result" role="status" hidden={sheetOpen}>
+          {view.result?.type === "win" && view.result.winner !== null ? (
             <>
               <strong className="console__headline">
                 {occupantName(view.players[view.result.winner])} wins
               </strong>
-              <span className="seat__meta">
-                {view.result.from === null
-                  ? "self-drawn 自摸"
-                  : `off ${occupantName(view.players[view.result.from])}`}{" "}
-                · +{view.result.payments[view.result.winner]} chips
-              </span>
-              <FaanBreakdown score={view.result.score} />
+              {view.result.score ? (
+                <span className="seat__meta">{view.result.score.scoredFaan} faan</span>
+              ) : null}
             </>
           ) : (
             <strong className="console__headline">Washed-out hand 流局</strong>
-          )}
-          {view.phase === "handOver" ? (
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={api.busy}
-              onClick={() => void api.control({ type: "nextHand" })}
-            >
-              Next hand
-            </button>
-          ) : (
-            <span className="seat__meta">Round complete — Restart to play again</span>
           )}
         </div>
       ) : (
@@ -593,6 +580,9 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
     (view.phase === "handOver" || view.phase === "gameOver") && view.result?.type === "win"
       ? view.result
       : null;
+  // The result sheet can be put aside to look at the table; the next hand brings it back.
+  const [asideHand, setAsideHand] = useState<number | null>(null);
+  const sheetOpen = over && view.result !== null && asideHand !== view.handNumber;
 
   return (
     <div className="tabletop">
@@ -613,6 +603,11 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         ) : null}
         <span className="topbar__spacer" />
         <div className="actions">
+          {over && !sheetOpen && view.result ? (
+            <button type="button" className="btn btn--sm" onClick={() => setAsideHand(null)}>
+              Result
+            </button>
+          ) : null}
           {view.phase === "handOver" ? (
             <button
               type="button"
@@ -697,7 +692,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
                 lit={display.turnGlow === "on" && view.phase === "action" && view.turn === seat}
               />
             ))}
-            <Console api={api} view={view} layout={layout} position={position} />
+            <Console view={view} layout={layout} position={position} sheetOpen={sheetOpen} />
             <DealOverlay
               live={dealing}
               layout={layout}
@@ -715,6 +710,15 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
               }}
               enabled={display.wall === "on" && !opening.live}
             />
+            {sheetOpen ? (
+              <TableResult
+                api={api}
+                view={view}
+                name={(seat) => occupantName(view.players[seat])}
+                tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
+                onHide={() => setAsideHand(view.handNumber)}
+              />
+            ) : null}
             <WinOverlay
               winKey={won ? `win-${view.handNumber}` : null}
               layout={layout}

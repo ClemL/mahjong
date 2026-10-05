@@ -65,6 +65,40 @@ describe("PhoneView", () => {
     });
   });
 
+  it("throws a tile flicked up off the hand, and only on your turn", () => {
+    touchScreen();
+    const { room, seat, view } = onTurn();
+    const api = fakeApi(view);
+    const { container } = render(<PhoneView api={api} view={view} sound={sound} />);
+    const tile = handButtons(container)[2];
+    const flick = (dy: number) => {
+      fireEvent.pointerDown(tile, { pointerId: 1, clientX: 100, clientY: 300 });
+      fireEvent.pointerMove(tile, { pointerId: 1, clientX: 102, clientY: 300 + dy / 2 });
+      fireEvent.pointerMove(tile, { pointerId: 1, clientX: 104, clientY: 300 + dy });
+      fireEvent.pointerUp(tile, { pointerId: 1, clientX: 104, clientY: 300 + dy });
+      fireEvent.click(tile);
+    };
+
+    // A short nudge settles back and arms nothing.
+    flick(-14);
+    expect(api.act).not.toHaveBeenCalled();
+    expect(tile.className).not.toContain("tile--armed");
+
+    flick(-120);
+    expect(api.act).toHaveBeenCalledWith({ type: "discard", tileId: tile.dataset.tileId });
+    expect(tile.className).toContain("tile--flung");
+
+    // Off turn, the same movement is only a drag along the rack.
+    const other = playerView(room, ((seat + 1) % 4) as Seat);
+    const offApi = fakeApi(other);
+    const { container: off } = render(<PhoneView api={offApi} view={other} sound={sound} />);
+    const theirs = handButtons(off)[2];
+    fireEvent.pointerDown(theirs, { pointerId: 2, clientX: 100, clientY: 300 });
+    fireEvent.pointerMove(theirs, { pointerId: 2, clientX: 100, clientY: 180 });
+    fireEvent.pointerUp(theirs, { pointerId: 2, clientX: 100, clientY: 180 });
+    expect(offApi.act).not.toHaveBeenCalled();
+  });
+
   it("arms a tile on the first tap and throws it on the second", () => {
     touchScreen();
     const { view } = onTurn();

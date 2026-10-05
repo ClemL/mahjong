@@ -163,3 +163,37 @@ export function completesHand(concealed: TileCode[], melds: Meld[], tile: TileCo
 export function waitingTiles(concealed: TileCode[], melds: Meld[]): TileCode[] {
   return PLAYABLE_CODES.filter((code) => completesHand(concealed, melds, code));
 }
+
+/** A finished hand's concealed tiles as they would be laid out to claim the win. */
+export interface WinningLayout {
+  sets: ConcealedSet[];
+  pair: TileCode | null;
+  /** Tiles that do not split into sets — a special hand, shown as it stands. */
+  loose: TileCode[];
+}
+
+/**
+ * Lay the concealed part of a winning hand out as sets and a pair. When it
+ * splits more than one way, the reading that matches what was scored is used:
+ * the chow reading for an All Sequences hand, the pung reading otherwise, since
+ * that is the one the scorer prefers whenever it is worth more.
+ */
+export function arrangeWinningHand(
+  concealed: TileCode[],
+  melds: Meld[],
+  preferChows = false,
+): WinningLayout {
+  const shape = analyzeShape(concealed, melds);
+  if (!shape || shape.special) {
+    const loose = [...concealed].sort(
+      (a, b) => (CODE_INDEX.get(a) ?? 99) - (CODE_INDEX.get(b) ?? 99),
+    );
+    return { sets: [], pair: null, loose };
+  }
+  const chows = (d: Decomposition) => d.sets.filter((s) => s.type === "chow").length;
+  let best = shape.decompositions[0];
+  for (const d of shape.decompositions) {
+    if (preferChows ? chows(d) > chows(best) : chows(d) < chows(best)) best = d;
+  }
+  return { sets: best.sets, pair: best.pair, loose: [] };
+}

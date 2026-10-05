@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SEAT_IDLE_MS, drain, robotName } from "@/game/room";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
@@ -124,6 +124,42 @@ describe("TableTop", () => {
     expect(rows).toEqual(["All Pungs 對對糊3", "Red Dragon 中1", "Total4"]);
   });
 
+  it("lays the result over the felt, the winning hand in its sets, and can be put aside", () => {
+    feltSize();
+    const view = tableView(dealt([0, 2]));
+    const hand = "m1 m2 m3 m4 m5 m6 p1 p2 p3 s7 s8 s9 dr dr".split(" ").map((code, i) => ({ id: `w${i}`, code }));
+    const players = view.players.map((p) => (p.seat === 2 ? { ...p, hand, handCount: 14, melds: [], flowers: [] } : p));
+    const over = {
+      ...view,
+      players,
+      phase: "handOver" as const,
+      result: { type: "win" as const, winner: 2 as const, from: null, score: null, payments: [-8, -8, 24, -8], dealerKeeps: false },
+    };
+    const { container } = render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
+
+    const sheet = screen.getByRole("dialog", { name: "Hand result" });
+    expect(within(sheet).getByRole("heading", { level: 2 }).textContent).toBe(`${NAMES[2]} wins 食糊`);
+    const groups = Array.from(sheet.querySelectorAll(".result-hand__group"));
+    expect(groups.map((g) => g.querySelector(".result-hand__label")!.textContent)).toEqual([
+      "Chow",
+      "Chow",
+      "Chow",
+      "Chow",
+      "Pair",
+    ]);
+    expect(groups.map((g) => g.querySelectorAll(".tile").length)).toEqual([3, 3, 3, 3, 2]);
+    expect(
+      Array.from(sheet.querySelectorAll(".result-chips__delta")).map((d) => d.textContent),
+    ).toEqual(["-8", "-8", "+24", "-8"]);
+    // The middle of the felt keeps only the gist.
+    expect(container.querySelector(".console__result .faan-list")).toBeNull();
+
+    fireEvent.click(within(sheet).getByRole("button", { name: "See the table" }));
+    expect(screen.queryByRole("dialog", { name: "Hand result" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Result" }));
+    expect(screen.getByRole("dialog", { name: "Hand result" })).toBeTruthy();
+  });
+
   it("never draws a concealed tile, only counts", () => {
     feltSize();
     const view = tableView(dealt());
@@ -193,7 +229,7 @@ describe("TableTop", () => {
     expect(result.textContent).toMatch(view.result!.type === "win" ? / wins/ : /Washed-out hand/);
     expect(container.querySelector(".console__wind")).toBeNull();
 
-    // Both the bar and the console offer the next hand.
+    // Both the bar and the result laid over the felt offer the next hand.
     const next = screen.getAllByRole("button", { name: "Next hand" });
     expect(next).toHaveLength(2);
     fireEvent.click(next[1]);

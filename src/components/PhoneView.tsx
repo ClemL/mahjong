@@ -24,6 +24,10 @@ import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
 const DRAG_THRESHOLD = 10;
+/** A tile pulled this far up and let go is thrown, as a share of its height. */
+const FLICK_REACH = 0.9;
+/** Or one let go moving up at least this fast, in pixels a millisecond: a quick flick travels less. */
+const FLICK_SPEED = 0.45;
 
 const KEEP_AWAKE_KEY = "hk-mahjong.keepAwake";
 
@@ -76,6 +80,29 @@ function offsetWithin(el: HTMLElement, box: HTMLElement): { x: number; y: number
     node = parent;
   }
   return node === box ? { x, y } : null;
+}
+
+/** How far an element is turned on screen, in radians, by the transforms above it. */
+function screenAngle(node: Element | null): number {
+  let angle = 0;
+  for (let n = node; n; n = n.parentElement) {
+    const m = /matrix\(([^)]+)\)/.exec(getComputedStyle(n).transform);
+    if (m) {
+      const [a, b] = m[1].split(",").map(Number);
+      angle += Math.atan2(b, a);
+    }
+  }
+  return angle;
+}
+
+/**
+ * A movement on screen in the controller's own frame. Turned on its side, the
+ * controller's "up" is across the glass, and a throw has to be read that way.
+ */
+function intoFrame(dx: number, dy: number, angle: number): { x: number; y: number } {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos };
 }
 
 /** A discard on its way from this phone up to the table. */
@@ -141,6 +168,14 @@ export function PhoneView({
   // A tile is armed by the first tap or click and thrown by the second, so a
   // double-click or double-tap discards and a single stray touch never does.
   const [armed, setArmed] = useState<string | null>(null);
+  // A flicked tile stays out of sight until the table takes it from the hand —
+  // or, if the throw never arrives, comes back after a moment.
+  const [flung, setFlung] = useState<string | null>(null);
+  useEffect(() => {
+    if (flung === null) return;
+    const timer = window.setTimeout(() => setFlung(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [flung]);
   // Face down for when the phone is set on the table or someone is looking over.
   const [hidden, setHidden] = useState(false);
   const keepAwake = useKeepAwake();
@@ -152,6 +187,7 @@ export function PhoneView({
     // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
     setPreview(null);
+    setFlung(null);
   }, [view.turn, view.handNumber, view.phase]);
 
   // The first touch asks for full screen. It cannot be asked for without one,
@@ -166,15 +202,26 @@ export function PhoneView({
   const yourTurn = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
   const turnLeft = useCountdown(yourTurn ? view.turnDeadlineIn : null);
 
-  // ---- dragging tiles into your own order --------------------------------
+  // ---- dragging tiles into your own order, or flicking one away ---------
   const handRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ id: string; x: number; y: number; pointerId: number; active: boolean } | null>(
-    null,
-  );
+  const drag = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    pointerId: number;
+    /** Undecided until the finger has travelled; then sideways rearranges, upwards throws. */
+    mode: "press" | "reorder" | "flick";
+    angle: number;
+    el: HTMLElement;
+    /** Where the tile has been pulled to, newest last, for how fast it was let go. */
+    trail: { x: number; y: number; t: number }[];
+  } | null>(null);
   // A drag ends with the finger lifting over a tile; that must not also count
   // as a tap on it.
   const justDragged = useRef(false);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [flicking, setFlicking] = useState<string | null>(null);
+  const canThrow = Boolean(yourTurn) && !api.busy;
 
   const displayIds = () => [...order.tiles.map((t) => t.id), ...(order.drawn ? [order.drawn.id] : [])];
 
@@ -182,18 +229,39 @@ export function PhoneView({
     justDragged.current = false;
     const el = (e.target as Element).closest<HTMLElement>("[data-tile-id]");
     if (!el?.dataset.tileId) return;
-    drag.current = { id: el.dataset.tileId, x: e.clientX, y: e.clientY, pointerId: e.pointerId, active: false };
+    drag.current = {
+      id: el.dataset.tileId,
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+      mode: "press",
+      angle: screenAngle(handRef.current),
+      el,
+      trail: [],
+    };
   };
 
   const onHandPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    if (!d.active) {
-      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_THRESHOLD) return;
-      d.active = true;
-      setDragging(d.id);
+    const moved = intoFrame(e.clientX - d.x, e.clientY - d.y, d.angle);
+    if (d.mode === "press") {
+      if (Math.hypot(moved.x, moved.y) < DRAG_THRESHOLD) return;
+      // Mostly upwards on your turn is a throw at the table; any other way,
+      // or when it is not yours to throw, is moving the tile along the rack.
+      d.mode = canThrow && -moved.y > Math.abs(moved.x) ? "flick" : "reorder";
       setArmed(null);
-      handRef.current?.setPointerCapture(e.pointerId);
+      handRef.current?.setPointerCapture?.(e.pointerId);
+      if (d.mode === "flick") setFlicking(d.id);
+      else setDragging(d.id);
+    }
+    if (d.mode === "flick") {
+      // The tile follows the finger up, and only a little sideways.
+      const at = { x: moved.x * 0.35, y: Math.min(0, moved.y) };
+      d.trail = [...d.trail.slice(-5), { ...at, t: e.timeStamp }];
+      d.el.style.setProperty("--flick-x", `${at.x}px`);
+      d.el.style.setProperty("--flick-y", `${at.y}px`);
+      return;
     }
     // Whichever tile's centre is nearest the finger is where this one goes.
     // Measured on screen, so it holds when the whole controller is turned on
@@ -221,17 +289,38 @@ export function PhoneView({
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || d.pointerId !== e.pointerId) return;
-    if (d.active) {
+    if (d.mode !== "press") {
       justDragged.current = true;
-      handRef.current?.releasePointerCapture(e.pointerId);
+      handRef.current?.releasePointerCapture?.(e.pointerId);
+    }
+    if (d.mode === "flick") {
+      const last = d.trail[d.trail.length - 1] ?? { x: 0, y: 0, t: e.timeStamp };
+      const first = d.trail.find((p) => last.t - p.t <= 120) ?? last;
+      const speed = last.t > first.t ? (first.y - last.y) / (last.t - first.t) : 0;
+      const reach = Math.max(36, d.el.offsetHeight * FLICK_REACH);
+      const thrown =
+        e.type === "pointerup" && canThrow && (-last.y >= reach || (speed >= FLICK_SPEED && -last.y >= 16));
+      d.el.style.removeProperty("--flick-x");
+      d.el.style.removeProperty("--flick-y");
+      if (thrown) {
+        discard(d.id, last);
+      } else if (last.x !== 0 || last.y !== 0) {
+        // Not far or fast enough: it settles back into the rack.
+        d.el.animate?.([{ translate: `${last.x}px ${last.y}px` }, { translate: "0px 0px" }], {
+          duration: 180,
+          easing: "ease-out",
+        });
+      }
     }
     drag.current = null;
     setDragging(null);
+    setFlicking(null);
   };
 
   // With a tablet on the table the discard is seen leaving the phone, thrown
-  // up off the top edge towards the table, where it lands a moment later.
-  const discard = (tileId: string) => {
+  // up off the top edge towards the table, where it lands a moment later. A
+  // flicked tile leaves from wherever the finger let it go.
+  const discard = (tileId: string, from: { x: number; y: number } = { x: 0, y: 0 }) => {
     setArmed(null);
     const root = rootRef.current;
     const el = handRef.current?.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`);
@@ -239,8 +328,16 @@ export function PhoneView({
     const at = root && el ? offsetWithin(el, root) : null;
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (landscape && tile && el && at && !still) {
-      setSent({ id: tileId, code: tile.code, ...at, w: el.offsetWidth, h: el.offsetHeight });
+      setSent({
+        id: tileId,
+        code: tile.code,
+        x: at.x + from.x,
+        y: at.y + from.y,
+        w: el.offsetWidth,
+        h: el.offsetHeight,
+      });
     }
+    if (from.x !== 0 || from.y !== 0) setFlung(tileId);
     void api.act({ type: "discard", tileId });
   };
 
@@ -261,6 +358,8 @@ export function PhoneView({
       armed === tileId ? "tile--armed" : "",
       using.has(tileId) ? "tile--uses" : "",
       dragging === tileId ? "tile--dragging" : "",
+      flicking === tileId ? "tile--flicking" : "",
+      flung === tileId ? "tile--flung" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -506,7 +605,13 @@ export function PhoneView({
       ) : (
         <div
           ref={handRef}
-          className={`phone__hand${dragging ? " phone__hand--dragging" : ""}`}
+          className={[
+            "phone__hand",
+            dragging ? "phone__hand--dragging" : "",
+            canThrow ? "phone__hand--throw" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
           onPointerDown={onHandPointerDown}
           onPointerMove={onHandPointerMove}
           onPointerUp={endDrag}
