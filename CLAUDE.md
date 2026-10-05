@@ -79,7 +79,8 @@ public/updates.txt Changelog, oldest first
 * **Test the engine, not the pixels.** New rules need a unit test; the fuzz test in
   `engine.test.ts` asserts the invariants that matter — all 144 tiles accounted for, hand sizes
   matching the melds exposed, every chow a real run, scores zero-sum.
-* **Verify UI work in a real browser.** The React layer has no automated coverage yet. Every UI bug
+* **Verify UI work in a real browser.** Component tests (`src/components/__tests__/*.test.tsx`, jsdom
+  + Testing Library) cover behavior, not layout or rendering. Every UI bug
   found so far — a double discard, a broken mobile grid, an invisible suit mark — was caught by
   driving the built app in Chromium, not by the test suite. Do that before claiming a UI change works.
 * **Before writing chart code, load the `dataviz` skill and run its palette validator** against the
