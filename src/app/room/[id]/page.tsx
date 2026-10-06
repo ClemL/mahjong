@@ -13,10 +13,12 @@ import { RegroupBanner } from "@/components/RegroupBanner";
 import { primeAudio } from "@/game/sound";
 import { readPreferences } from "@/hooks/usePreferences";
 import type { Seat } from "@/game/tiles";
+import { TABLES, findTable, tableName } from "@/game/tables";
 
 export default function RoomPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const roomId = id.toUpperCase();
+  // TABLE1 and lower case land on the same table — and the same stored seat.
+  const roomId = findTable(id)?.id ?? id.toUpperCase();
   const api = useRoom(roomId);
   const { view } = api;
   const sound = useRoomSound(view);
@@ -99,9 +101,25 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   }, [view, claim, api]);
 
   if (!view) {
+    // A mistyped or out-of-date link should still lead somewhere.
+    const known = findTable(roomId) !== null;
     return (
       <main className="app">
-        <div className="panel">{api.error ?? `Looking for room ${roomId}…`}</div>
+        <div className="panel">
+          {known ? (api.error ?? `Looking for ${tableName(roomId)}…`) : `There is no table called ${id}.`}
+          {known ? null : (
+            <p className="seat__meta">
+              Go to{" "}
+              {TABLES.map((t, i) => (
+                <span key={t.id}>
+                  {i > 0 ? (i === TABLES.length - 1 ? " or " : ", ") : null}
+                  <a href={`/room/${t.id}`}>{t.name}</a>
+                </span>
+              ))}
+              , or back to the <a href="/">start page</a>.
+            </p>
+          )}
+        </div>
       </main>
     );
   }

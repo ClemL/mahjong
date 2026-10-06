@@ -8,6 +8,7 @@ import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { MIN_FAAN_CHOICES, flowersInPlay } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 import { QrCode } from "./QrCode";
 import { positionOf } from "./tableLayout";
 import { SettingsMenu } from "./SettingsMenu";
@@ -51,7 +52,7 @@ export function TableLobby({
   // somebody scans it, so there is nothing to reserve.
   const [names, setNames] = useState<Record<number, string>>({});
 
-  // One open table, so the link is just its address — there is no key to carry
+  // An open table, so the link is just its address — there is no key to carry
   // and nothing to type once it has been scanned.
   const joinUrl = origin ? `${origin}/room/${view.roomId}` : null;
 
@@ -73,7 +74,7 @@ export function TableLobby({
     <div className="gather__join">
       {joinUrl ? (
         <>
-          <QrCode value={joinUrl} label={`Join the ${view.roomId} table`} />
+          <QrCode value={joinUrl} label={`Join ${tableName(view.roomId)}`} />
           <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
           <span className="gather__hint">No camera? Open that address and take a seat.</span>
         </>
@@ -90,6 +91,8 @@ export function TableLobby({
           <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
         ) : null}
         <p className="gather__lead">
+          {/* Three tables can be gathering at once; say which one this is. */}
+          <strong>{tableName(view.roomId)}.</strong>{" "}
           {isTable
             ? "Scan the code on the chair you are sitting in. Type a name into it first and it arrives with them. Nothing is dealt until the table deals."
             : view.canDeal
@@ -115,6 +118,7 @@ export function TableLobby({
               // The controller layout only exists once a tablet is the table.
               layout={view.tablePresent ? layout : undefined}
               display={view.tablePresent ? phoneDisplay : undefined}
+              table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
             />
           )}

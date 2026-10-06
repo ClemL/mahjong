@@ -5,6 +5,7 @@ import type { ClaimOption } from "@/game/engine";
 import { MORE_TIME_MS, type RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
@@ -585,6 +586,7 @@ export function PhoneView({
               layout={landscape ? layout : undefined}
               display={landscape ? display : undefined}
               sort={order}
+              table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
             />
           </SettingsMenu>

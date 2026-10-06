@@ -5,6 +5,7 @@ import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useElementSize } from "@/hooks/useElementSize";
@@ -588,7 +589,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   return (
     <div className="tabletop">
       <header className="tabletop__bar">
-        <span className="tableview__code">Room {view.roomId}</span>
+        <span className="tableview__code">{tableName(view.roomId)}</span>
         <span className="stat__value">
           {tileGlyph(view.roundWind)} East · hand {view.handNumber}
         </span>

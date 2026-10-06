@@ -40,18 +40,19 @@ import {
   startHand,
 } from "@/game/engine";
 import type { Seat } from "@/game/tiles";
+import { TABLES, findTable } from "@/game/tables";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
 /**
- * One table, no password.
+ * Three fixed tables, no password.
  *
- * There is a single room rather than a code per game: everyone goes to the
- * same place and takes a seat. Anyone who can reach the URL can sit down, so
- * this suits a group who already share the link and not much else — the rate
+ * Rooms are not made up per game: there are Table 1, 2 and 3, and everyone
+ * goes to one and takes a seat. Anyone who can reach the URL can sit down, so
+ * this suits groups who already share the link and not much else — the rate
  * limiter is what stops seat-grabbing, not authentication.
  */
-export const FIXED_ROOM_ID = "TABLE";
+export const FIXED_ROOM_ID = TABLES[0].id;
 
 /** Flip to true, and set MAHJONG_ROOM_PASSWORD, to ask for a password again. */
 const REQUIRE_PASSWORD = false;
@@ -76,17 +77,18 @@ export function multiplayerEnabled(): boolean {
 }
 
 /**
- * Load the one room, opening it the first time anyone arrives. It opens in its
+ * Load a table, opening it the first time anyone arrives. It opens in its
  * lobby with nothing dealt, so everybody who turns up starts the same hand.
  * `create` is NX, so two people opening the page together cannot both win —
  * the loser simply reads what the winner wrote.
  */
 async function load(id: string): Promise<Room> {
-  if (id.toUpperCase() !== FIXED_ROOM_ID) throw new RoomError("No such room", 404);
-  const existing = await roomStore().get(FIXED_ROOM_ID);
+  const table = findTable(id);
+  if (!table) throw new RoomError("No such table", 404);
+  const existing = await roomStore().get(table.id);
   if (existing) return normalizeRoom(existing);
-  await roomStore().create(newRoom(FIXED_ROOM_ID));
-  const room = await roomStore().get(FIXED_ROOM_ID);
+  await roomStore().create(newRoom(table.id));
+  const room = await roomStore().get(table.id);
   if (!room) throw new RoomError("Could not open the table", 500);
   return room;
 }

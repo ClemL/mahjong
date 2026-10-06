@@ -74,3 +74,4 @@
 2026-10-06T12:00:00Z - Claims are asked one player at a time, strongest first: a win, then a pung or kong, and only then a chow — nobody is offered a chow a pung could still take
 2026-10-06T12:00:00Z - "Waiting for…" names whoever is deciding on a claim, not just whose turn it is
 2026-10-06T12:00:00Z - Your turn and your claim decisions light your phone and your rack on the table in the same gold
+2026-10-06T11:11:55Z - Three multiplayer tables: pick Table 1, 2 or 3 on the start page (with who is already at each); Multiplayer, Tablet mode and Reset follow the choice, and every screen names its table
