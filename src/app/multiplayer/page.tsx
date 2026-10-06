@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { FIXED_ROOM_ID } from "@/server/rooms";
 
-/** There is one table, so there is nothing to choose here. */
+/** The old way in, from before there were three tables; it still goes where it always went. */
 export default function MultiplayerPage() {
   redirect(`/room/${FIXED_ROOM_ID}`);
 }

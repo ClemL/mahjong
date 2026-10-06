@@ -2,6 +2,7 @@
 
 import type { PublicPlayer, RoomView } from "@/game/room";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 import { TileBack, TileFace } from "./TileView";
 import { MeldRow, isFreshClaim } from "./SeatPanel";
 
@@ -126,7 +127,7 @@ export function TableView({ view }: { view: RoomView }) {
   return (
     <div className="tableview">
       <header className="tableview__bar">
-        <span className="tableview__code">Room {view.roomId}</span>
+        <span className="tableview__code">{tableName(view.roomId)}</span>
         <span className="stat__value">
           {tileGlyph(view.roundWind)} East · hand {view.handNumber}
         </span>

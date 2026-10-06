@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 
 interface Props {
   view: RoomView;
@@ -34,9 +35,9 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
 
   return (
     <div className="lobby">
-      <h1 className="lobby__title">Take a seat</h1>
+      <h1 className="lobby__title">Take a seat at {tableName(view.roomId)}</h1>
       <p className="lobby__lead">
-        Everyone plays at the same table. Any seat still open when the table deals is played by
+        Everyone here plays at the same table. Any seat still open when the table deals is played by
         the computer, and the tablet in the middle takes the Table seat.
       </p>
 
@@ -132,7 +133,7 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
             onClick={() => {
               if (
                 confirm(
-                  "Reset the table? Everyone at it — the players and the table screen — goes back to choosing a seat, and the scores and house rules go back to the defaults.",
+                  `Reset ${tableName(view.roomId)}? Everyone at it — the players and the table screen — goes back to choosing a seat, and the scores and house rules go back to the defaults.`,
                 )
               ) {
                 onReset();

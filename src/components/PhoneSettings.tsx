@@ -58,6 +58,7 @@ export function PhoneSettings({
   layout,
   display,
   sort,
+  table,
   onLeave,
 }: {
   sound: SoundToggle;
@@ -71,6 +72,8 @@ export function PhoneSettings({
   display?: PhoneDisplay;
   /** How the hand is laid out; absent where there is no hand yet. */
   sort?: HandOrder;
+  /** Which of the tables this phone is at, e.g. "Table 2". */
+  table?: string;
   /** Give up the seat. */
   onLeave?: () => void;
 }) {
@@ -128,7 +131,7 @@ export function PhoneSettings({
                   onClick={() => {
                     if (
                       confirm(
-                        "Leave the table? The computer plays your seat from here, and this phone goes back to choosing a seat.",
+                        `Leave ${table ?? "the table"}? The computer plays your seat from here, and this phone goes back to choosing a seat.`,
                       )
                     ) {
                       onLeave();
@@ -139,7 +142,8 @@ export function PhoneSettings({
                 </button>
               </div>
               <span className="choice__hint">
-                The computer takes over your hand; anyone can sit back down in it
+                {table ? `You are at ${table}. ` : null}The computer takes over your hand; anyone
+                can sit back down in it
               </span>
             </div>
           ) : null}

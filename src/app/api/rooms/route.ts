@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { FIXED_ROOM_ID, multiplayerEnabled, passwordRequired } from "@/server/rooms";
 import { roomStore } from "@/server/store";
+import { TABLES } from "@/game/tables";
 
 export const dynamic = "force-dynamic";
 // Seat tokens need node:crypto.
@@ -16,7 +17,7 @@ export const runtime = "nodejs";
  * running commit is the only way to tell. No secret values are returned — only
  * whether each name is present.
  *
- * There is no POST: the deployment serves one fixed table, opened on first
+ * There is no POST: the deployment serves three fixed tables, each opened on first
  * arrival, rather than a room per game.
  */
 export async function GET() {
@@ -24,6 +25,7 @@ export async function GET() {
     enabled: multiplayerEnabled(),
     persistent: roomStore().isPersistent(),
     roomId: FIXED_ROOM_ID,
+    tables: TABLES.map((t) => t.id),
     passwordRequired: passwordRequired(),
     deployment: {
       environment: process.env.VERCEL_ENV ?? "self-hosted",

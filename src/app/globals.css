@@ -4173,6 +4173,68 @@ body:has(.app--handset) {
   line-height: 1.4;
 }
 
+/* The table picker: three chips that say who is already at each. */
+.start__tables {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.start__table-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.start__table {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  color: var(--ink-dim);
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.start__table:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .start__table:hover {
+    background: var(--raise-2);
+    color: var(--ink);
+  }
+}
+
+.start__table--on {
+  border-color: var(--gold);
+  background: var(--accent-wash-2);
+  color: var(--gold);
+}
+
+.start__table-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* Wraps rather than truncates: on a phone "In play · 3 players" is the part that matters. */
+.start__table-status {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-dim);
+}
+
 .start__aside {
   display: flex;
   flex-wrap: wrap;
