@@ -267,3 +267,33 @@ describe("PhoneView compact mode", () => {
     expect(container.querySelector(".phone__bar .phone__prompt")).toBeNull();
   });
 });
+
+describe("PhoneView — whose move it is", () => {
+  it("lights the phone of the player to discard, and only theirs", () => {
+    const { room, seat, view } = onTurn();
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(container.querySelector(".phone--acting")).not.toBeNull();
+
+    const other = ((seat + 1) % 4) as Seat;
+    const theirs = playerView(room, other);
+    const { container: elsewhere } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+    expect(elsewhere.querySelector(".phone--acting")).toBeNull();
+  });
+
+  it("lights the phone being asked about a claim, and tells the others who they are waiting on", () => {
+    const { room, claimer } = claimable();
+    const asked = playerView(room, claimer);
+    const { container } = render(<PhoneView api={fakeApi(asked)} view={asked} sound={sound} />);
+    expect(container.querySelector(".phone--acting")).not.toBeNull();
+
+    const bystander = ([0, 1, 2, 3] as Seat[]).find(
+      (s) => s !== claimer && s !== room.state.lastDiscard!.from,
+    )!;
+    const theirs = playerView(room, bystander);
+    const { container: elsewhere } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+    expect(elsewhere.querySelector(".phone--acting")).toBeNull();
+    const name = theirs.players[claimer].occupant.name;
+    const tile = tileName(room.state.lastDiscard!.tile.code);
+    expect(within(elsewhere).getByText(`Waiting for ${name} to decide on ${tile}…`)).toBeTruthy();
+  });
+});

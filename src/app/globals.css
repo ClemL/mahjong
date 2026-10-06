@@ -3347,16 +3347,15 @@ a.btn {
   transition: box-shadow 160ms ease, border-color 160ms ease;
 }
 
-.rack--active {
+/* Whoever the table is waiting on — to discard, or to answer a claim — is lit
+   in one colour, the same one their phone lights up in. The status pill says
+   which it is. */
+.rack--active,
+.rack--deciding {
   border-color: var(--gold);
   box-shadow:
     0 0 0 2px var(--gold),
     0 0 24px color-mix(in srgb, var(--gold) 45%, transparent);
-}
-
-.rack--deciding {
-  border-color: var(--claim-outline);
-  box-shadow: 0 0 0 2px var(--claim-outline);
 }
 
 .rack__wind {
@@ -3446,14 +3445,10 @@ a.btn {
   color: var(--ink);
 }
 
-.rack--active .rack__status {
+.rack--active .rack__status,
+.rack--deciding .rack__status {
   background: var(--gold);
   color: #2a2110;
-}
-
-.rack--deciding .rack__status {
-  background: var(--claim-outline);
-  color: #0b2230;
 }
 
 /* ------------------------------------------------------------- discards */
@@ -3506,15 +3501,11 @@ a.btn {
 .console__wind--2 { top: 0; left: 50%; transform: translateX(-50%) rotate(180deg); }
 .console__wind--3 { left: 0; top: 50%; transform: translateY(-50%) rotate(90deg); }
 
-.console__wind--active {
+.console__wind--active,
+.console__wind--deciding {
   background: var(--gold);
   color: #2a2110;
   box-shadow: 0 0 14px var(--gold);
-}
-
-.console__wind--deciding {
-  color: var(--claim-outline);
-  outline: 2px solid var(--claim-outline);
 }
 
 .console__middle {
@@ -4836,4 +4827,13 @@ body:has(.app--handset) {
 /* The header is already full across a phone, so it only ever shrinks. */
 .phone--landscape .phone__bar {
   zoom: min(var(--ui-zoom, 1), 1);
+}
+
+/* Your move on this phone, in the gold the table lights your rack with. Drawn
+   as an outline so it sits over the bar and the hand rather than under them. */
+.phone--acting {
+  border-radius: 14px;
+  outline: 3px solid var(--gold);
+  outline-offset: -3px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 45%, transparent);
 }

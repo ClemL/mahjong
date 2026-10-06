@@ -1,6 +1,7 @@
 "use client";
 
 import type { GameState } from "@/game/engine";
+import { claimingSeats } from "@/game/controller";
 import { SEAT_NAMES, type Seat, tileGlyph, seatWind } from "@/game/tiles";
 import type { Meld } from "@/game/melds";
 import { TileBack, TileFace } from "./TileView";
@@ -65,7 +66,7 @@ interface Props {
 export function SeatPanel({ state, seat }: Props) {
   const player = state.players[seat];
   const isTurn = state.turn === seat && state.phase === "action";
-  const isClaiming = state.pendingClaims.some((c) => c.seat === seat);
+  const isClaiming = claimingSeats(state).includes(seat);
   const score = state.scores[seat];
 
   return (
