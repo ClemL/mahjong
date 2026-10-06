@@ -6,6 +6,8 @@ import {
   type GameState,
   type KongOption,
   type TurnActions,
+  answerClaim,
+  claimTurn,
   createGame,
   declareAddedKong,
   declareConcealedKong,
@@ -19,7 +21,6 @@ import {
 import {
   awaitingHumanClaim,
   needsTurnAdvance,
-  resolveWithAi,
   shouldPromptClaim,
   stepTable,
 } from "@/game/controller";
@@ -146,11 +147,9 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     const timer = setTimeout(() => {
       setState((current) => {
         if (current !== state) return current;
-        // An auto-passed claim still resolves through the normal path, so the
-        // other seats' claims on the same discard are honoured.
-        if (awaitingHumanClaim(state)) {
-          return resolveWithAi(state, rngRef.current, { seat: humanSeat, optionId: null }, strategy);
-        }
+        // A claim the player would not be asked about is passed for them, and
+        // the next seat in line is asked in turn.
+        if (awaitingHumanClaim(state)) return answerClaim(state, humanSeat, null);
         return stepTable(state, rngRef.current, strategy);
       });
     }, DELAYS[speed]);
@@ -163,7 +162,10 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   );
 
   const claimOptions = useMemo<ClaimOption[]>(
-    () => (state?.pendingClaims.find((c) => c.seat === humanSeat)?.options ?? []),
+    () => {
+      const turn = state ? claimTurn(state) : null;
+      return turn?.seat === humanSeat ? turn.options : [];
+    },
     [state, humanSeat],
   );
 
@@ -209,11 +211,11 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     (optionId: string | null) => {
       setState((current) =>
         current && awaitingHumanClaim(current)
-          ? resolveWithAi(current, rngRef.current, { seat: humanSeat, optionId }, strategy)
+          ? answerClaim(current, humanSeat, optionId)
           : current,
       );
     },
-    [humanSeat, strategy],
+    [humanSeat],
   );
 
   const claim = useCallback((optionId: string) => respond(optionId), [respond]);

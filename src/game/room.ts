@@ -12,10 +12,11 @@ import {
   type HandRecord,
   type HandResult,
   type LogEntry,
-  type PendingClaim,
   type Phase,
   type TurnActions,
   advanceTurn,
+  answerClaim,
+  claimTurn,
   createGame,
   discard,
   resolveClaims,
@@ -446,12 +447,16 @@ export function identify(room: Room, token: string | null): { role: Role; seat: 
   return { role: "spectator", seat: null };
 }
 
-/** Seats that still owe an answer on the discard currently on the table. */
+/**
+ * The person the discard is waiting on, if it is waiting on a person at all.
+ * Claims are asked one seat at a time, strongest first, so this is never more
+ * than one seat — a chow is not put to anyone while a pung is still open.
+ */
 export function pendingHumanClaimants(room: Room, now = Date.now()): Seat[] {
-  if (room.state.phase !== "claiming") return [];
-  return room.state.pendingClaims
-    .map((c: PendingClaim) => c.seat)
-    .filter((seat) => isHumanSeat(room, seat, now) && !(String(seat) in room.claimResponses));
+  const turn = claimTurn(room.state);
+  if (!turn) return [];
+  const answered = String(turn.seat) in room.claimResponses;
+  return isHumanSeat(room, turn.seat, now) && !answered ? [turn.seat] : [];
 }
 
 /**
@@ -506,24 +511,32 @@ export function drain(room: Room, now = Date.now()): boolean {
     if (state.phase === "handOver" || state.phase === "gameOver") break;
 
     if (state.phase === "claiming") {
-      const waiting = pendingHumanClaimants(room, now);
-      const expired = room.claimDeadline !== null && now >= room.claimDeadline;
-      if (waiting.length > 0 && !expired) break;
-
-      const decisions = state.pendingClaims.map((c) => {
-        const recorded = room.claimResponses[String(c.seat)];
-        if (recorded !== undefined) return { seat: c.seat, optionId: recorded };
-        if (isHumanSeat(room, c.seat, now)) return { seat: c.seat, optionId: null };
-        const choice = greedyAi.chooseClaim(state, c.seat, c.options, rng);
-        return { seat: c.seat, optionId: choice?.id ?? null };
-      });
+      const turn = claimTurn(state);
+      let optionId: string | null = null;
+      if (turn) {
+        const recorded = room.claimResponses[String(turn.seat)];
+        if (recorded !== undefined) {
+          optionId = recorded;
+        } else if (isHumanSeat(room, turn.seat, now)) {
+          // Each person gets a window of their own, from the moment the
+          // call becomes theirs — not from the discard, which may have been
+          // put to somebody else first.
+          if (room.claimDeadline === null) {
+            room.claimDeadline = now + CLAIM_WINDOW_MS;
+            changed = true;
+          }
+          if (now < room.claimDeadline) break;
+        } else {
+          optionId = greedyAi.chooseClaim(state, turn.seat, turn.options, rng)?.id ?? null;
+        }
+      }
       // People were being waited on: the computer's next move is paced from
       // when the window closed, not from the discard that opened it.
       if (room.claimDeadline !== null) {
         room.lastStepAt = Math.max(room.lastStepAt, Math.min(now, room.claimDeadline));
       }
       const taken = state.lastDiscard?.tile.id;
-      move(resolveClaims(state, decisions));
+      move(turn ? answerClaim(state, turn.seat, optionId) : resolveClaims(state, []));
       room.claimResponses = {};
       room.claimDeadline = null;
       // A claim is a move of its own: the table shows the discard landing and
@@ -648,14 +661,16 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     };
   });
 
+  // Only the seat being asked sees its claims: everyone else's turn to be
+  // asked comes after, if the stronger claims are passed.
   let claim: RoomView["claim"] = null;
-  if (you.role === "player" && you.seat !== null && state.phase === "claiming") {
-    const pending = state.pendingClaims.find((c) => c.seat === you.seat);
+  const asked = claimTurn(state);
+  if (you.role === "player" && asked && asked.seat === you.seat) {
     const answered = String(you.seat) in room.claimResponses;
-    if (pending && !answered) {
+    if (!answered) {
       claim = {
-        options: pending.options,
-        deadlineIn: Math.max(0, (room.claimDeadline ?? now) - now),
+        options: asked.options,
+        deadlineIn: Math.max(0, (room.claimDeadline ?? now + CLAIM_WINDOW_MS) - now),
       };
     }
   }

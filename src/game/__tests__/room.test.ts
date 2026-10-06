@@ -318,16 +318,18 @@ describe("draining", () => {
     expect(room.state.phase).not.toBe("claiming");
   });
 
-  it("records a claim answer and resolves once everyone has replied", () => {
+  it("asks one person at a time and moves on once each has passed", () => {
     const room = dealt("TEST", 33, [0, 1, 2, 3]);
     drain(room);
     const dealer = room.state.dealer;
     room.state = discard(room.state, dealer, room.state.players[dealer].hand[0].id);
     if (room.state.phase !== "claiming") return;
-    for (const claimant of pendingHumanClaimants(room)) {
-      room.claimResponses[String(claimant)] = null;
+    for (let i = 0; i < 4 && room.state.phase === "claiming"; i++) {
+      const asked = pendingHumanClaimants(room);
+      expect(asked).toHaveLength(1);
+      room.claimResponses[String(asked[0])] = null;
+      drain(room);
     }
-    drain(room);
     expect(room.state.phase).not.toBe("claiming");
   });
 });
@@ -571,5 +573,50 @@ describe("room settings", () => {
     normalizeRoom(room);
     expect(room.settings).toEqual(DEFAULT_ROOM_SETTINGS);
     expect(room.lastPlayed).toBeNull();
+  });
+});
+
+describe("claim order at the table", () => {
+  /** A discard of 5 Dots that South can chow and West can pung, both people. */
+  function chowAgainstPung(): Room {
+    const room = dealt("TEST", 5, [0, 1, 2]);
+    const filler = ["m1", "m9", "s1", "s9", "we", "ws", "ww", "wn", "dr", "dg", "dw"];
+    const hand = (seat: number, codes: string[]) =>
+      [...codes, ...filler].slice(0, 13).map((code, i) => ({ id: `${code}#t${seat}${i}`, code }));
+    const state = room.state;
+    state.players[0].hand = [...hand(0, []), { id: "p5#x", code: "p5" }];
+    state.players[1].hand = hand(1, ["p4", "p6"]);
+    state.players[2].hand = hand(2, ["p5", "p5"]);
+    state.players[3].hand = hand(3, []);
+    for (const p of state.players) p.melds = [];
+    state.turn = 0;
+    state.phase = "action";
+    state.lastDiscard = null;
+    state.drawnTileId = null;
+    room.state = discard(state, 0, "p5#x");
+    drain(room);
+    return room;
+  }
+
+  it("puts the pung to its holder first, and keeps the chow from the next seat until it is passed", () => {
+    const room = chowAgainstPung();
+    expect(pendingHumanClaimants(room)).toEqual([2]);
+    expect(viewFor(room, "tok-2").claim?.options.map((o) => o.type)).toEqual(["pung"]);
+    expect(viewFor(room, "tok-1").claim).toBeNull();
+    expect(viewFor(room, "tok-1").awaitingClaimSeats).toEqual([2]);
+
+    room.claimResponses["2"] = null;
+    drain(room);
+    expect(pendingHumanClaimants(room)).toEqual([1]);
+    expect(viewFor(room, "tok-1").claim?.options.map((o) => o.type)).toEqual(["chow"]);
+  });
+
+  it("never asks about the chow once the pung is taken", () => {
+    const room = chowAgainstPung();
+    room.claimResponses["2"] = "pung:p5";
+    drain(room);
+    expect(room.state.phase).toBe("action");
+    expect(room.state.turn).toBe(2);
+    expect(room.state.players[2].melds.map((m) => m.type)).toEqual(["pung"]);
   });
 });

@@ -694,7 +694,11 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
                 layout={layout}
                 position={position(seat)}
                 centreId={centreId}
-                lit={display.turnGlow === "on" && view.phase === "action" && view.turn === seat}
+                lit={
+                  display.turnGlow === "on" &&
+                  ((view.phase === "action" && view.turn === seat) ||
+                    view.awaitingClaimSeats.includes(seat))
+                }
               />
             ))}
             <Console view={view} layout={layout} position={position} sheetOpen={sheetOpen} />

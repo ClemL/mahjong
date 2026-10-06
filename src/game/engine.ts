@@ -540,10 +540,16 @@ export function declareSelfDraw(previous: GameState, seat: Seat): GameState {
 
 /** Everything the other three seats could do with `tile` discarded by `from`. */
 export function collectClaims(state: GameState, tile: Tile, from: Seat): PendingClaim[] {
+  // The wall is spent, so nobody can draw again: a pung or chow would only
+  // hand the turn to someone with nothing left to draw, and a kong has no
+  // replacement tile. The last discard can only be taken to win.
+  const lastTile = state.wall.length === 0;
   const claims: PendingClaim[] = [];
   for (let step = 1; step <= 3; step++) {
     const seat = nextSeat(from, step);
-    const options = claimOptionsFor(state, seat, tile, from, step === 1);
+    const options = claimOptionsFor(state, seat, tile, from, step === 1).filter(
+      (o) => !lastTile || o.type === "win",
+    );
     if (options.length > 0) claims.push({ seat, options });
   }
   return claims;
@@ -632,6 +638,70 @@ export function claimOptionsFor(
 }
 
 const CLAIM_PRIORITY: Record<ClaimOption["type"], number> = { win: 3, kong: 2, pung: 2, chow: 1 };
+
+/**
+ * How strongly a claim holds against the others on the same discard: a win
+ * over a pung or kong, those over a chow, and between two wins the seat that
+ * plays first after the discarder.
+ */
+function claimRank(state: GameState, seat: Seat, option: ClaimOption): number {
+  const from = state.lastDiscard?.from ?? seat;
+  const distance = (((seat - from) % 4) + 4) % 4;
+  return CLAIM_PRIORITY[option.type] * 4 - distance;
+}
+
+/**
+ * Whose answer the discard is waiting on, and what they may claim now.
+ *
+ * Claims are asked one seat at a time, strongest first, so nobody is offered
+ * a chow while someone else could still pung the tile out from under them.
+ * A seat is offered every claim of its own that no other seat's remaining
+ * claim outranks — a player who can both pung and chow sees both together.
+ * Null when there is nothing left to ask.
+ */
+export function claimTurn(state: GameState): PendingClaim | null {
+  if (state.phase !== "claiming") return null;
+  let best: { seat: Seat; rank: number } | null = null;
+  for (const claim of state.pendingClaims) {
+    for (const option of claim.options) {
+      const rank = claimRank(state, claim.seat, option);
+      if (!best || rank > best.rank) best = { seat: claim.seat, rank };
+    }
+  }
+  if (!best) return null;
+  const asked = best.seat;
+  const rivals = state.pendingClaims
+    .filter((c) => c.seat !== asked)
+    .flatMap((c) => c.options.map((o) => claimRank(state, c.seat, o)));
+  const ceiling = rivals.length > 0 ? Math.max(...rivals) : -Infinity;
+  const mine = state.pendingClaims.find((c) => c.seat === asked)!;
+  return { seat: asked, options: mine.options.filter((o) => claimRank(state, asked, o) > ceiling) };
+}
+
+/**
+ * The seat being asked turns down what it was offered. Anything lower it can
+ * still claim waits for its turn to come round again; once nobody is left to
+ * ask, the discard stands and play moves on.
+ */
+export function passClaim(previous: GameState, seat: Seat): GameState {
+  const turn = claimTurn(previous);
+  if (!turn || turn.seat !== seat) return previous;
+  const state = clone(previous);
+  const declined = new Set(turn.options.map((o) => o.id));
+  state.pendingClaims = state.pendingClaims
+    .map((c) => (c.seat === seat ? { ...c, options: c.options.filter((o) => !declined.has(o.id)) } : c))
+    .filter((c) => c.options.length > 0);
+  return state.pendingClaims.length > 0 ? state : resolveClaims(state, []);
+}
+
+/** Take a claim the seat was offered, or pass on all of them with null. */
+export function answerClaim(previous: GameState, seat: Seat, optionId: string | null): GameState {
+  const turn = claimTurn(previous);
+  if (!turn || turn.seat !== seat) return previous;
+  if (optionId === null) return passClaim(previous, seat);
+  if (!turn.options.some((o) => o.id === optionId)) return previous;
+  return resolveClaims(previous, [{ seat, optionId }]);
+}
 
 export interface ClaimDecision {
   seat: Seat;

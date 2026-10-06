@@ -10,6 +10,7 @@ import {
   identify,
   seatName,
   isHumanSeat,
+  pendingHumanClaimants,
   mayDeal,
   mayRegroup,
   newRoom,
@@ -28,6 +29,7 @@ import {
   TURN_LIMITS,
 } from "@/game/room";
 import {
+  claimTurn,
   declareAddedKong,
   declareConcealedKong,
   declareSelfDraw,
@@ -193,9 +195,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
 
     if (action.type === "claim") {
       if (r.state.phase !== "claiming") throw new RoomError("Nothing to claim", 409);
-      const pending = r.state.pendingClaims.find((c) => c.seat === seat);
-      if (!pending) throw new RoomError("You have no claim on this tile", 403);
-      if (action.optionId && !pending.options.some((o) => o.id === action.optionId)) {
+      if (!r.state.pendingClaims.some((c) => c.seat === seat)) {
+        throw new RoomError("You have no claim on this tile", 403);
+      }
+      // A stronger claim elsewhere is asked first; this seat's turn comes
+      // only if that one is passed.
+      const turn = claimTurn(r.state);
+      if (turn?.seat !== seat) throw new RoomError("Another player is deciding first", 409);
+      if (action.optionId && !turn.options.some((o) => o.id === action.optionId)) {
         throw new RoomError("That claim is not available", 409);
       }
       r.claimResponses[String(seat)] = action.optionId;
@@ -364,11 +371,7 @@ export async function control(
         break;
       }
       case "forcePass":
-        for (const claim of r.state.pendingClaims) {
-          if (isHumanSeat(r, claim.seat) && !(String(claim.seat) in r.claimResponses)) {
-            r.claimResponses[String(claim.seat)] = null;
-          }
-        }
+        for (const seat of pendingHumanClaimants(r, now)) r.claimResponses[String(seat)] = null;
         break;
     }
   });
