@@ -8,8 +8,7 @@ const SEED = 20261007;
 const TURNS = 8;
 
 const yourHand = (page: Page) => page.getByRole("region", { name: "Your hand" });
-const yourPond = (page: Page) =>
-  page.locator(".pond__group").filter({ hasText: "(you)" }).locator(".pond__row .tile");
+const handTiles = (page: Page) => yourHand(page).locator(".hand__tiles button.tile--button");
 const handResult = (page: Page) => page.getByRole("dialog", { name: /Hand result|Round complete/ });
 
 /**
@@ -34,10 +33,13 @@ test.describe("solo table", () => {
     await presetPreferences(page, { speed: "fast", claimPrompt: "wins", showHints: true });
   });
 
-  test("plays a run of turns: one discard per throw, hand sizes hold", async ({ page }) => {
+  test("plays a run of turns on the felt: one discard per throw, hand sizes hold", async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto(`/solo?seed=${SEED}`);
     await expect(yourHand(page)).toBeVisible();
+    // Wide enough for the felt: four racks, four ponds, the wall dealt from.
+    await expect(page.locator(".felt .rack")).toHaveCount(4);
+    const pause = page.getByRole("button", { name: /^(Pause|Resume)$/ });
 
     let turns = 0;
     while (turns < TURNS) {
@@ -48,19 +50,27 @@ test.describe("solo table", () => {
         continue;
       }
 
+      // Hold the computer while this turn is checked, so nothing it does —
+      // claiming the tile, or play coming round again — can blur the count.
+      await pause.click();
+      await expect(pause).toHaveText("Resume");
+
       // On your turn the hand is fourteen tiles counting each set as three,
-      // whatever has been claimed.
+      // whatever has been claimed. Your sets are on your rack, at the bottom.
       const hand = yourHand(page);
-      const tiles = await hand.locator(".hand__tiles button.tile--button").count();
-      const melds = await hand.locator(".meld").count();
-      expect(tiles + melds * 3, "tiles in hand on your turn").toBe(14);
+      const melds = await page.locator('.rack[data-seat="0"] .meld:not(.rack__flowers)').count();
+      await expect(handTiles(page)).toHaveCount(14 - melds * 3);
 
       // A double-click must throw one tile, not two: the first click ends the
       // turn, and the second must find nothing it can throw.
-      const before = await yourPond(page).count();
       await hand.locator("button.tile--button:not([disabled])").first().dblclick();
-      await expect(yourPond(page)).toHaveCount(before + 1);
+      await expect(handTiles(page)).toHaveCount(13 - melds * 3);
       await expect(hand.locator("button.tile--button:not([disabled])")).toHaveCount(0);
+      await page.waitForTimeout(300);
+      await expect(handTiles(page)).toHaveCount(13 - melds * 3);
+
+      await pause.click();
+      await expect(pause).toHaveText("Pause");
       turns++;
     }
 
@@ -68,13 +78,39 @@ test.describe("solo table", () => {
     expect(errors).toEqual([]);
   });
 
-  test("fits a phone held upright", async ({ page }) => {
+  test("keeps the compact table on a phone held upright, and fits it", async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize(PHONE_PORTRAIT);
     await page.goto(`/solo?seed=${SEED}`);
     await expect(yourHand(page)).toBeVisible();
+    // Too narrow for the felt's racks; the grid, and no wait for a deal it does not show.
+    await expect(page.locator(".felt")).toHaveCount(0);
+    await expect(page.locator(".pond")).toBeVisible();
     await nextDecision(page);
     await expectNoSidewaysScroll(page);
+    expect(errors).toEqual([]);
+  });
+
+  test("finishes a hand on a phone and reads out what everyone paid", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.setViewportSize(PHONE_PORTRAIT);
+    await page.goto(`/solo?seed=${SEED}`);
+    for (;;) {
+      const decision = await nextDecision(page);
+      if (decision === "over") break;
+      const hand = yourHand(page);
+      if (decision === "claim") await hand.getByRole("button", { name: "Pass" }).click();
+      else await hand.locator("button.tile--button:not([disabled])").first().click();
+    }
+    // Each seat's payment is a pill with its text inside it. A gaming-chip
+    // style once shared the class name and drew a coin over the words.
+    const pills = handResult(page).locator(".modal__payments > *");
+    await expect(pills).toHaveCount(4);
+    for (const pill of await pills.all()) {
+      await expect(pill).toHaveText(/^(East|South|West|North) [+-]?\d+$/);
+      const fits = await pill.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.clientWidth > 40);
+      expect(fits, "payment pill holds its text").toBe(true);
+    }
     expect(errors).toEqual([]);
   });
 });

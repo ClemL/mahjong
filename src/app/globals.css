@@ -3315,6 +3315,38 @@ a.btn {
   border-radius: 10px;
 }
 
+/* The solo game on the same felt, your hand under it. The felt takes the height
+   the screen can spare once the hand is below it, within limits: much shorter
+   and the ponds shrink past reading, much taller and the hand drops out of view. */
+.solo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.solo__felt {
+  position: relative;
+  display: flex;
+  height: clamp(420px, calc(100vh - 290px), 820px);
+}
+
+@media (max-width: 760px) {
+  .solo__felt {
+    height: clamp(380px, 118vw, 600px);
+  }
+}
+
+/* With the result put aside, the way back to it and on to the next hand. */
+.solo__after {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  gap: 8px;
+}
+
 /* Cloth inside a wooden rim. Everything on it is placed by tableLayout.ts:
    each box is positioned by its centre and turned to face its seat. */
 .felt {
@@ -4339,7 +4371,9 @@ body:has(.app--handset) {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
 }
 
-.chip {
+/* A gaming chip. Not `.chip`: that is the result dialog's payment pill, and a
+   rule here once turned every pill into a coin with its text under it. */
+.chip-coin {
   display: inline-block;
   width: 22px;
   height: 22px;
@@ -4444,7 +4478,7 @@ body:has(.app--handset) {
   100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.8); opacity: 0; }
 }
 
-.chip--flying {
+.chip-coin--flying {
   position: absolute;
   animation-name: chip-fly;
   animation-timing-function: cubic-bezier(0.5, 0, 0.3, 1);

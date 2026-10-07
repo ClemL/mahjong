@@ -2,7 +2,6 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
-import type { RoomApi } from "@/hooks/useRoom";
 import type { ScoreResult } from "@/game/scoring";
 import { arrangeWinningHand } from "@/game/winning";
 import { type Seat, isFlower } from "@/game/tiles";
@@ -88,18 +87,20 @@ export function WinningHand({ player, score }: { player: PublicPlayer; score: Sc
  * and it can be put aside to look at them properly.
  */
 export function TableResult({
-  api,
   view,
   name,
   tile,
   onHide,
+  onNextHand,
+  busy,
 }: {
-  api: RoomApi;
   view: RoomView;
   name: (seat: Seat) => string;
   /** The size the tiles in it are drawn at. */
   tile: number;
   onHide: () => void;
+  onNextHand: () => void;
+  busy: boolean;
 }) {
   const result = view.result;
   if (!result) return null;
@@ -174,8 +175,8 @@ export function TableResult({
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={api.busy}
-                onClick={() => void api.control({ type: "nextHand" })}
+                disabled={busy}
+                onClick={onNextHand}
               >
                 Next hand
               </button>

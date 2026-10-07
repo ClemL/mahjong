@@ -2,7 +2,7 @@
 
 import type { MahjongApi } from "@/hooks/useMahjong";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
-import { TileButton, TileFace } from "./TileView";
+import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 
 function claimLabel(type: string): string {
@@ -18,8 +18,15 @@ function claimLabel(type: string): string {
   }
 }
 
-export function PlayerHand({ api }: { api: MahjongApi }) {
-  const { state, humanSeat, actions, claimOptions, awaitingClaim, readyDiscards } = api;
+export function PlayerHand({
+  api,
+  showSets = false,
+}: {
+  api: MahjongApi;
+  /** Lay your sets and flowers out here too, when no rack of yours is on screen. */
+  showSets?: boolean;
+}) {
+  const { state, humanSeat, actions, claimOptions, awaitingClaim, readyDiscards, dealing } = api;
   if (!state) return null;
   const me = state.players[humanSeat];
   const drawn = me.hand.find((t) => t.id === state.drawnTileId);
@@ -28,7 +35,10 @@ export function PlayerHand({ api }: { api: MahjongApi }) {
 
   let prompt: string;
   let muted = false;
-  if (state.phase === "gameOver") {
+  if (dealing) {
+    prompt = "Dealing…";
+    muted = true;
+  } else if (state.phase === "gameOver") {
     prompt = "The round is over.";
     muted = true;
   } else if (state.phase === "handOver") {
@@ -49,7 +59,7 @@ export function PlayerHand({ api }: { api: MahjongApi }) {
     <section className="hand" aria-label="Your hand">
       <div className={`hand__prompt${muted ? " hand__prompt--muted" : ""}`}>{prompt}</div>
 
-      {(me.melds.length > 0 || me.flowers.length > 0) && (
+      {showSets && (me.melds.length > 0 || me.flowers.length > 0) && (
         <div className="seat__row">
           {me.melds.map((m, i) => (
             <MeldRow key={`my-meld-${i}`} meld={m} />
@@ -60,18 +70,21 @@ export function PlayerHand({ api }: { api: MahjongApi }) {
         </div>
       )}
 
+      {/* Your tiles stay face down until the deal has reached you. */}
       <div className="hand__tiles">
-        {rest.map((t) => (
-          <TileButton
-            key={t.id}
-            code={t.code}
-            size="lg"
-            ready={readyDiscards.has(t.id)}
-            disabled={!actions.canDiscard}
-            onClick={() => api.discard(t.id)}
-          />
-        ))}
-        {drawn ? (
+        {dealing
+          ? me.hand.map((t) => <TileBack key={t.id} size="lg" />)
+          : rest.map((t) => (
+              <TileButton
+                key={t.id}
+                code={t.code}
+                size="lg"
+                ready={readyDiscards.has(t.id)}
+                disabled={!actions.canDiscard}
+                onClick={() => api.discard(t.id)}
+              />
+            ))}
+        {drawn && !dealing ? (
           <>
             <span className="hand__gap" aria-hidden />
             <TileButton

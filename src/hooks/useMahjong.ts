@@ -46,6 +46,8 @@ const IDLE_ACTIONS: TurnActions = {
 
 export interface MahjongApi extends GameSettings {
   state: GameState | null;
+  /** Counts the games dealt on this page; a new game starts back at hand 1. */
+  game: number;
   humanSeat: Seat;
   /** What the player may do on their own turn. */
   actions: TurnActions;
@@ -54,6 +56,8 @@ export interface MahjongApi extends GameSettings {
   awaitingClaim: boolean;
   /** Ids of hand tiles whose discard would leave the hand ready (聽牌). */
   readyDiscards: Set<string>;
+  /** The felt is still building the wall and dealing; nobody plays until it has. */
+  dealing: boolean;
   paused: boolean;
   setPaused: (value: boolean) => void;
   discard: (tileId: string) => void;
@@ -75,14 +79,25 @@ function seedFromAddress(): number | undefined {
   return Number.isInteger(asked) && asked > 0 ? asked >>> 0 : undefined;
 }
 
-export function useMahjong(humanSeat: Seat = 0): MahjongApi {
+export interface MahjongOptions {
+  /**
+   * How long a fresh hand is shown being dealt before anyone plays, decided as
+   * it is dealt. The table on screen knows; the default is not at all.
+   */
+  dealHoldMs?: (state: GameState) => number;
+}
+
+export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): MahjongApi {
   const [state, setState] = useState<GameState | null>(null);
+  const [game, setGame] = useState(0);
   const settings = usePreferences();
   const { speed, showHints, muted, opponents, claimPrompt } = settings;
   const [paused, setPaused] = useState(false);
   const rngRef = useRef<Rng>(createRng(1));
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
+  const dealHoldRef = useRef(options.dealHoldMs);
+  dealHoldRef.current = options.dealHoldMs;
 
   const start = useCallback((asked?: number) => {
     const seed = asked ?? Math.floor(Math.random() * 0xffffffff);
@@ -91,9 +106,27 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     // copy of the stored choices has landed in state.
     const { minFaan } = readPreferences();
     setState(createGame({ seed, humanSeat, config: { ...DEFAULT_RULES, minFaan } }));
+    setGame((n) => n + 1);
   }, [humanSeat]);
 
   const newGame = useCallback(() => start(), [start]);
+
+  // A table that shows the deal holds play until it has, rather than playing
+  // on top of it. The hold is decided the moment a hand is first seen, so no
+  // render ever offers a move early.
+  const dealKey = state ? `${state.rngSeed}:${state.handNumber}` : null;
+  const hold = useRef<{ key: string | null; until: number }>({ key: null, until: 0 });
+  if (state && hold.current.key !== dealKey) {
+    hold.current = { key: dealKey, until: Date.now() + (dealHoldRef.current?.(state) ?? 0) };
+  }
+  const [, wake] = useState(0);
+  const dealing = hold.current.until > Date.now();
+  useEffect(() => {
+    const left = hold.current.until - Date.now();
+    if (left <= 0) return;
+    const timer = setTimeout(() => wake((n) => n + 1), left + 20);
+    return () => clearTimeout(timer);
+  }, [dealKey]);
 
   // Deal on the client so the server render stays deterministic.
   useEffect(() => {
@@ -149,7 +182,7 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
 
   // Drive the table forward whenever it is not the player's move.
   useEffect(() => {
-    if (!state || paused) return;
+    if (!state || paused || dealing) return;
     if (state.phase === "handOver" || state.phase === "gameOver") return;
     if (awaitingHumanClaim(state) && shouldPromptClaim(state, humanSeat, claimPrompt)) return;
     const humanToAct =
@@ -166,11 +199,11 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
       });
     }, DELAYS[speed]);
     return () => clearTimeout(timer);
-  }, [state, paused, speed, humanSeat, claimPrompt, strategy]);
+  }, [state, paused, dealing, speed, humanSeat, claimPrompt, strategy]);
 
   const actions = useMemo<TurnActions>(
-    () => (state ? turnActions(state, humanSeat) : IDLE_ACTIONS),
-    [state, humanSeat],
+    () => (state && !dealing ? turnActions(state, humanSeat) : IDLE_ACTIONS),
+    [state, humanSeat, dealing],
   );
 
   const claimOptions = useMemo<ClaimOption[]>(
@@ -249,11 +282,13 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   return {
     ...settings,
     state,
+    game,
     humanSeat,
     actions,
     claimOptions,
     awaitingClaim,
     readyDiscards,
+    dealing,
     paused,
     setPaused,
     discard,

@@ -239,7 +239,7 @@ export function WinOverlay({
   return (
     <div className="win-fx" aria-hidden>
       {chips.map((c) => (
-        <span key={c.key} className="chip chip--flying" style={c.style} />
+        <span key={c.key} className="chip-coin chip-coin--flying" style={c.style} />
       ))}
       <Confetti
         count={confettiCount(faan)}
