@@ -5,6 +5,7 @@ import { SUIT_PALETTES, THEMES, TILE_BACKS, TILE_BODIES, TILE_STYLES } from "@/g
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import { TileBack, TileFace } from "./TileView";
 import { Choice } from "./Choice";
+import { TileReference } from "./TileReference";
 
 /** One sample of each suit, an honor and a back, so a choice can be judged at a glance. */
 const PREVIEW = ["m5", "p3", "s7", "we", "dr"].filter((c) => PLAYABLE_CODES.includes(c));
@@ -23,6 +24,7 @@ export function AppearancePanel({ api }: { api: AppearanceApi }) {
             ))}
             <TileBack size="md" />
           </div>
+          <TileReference api={api} />
 
           <Choice
             label="Table"
