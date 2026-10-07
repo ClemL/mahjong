@@ -191,7 +191,7 @@ export function TilePips({ code }: { code: TileCode }) {
   const rank = rankOf(code);
   return (
     <svg
-      className="tile__pips"
+      className="tile__pips tile__pips--plain"
       viewBox="0 0 100 100"
       aria-hidden
       focusable="false"

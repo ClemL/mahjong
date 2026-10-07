@@ -76,3 +76,4 @@
 2026-10-06T12:00:00Z - Your turn and your claim decisions light your phone and your rack on the table in the same gold
 2026-10-06T11:11:55Z - Three multiplayer tables: pick Table 1, 2 or 3 on the start page (with who is already at each); Multiplayer, Tablet mode and Reset follow the choice, and every screen names its table
 2026-10-07T02:48:46Z - Computer opponents now play for the faan minimum: they keep a hand concealed, chase a flush, all triplets or all runs, and only claim a set when the hand stays worth enough to win, so far fewer hands wash out at 3 faan
+2026-10-07T16:01:24Z - New Hong Kong tile face, now the default: dots and bamboo painted red, green and blue, the Eight Bamboo as a W over an M, the Nine Bamboo with a red middle column, a red 萬 under each Characters numeral, and the White Dragon as an empty blue frame. The plain Pips face is still under Table & tiles

@@ -15,7 +15,7 @@ export interface Option<T extends string> {
 
 export type Theme = "jade" | "slate" | "mahogany" | "midnight" | "parchment";
 export type SuitPalette = "vivid" | "classic" | "mono";
-export type TileStyle = "pips" | "indexed" | "numerals" | "western";
+export type TileStyle = "pips" | "traditional" | "indexed" | "numerals" | "western";
 export type TileBody = "ivory" | "bone" | "twotone" | "amber" | "flat";
 export type TileBacks = "table" | "emerald" | "crimson" | "sapphire" | "gold" | "ebony";
 
@@ -35,6 +35,11 @@ export const SUIT_PALETTES: Option<SuitPalette>[] = [
 
 export const TILE_STYLES: Option<TileStyle>[] = [
   { value: "pips", label: "Pips", hint: "Drawn dots and bamboo, as on a real set" },
+  {
+    value: "traditional",
+    label: "Hong Kong",
+    hint: "Painted in red, green and blue like a parlour set, with a framed White Dragon",
+  },
   { value: "indexed", label: "Indexed", hint: "Pips with the number in the corner, as on Western sets" },
   { value: "numerals", label: "Numerals", hint: "Chinese numeral over the suit mark" },
   { value: "western", label: "Western", hint: "Arabic numeral over the suit mark — easiest to learn" },
@@ -68,7 +73,7 @@ export interface Appearance {
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "jade",
   suits: "vivid",
-  tiles: "pips",
+  tiles: "traditional",
   body: "ivory",
   backs: "table",
 };
