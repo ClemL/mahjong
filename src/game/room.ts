@@ -281,12 +281,17 @@ export function startPlay(room: Room, now = Date.now()): void {
   syncSeats(room, now);
 }
 
+/** How long the felt takes to build the wall, deal this hand and lay down its opening flowers. */
+export function dealShowMs(state: GameState): number {
+  const flowers = state.players.reduce((n, p) => n + p.flowers.length, 0);
+  return DEAL_MS + flowers * FLOWER_STEP_MS;
+}
+
 /** How long the table needs to show a fresh deal and its opening flowers. */
 export function openingHoldMs(room: Room): number {
   // Only the tablet animates the deal; phones on their own go straight in.
   if (!room.table) return 0;
-  const flowers = room.state.players.reduce((n, p) => n + p.flowers.length, 0);
-  return DEAL_MS + flowers * FLOWER_STEP_MS;
+  return dealShowMs(room.state);
 }
 
 /** A hand has just been dealt: the clock starts once the table has shown it. */
@@ -721,6 +726,69 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         : null,
     turnExtended: turnExtended(room),
     turnAllowance: turnAllowanceMs(room),
+  };
+}
+
+/**
+ * A solo game as the felt draws it: the table device's view of a game the
+ * browser runs for itself. The redaction is the table's — no concealed tile on
+ * the cloth until the hand is settled — because the player's own tiles are
+ * drawn in their hand below the felt, not on it.
+ *
+ * The engine forgets a discard as soon as the next seat draws, so the caller
+ * keeps the newest one (`lastPlayed`), as a room does.
+ */
+export function soloTableView(
+  state: GameState,
+  lastPlayed: { tile: Tile; from: Seat } | null,
+  awaitingClaimSeats: Seat[],
+): RoomView {
+  const settled = state.phase === "handOver" || state.phase === "gameOver";
+  return {
+    roomId: "solo",
+    version: 0,
+    started: true,
+    canDeal: false,
+    warmup: false,
+    canRegroup: false,
+    seatedCount: 1,
+    phase: state.phase,
+    turn: state.turn,
+    dealer: state.dealer,
+    roundWind: state.roundWind,
+    handNumber: state.handNumber,
+    dealership: state.dealership,
+    wallCount: state.wall.length,
+    lastDiscard: state.lastDiscard,
+    drawnTileId: null,
+    players: state.players.map((p) => ({
+      seat: p.seat,
+      handCount: p.hand.length,
+      hand: settled ? p.hand : hiddenTiles(p.seat, p.hand.length),
+      melds: p.melds,
+      flowers: p.flowers,
+      discards: p.discards,
+      // Named as the score panel names it; a bare "You" would have the felt
+      // say "You wins" and "Off You's discard".
+      occupant: p.isHuman
+        ? { kind: "human", name: `${SEAT_NAMES[p.seat]} (you)`, away: false }
+        : { kind: "ai", name: null, away: false },
+    })),
+    scores: state.scores,
+    result: state.result,
+    history: state.history,
+    log: state.log,
+    config: state.config,
+    you: { role: "table", seat: null },
+    tablePresent: false,
+    awaitingClaimSeats,
+    claim: null,
+    actions: null,
+    settings: { ...DEFAULT_ROOM_SETTINGS, turnLimit: 0 },
+    lastPlayed,
+    turnDeadlineIn: null,
+    turnExtended: false,
+    turnAllowance: 0,
   };
 }
 

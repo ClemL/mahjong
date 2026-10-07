@@ -76,5 +76,14 @@
 2026-10-06T12:00:00Z - Your turn and your claim decisions light your phone and your rack on the table in the same gold
 2026-10-06T11:11:55Z - Three multiplayer tables: pick Table 1, 2 or 3 on the start page (with who is already at each); Multiplayer, Tablet mode and Reset follow the choice, and every screen names its table
 2026-10-07T02:48:46Z - Computer opponents now play for the faan minimum: they keep a hand concealed, chase a flush, all triplets or all runs, and only claim a set when the hand stays worth enough to win, so far fewer hands wash out at 3 faan
+2026-10-07T11:58:10Z - Play solo on the same felt as the shared table: the wall is built and dealt from, claims fly to their sets, chips cross to the winner and confetti goes up; play waits for the deal. A phone held upright keeps the compact table
+2026-10-07T11:58:10Z - Fixed: on the hand result, each seat's payment showed as a coin drawn over its text
+2026-10-07T12:06:46Z - Tiles slide into place when your hand is sorted, a tile is thrown or the drawn tile joins the hand, on phones and in solo
+2026-10-07T12:06:46Z - The table draws whoever is on the clock as a bar draining along their rack, pulsing in the last five seconds
+2026-10-07T12:06:46Z - Phones buzz when it is your turn, when you can claim, and when you win (Settings → This phone → Vibrate). Android only: iPhones cannot vibrate from a web page
+2026-10-07T12:21:46Z - Hints now count your waits: on your turn, which throw leaves you ready and on how many tiles; between turns, each tile you win on and how many are still unseen, with a dead wait struck through
+2026-10-07T12:21:46Z - Game length: play the East round alone, East and South, or all four winds (start page, solo settings and the table settings). The round wind moves on after every four dealerships
+2026-10-07T12:49:52Z - Skip the deal or a win's celebration: a Skip button in the corner of the felt, in solo and on the table screen. A table screen that shows no motion no longer holds play while it would have dealt
+2026-10-07T12:49:52Z - Wins worth retelling get their own moment on the felt: petals for 槓上開花, the robbed tile snatched across the table for 搶槓, a moon for 海底撈月, ripples for 河底撈魚, and gold rays for a limit hand, whose sets then turn over one by one on the result sheet. They share a longer flourish in place of the usual win sound
 2026-10-07T16:01:24Z - New Hong Kong tile face, now the default: dots and bamboo painted red, green and blue, the Eight Bamboo as a W over an M, the Nine Bamboo with a red middle column, a red 萬 under each Characters numeral, and the White Dragon as an empty blue frame. The plain Pips face is still under Table & tiles
 2026-10-07T17:05:40Z - Hong Kong tiles: the Eight Bamboo's outer sticks now stand upright and parallel, with only the inner pair leaning, as on a conventional set

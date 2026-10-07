@@ -66,6 +66,9 @@ export interface PhoneDisplay {
   setPlayLog: (value: OnOff) => void;
   size: PhoneSize;
   setSize: (value: PhoneSize) => void;
+  /** A buzz when it is your turn, a claim is offered, or you win. */
+  vibrate: OnOff;
+  setVibrate: (value: OnOff) => void;
 }
 
 export function usePhoneDisplay(): PhoneDisplay {
@@ -75,5 +78,6 @@ export function usePhoneDisplay(): PhoneDisplay {
     "standard",
     "comfy",
   ]);
-  return { playLog, setPlayLog, size, setSize };
+  const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
+  return { playLog, setPlayLog, size, setSize, vibrate, setVibrate };
 }

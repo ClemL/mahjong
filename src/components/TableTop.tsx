@@ -1,20 +1,30 @@
 "use client";
 
-import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
-import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { useTabletDisplay } from "@/hooks/useLocalSetting";
+import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
 import { TableResult } from "./TableResult";
-import { ChipStack, DealOverlay, WinOverlay, chipsOf, useWindow } from "./TableEffects";
+import {
+  ChipStack,
+  DealOverlay,
+  MOMENT_MS,
+  MomentOverlay,
+  WinOverlay,
+  chipsOf,
+  useWindow,
+  winFxMs,
+} from "./TableEffects";
+import { signatureMoment, winningTileOf } from "./moments";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
@@ -31,6 +41,12 @@ import {
 } from "./tableLayout";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
+
+/** A deal shown without its opening flowers being laid down one by one. */
+const NO_FLOWERS = new Map<string, number>();
+
+/** Under this much time left, the rack's clock starts to pulse. */
+const URGENT_MS = 5000;
 
 /** Ponds are sized for a full hand's worth from the start, so tiles do not shrink as it fills. */
 const POND_CAPACITY = 24;
@@ -187,6 +203,15 @@ function Rack({
         ) : null}
       </div>
       {status ? <span className="rack__status">{status}</span> : null}
+      {left !== null && view.turnAllowance > 0 ? (
+        // The clock drawn along the rack, to read from across the table; the
+        // seconds stay in the pill above for anyone close enough.
+        <span
+          className={left <= URGENT_MS ? "rack__clock rack__clock--urgent" : "rack__clock"}
+          style={{ "--left": Math.max(0, Math.min(1, left / view.turnAllowance)) } as Vars}
+          aria-hidden
+        />
+      ) : null}
     </section>
   );
 }
@@ -534,16 +559,45 @@ function Console({
 }
 
 /**
- * The shared tablet, drawn as the table itself. The felt is the screen: a
- * rack along each edge for the seat sitting there, every pond in front of its
- * owner, and the last discard in the middle. Concealed tiles are never on it —
- * the server does not send them to this device at all.
+ * Whether the hand's result is laid over the felt. It can be put aside to look
+ * at the table, and the next hand brings it back.
  */
-export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; sound?: SoundToggle }) {
-  const wakeLock = useWakeLock(true);
-  const appearance = useAppearance();
-  const fullscreen = useFullscreen();
-  const display = useTabletDisplay();
+export function useResultSheet(view: RoomView) {
+  const [asideHand, setAsideHand] = useState<number | null>(null);
+  const settled = (view.phase === "handOver" || view.phase === "gameOver") && view.result !== null;
+  return {
+    open: settled && asideHand !== view.handNumber,
+    /** Settled, with the sheet put aside — the way back to it is the caller's. */
+    aside: settled && asideHand === view.handNumber,
+    hide: () => setAsideHand(view.handNumber),
+    show: () => setAsideHand(null),
+  };
+}
+
+export type ResultSheet = ReturnType<typeof useResultSheet>;
+
+/**
+ * The cloth and everything on it: a rack along each edge for the seat sitting
+ * there, every pond in front of its owner, the wall, the last discard in the
+ * middle, and the deal, the claims and the win played out across it. It draws
+ * a table's view, so concealed tiles are never on it.
+ */
+export function Felt({
+  view,
+  display,
+  sheet,
+  onNextHand,
+  onSkipDeal,
+  busy = false,
+}: {
+  view: RoomView;
+  display: TabletDisplay;
+  sheet: ResultSheet;
+  onNextHand: () => void;
+  /** The deal has been skipped here; whoever holds play for it should stop. */
+  onSkipDeal?: () => void;
+  busy?: boolean;
+}) {
   const felt = useRef<HTMLDivElement>(null);
   const size = useElementSize(felt);
 
@@ -575,23 +629,153 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   useClaimFlight(felt, view, position);
   usePondArrival(felt, view, position);
   const opening = useOpening(view);
-  const dealing = useWindow(opening.dealKey, DEAL_MS + 100);
+  const won = over && view.result?.type === "win" ? view.result : null;
+  const winKey = won ? `win-${view.handNumber}` : null;
+  // Whichever ceremony was skipped, by its key: a deal or a win, never a later one.
+  const [skipped, setSkipped] = useState<string | null>(null);
+  const dealSkipped = opening.dealKey !== null && skipped === opening.dealKey;
+  const winSkipped = winKey !== null && skipped === winKey;
+  const opened = opening.live && !dealSkipped;
+  const dealing = useWindow(opening.dealKey, DEAL_MS + 100) && !dealSkipped;
+  const winLive = useWindow(winKey, winFxMs(won?.payments ?? [], won?.winner ?? null)) && !winSkipped;
+  const moment = signatureMoment(won);
+  const momentLive = useWindow(moment ? winKey : null, MOMENT_MS) && !winSkipped;
   const wall = wallGeometry(layout, flowersInPlay(view.config) ? 144 : 136, view.handNumber);
   const brk = wallBreak(wall, position(view.dealer), view.handNumber);
-  const won =
-    (view.phase === "handOver" || view.phase === "gameOver") && view.result?.type === "win"
-      ? view.result
-      : null;
-  // The result sheet can be put aside to look at the table; the next hand brings it back.
-  const [asideHand, setAsideHand] = useState<number | null>(null);
-  const sheetOpen = over && view.result !== null && asideHand !== view.handNumber;
+  // A screen that does not animate the deal has nothing to wait for: the hold
+  // the room keeps for it is let go as soon as the hand is seen.
+  const skipRef = useRef(onSkipDeal);
+  skipRef.current = onSkipDeal;
+  useEffect(() => {
+    if (opening.dealKey === null) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) skipRef.current?.();
+  }, [opening.dealKey]);
+  const skip = () => {
+    if (opened) {
+      setSkipped(opening.dealKey);
+      onSkipDeal?.();
+    } else if (winKey) {
+      setSkipped(winKey);
+    }
+  };
+
+  return (
+    <div className="felt" ref={felt}>
+      {/* Nothing is placed until the felt has a size to solve against. */}
+      {size.width > 0 ? (
+        <>
+          <TableWall
+            geometry={wall}
+            brk={brk}
+            view={view}
+            opening={opened}
+            hidden={display.wall === "off"}
+          />
+          {SEATS.map((seat) => (
+            <Rack
+              key={seat}
+              player={view.players[seat]}
+              view={view}
+              layout={layout}
+              position={position(seat)}
+              flowerOrder={dealSkipped ? NO_FLOWERS : opening.flowerOrder}
+            />
+          ))}
+          {SEATS.map((seat) => (
+            <Discards
+              key={seat}
+              player={view.players[seat]}
+              layout={layout}
+              position={position(seat)}
+              centreId={centreId}
+              lit={
+                display.turnGlow === "on" &&
+                ((view.phase === "action" && view.turn === seat) ||
+                  view.awaitingClaimSeats.includes(seat))
+              }
+            />
+          ))}
+          <Console view={view} layout={layout} position={position} sheetOpen={sheet.open} />
+          <DealOverlay
+            live={dealing}
+            layout={layout}
+            dealer={view.dealer}
+            position={position}
+            origin={(i) => headPoint(wall, brk, i < 12 ? i * 4 : 48 + (i - 12))}
+          />
+          <WallDraws
+            geometry={wall}
+            brk={brk}
+            view={view}
+            rackCentre={(seat) => {
+              const r = layout.racks[position(seat)];
+              return { x: r.cx, y: r.cy };
+            }}
+            enabled={display.wall === "on" && !opened}
+          />
+          {/* A moment has the felt to itself; the sheet follows it, or a skip. */}
+          {sheet.open && !momentLive ? (
+            <TableResult
+              view={view}
+              name={(seat) => occupantName(view.players[seat])}
+              tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
+              onHide={sheet.hide}
+              onNextHand={onNextHand}
+              busy={busy}
+            />
+          ) : null}
+          <WinOverlay
+            live={winLive}
+            layout={layout}
+            winner={won?.winner ?? null}
+            payments={won?.payments ?? []}
+            faan={won?.score?.scoredFaan ?? 0}
+            position={position}
+          />
+          <MomentOverlay
+            moment={moment}
+            live={momentLive}
+            layout={layout}
+            winner={won?.winner ?? null}
+            robbedFrom={moment?.kind === "robbing" ? (won?.from ?? null) : null}
+            tile={moment?.kind === "robbing" ? winningTileOf(view.log) : null}
+            position={position}
+          />
+          {opened || winLive || momentLive ? (
+            // Seen it before: the deal, or a win's chips and confetti, can be cut short.
+            <button
+              type="button"
+              className="felt__skip"
+              onClick={skip}
+              aria-label={opened ? "Skip the deal" : "Skip the celebration"}
+            >
+              Skip ⏭
+            </button>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The shared tablet, drawn as the table itself: the felt under a bar of the
+ * table's own controls. Concealed tiles are never on it — the server does not
+ * send them to this device at all.
+ */
+export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; sound?: SoundToggle }) {
+  const wakeLock = useWakeLock(true);
+  const appearance = useAppearance();
+  const fullscreen = useFullscreen();
+  const display = useTabletDisplay();
+  const sheet = useResultSheet(view);
 
   return (
     <div className="tabletop">
       <header className="tabletop__bar">
         <span className="tableview__code">{tableName(view.roomId)}</span>
         <span className="stat__value">
-          {tileGlyph(view.roundWind)} East · hand {view.handNumber}
+          {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
         </span>
         <span className="seat__meta">{view.wallCount} tiles left</span>
         {wakeLock !== "held" ? (
@@ -605,8 +789,8 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         ) : null}
         <span className="topbar__spacer" />
         <div className="actions">
-          {over && !sheetOpen && view.result ? (
-            <button type="button" className="btn btn--sm" onClick={() => setAsideHand(null)}>
+          {sheet.aside ? (
+            <button type="button" className="btn btn--sm" onClick={sheet.show}>
               Result
             </button>
           ) : null}
@@ -667,79 +851,14 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         </div>
       </header>
 
-      <div className="felt" ref={felt}>
-        {/* Nothing is placed until the felt has a size to solve against. */}
-        {size.width > 0 ? (
-          <>
-            <TableWall
-              geometry={wall}
-              brk={brk}
-              view={view}
-              opening={opening.live}
-              hidden={display.wall === "off"}
-            />
-            {SEATS.map((seat) => (
-              <Rack
-                key={seat}
-                player={view.players[seat]}
-                view={view}
-                layout={layout}
-                position={position(seat)}
-                flowerOrder={opening.flowerOrder}
-              />
-            ))}
-            {SEATS.map((seat) => (
-              <Discards
-                key={seat}
-                player={view.players[seat]}
-                layout={layout}
-                position={position(seat)}
-                centreId={centreId}
-                lit={
-                  display.turnGlow === "on" &&
-                  ((view.phase === "action" && view.turn === seat) ||
-                    view.awaitingClaimSeats.includes(seat))
-                }
-              />
-            ))}
-            <Console view={view} layout={layout} position={position} sheetOpen={sheetOpen} />
-            <DealOverlay
-              live={dealing}
-              layout={layout}
-              dealer={view.dealer}
-              position={position}
-              origin={(i) => headPoint(wall, brk, i < 12 ? i * 4 : 48 + (i - 12))}
-            />
-            <WallDraws
-              geometry={wall}
-              brk={brk}
-              view={view}
-              rackCentre={(seat) => {
-                const r = layout.racks[position(seat)];
-                return { x: r.cx, y: r.cy };
-              }}
-              enabled={display.wall === "on" && !opening.live}
-            />
-            {sheetOpen ? (
-              <TableResult
-                api={api}
-                view={view}
-                name={(seat) => occupantName(view.players[seat])}
-                tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
-                onHide={() => setAsideHand(view.handNumber)}
-              />
-            ) : null}
-            <WinOverlay
-              winKey={won ? `win-${view.handNumber}` : null}
-              layout={layout}
-              winner={won?.winner ?? null}
-              payments={won?.payments ?? []}
-              faan={won?.score?.scoredFaan ?? 0}
-              position={position}
-            />
-          </>
-        ) : null}
-      </div>
+      <Felt
+        view={view}
+        display={display}
+        sheet={sheet}
+        onNextHand={() => void api.control({ type: "nextHand" })}
+        onSkipDeal={() => void api.control({ type: "skipOpening" })}
+        busy={api.busy}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import {
   type GameState,
   claimOptionsFor,
   createGame,
+  setRounds,
   discard,
   nextHand,
   resolveClaims,
@@ -340,5 +341,59 @@ describe("full hands", () => {
     expect(state.phase).toBe("gameOver");
     expect(state.dealership).toBe(4);
     expect(state.scores.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  /** Plays every hand of a game of `rounds` wind rounds, all four seats by the computer. */
+  function playGame(rounds: number, seed: number): GameState {
+    const rng = createRng(seed);
+    let state = createGame({ seed, config: { ...DEFAULT_RULES, rounds } });
+    for (const p of state.players) p.isHuman = false;
+    for (let hands = 0; state.phase !== "gameOver" && hands < 400; hands++) {
+      state = nextHand(autoPlayHand(state, rng).state);
+      for (const p of state.players) p.isHuman = false;
+    }
+    return state;
+  }
+
+  it("plays the East round and then the South round when the game runs two", () => {
+    const state = playGame(2, 777);
+    expect(state.phase).toBe("gameOver");
+    const winds = [...new Set(state.history.map((h) => h.roundWind))];
+    expect(winds).toEqual(["we", "ws"]);
+    // Each round starts back with the first dealer.
+    const firstSouth = state.history.find((h) => h.roundWind === "ws")!;
+    expect(firstSouth.dealer).toBe(0);
+    expect(state.scores.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it("plays every wind when the game runs four rounds", () => {
+    const state = playGame(4, 4321);
+    expect(state.phase).toBe("gameOver");
+    expect([...new Set(state.history.map((h) => h.roundWind))]).toEqual(["we", "ws", "ww", "wn"]);
+  });
+
+  it("ends a game in the round it is in when it is shortened", () => {
+    // Play into the South round of a two-round game, then cut it to one round.
+    const rng = createRng(777);
+    let state = createGame({ seed: 777, config: { ...DEFAULT_RULES, rounds: 2 } });
+    for (const p of state.players) p.isHuman = false;
+    while (state.roundWind !== "ws") {
+      state = nextHand(autoPlayHand(state, rng).state);
+      for (const p of state.players) p.isHuman = false;
+    }
+    state = setRounds(state, 1);
+    expect(state.config.rounds).toBe(1);
+    while (state.phase !== "gameOver") {
+      state = nextHand(autoPlayHand(state, rng).state);
+      for (const p of state.players) p.isHuman = false;
+    }
+    expect(state.roundWind).toBe("ws");
+  });
+
+  it("treats a table saved before game lengths existed as one round", () => {
+    const old = createGame({ seed: 5 });
+    const { rounds: _gone, ...config } = old.config;
+    const state = { ...old, config: config as typeof old.config };
+    expect(setRounds(state, 1)).toBe(state);
   });
 });

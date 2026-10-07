@@ -17,17 +17,19 @@ import {
   mayDeal,
   mayRegroup,
   newRoom,
+  dealShowMs,
   normalizeRoom,
   pendingHumanClaimants,
   returnToLobby,
   robotName,
   shouldRegroup,
+  soloTableView,
   startPlay,
   syncSeats,
   touch,
   viewFor,
 } from "../room";
-import { discard } from "../engine";
+import { createGame, discard } from "../engine";
 import type { Seat } from "../tiles";
 
 function seat(room: Room, index: Seat, token: string, name = "Someone"): void {
@@ -146,6 +148,45 @@ describe("redaction", () => {
       dealer === 0 || dealer === 1 ? room.state.drawnTileId : null,
     );
     expect(viewFor(room, "tok-table").drawnTileId).toBeNull();
+  });
+});
+
+describe("the solo felt", () => {
+  const state = createGame({ seed: 11, humanSeat: 0 });
+
+  it("draws no concealed tile on the felt, the player's own included", () => {
+    const view = soloTableView(state, null, []);
+    for (const player of view.players) {
+      expect(player.hand.every((t) => t.code === "back")).toBe(true);
+      expect(player.handCount).toBe(state.players[player.seat].hand.length);
+    }
+    expect(view.you).toEqual({ role: "table", seat: null });
+    expect(view.actions).toBeNull();
+    expect(view.claim).toBeNull();
+  });
+
+  it("never carries the wall, only its count", () => {
+    const view = soloTableView(state, null, []);
+    expect(view.wallCount).toBe(state.wall.length);
+    expect(JSON.stringify(view)).not.toContain('"wall"');
+  });
+
+  it("turns every hand up once the hand is settled", () => {
+    const view = soloTableView({ ...state, phase: "handOver" }, null, []);
+    for (const player of view.players) {
+      expect(player.hand).toEqual(state.players[player.seat].hand);
+    }
+  });
+
+  it("names the player and leaves the computer seats to their winds", () => {
+    const view = soloTableView(state, null, []);
+    expect(view.players[0].occupant).toEqual({ kind: "human", name: "East (you)", away: false });
+    expect(view.players[1].occupant).toEqual({ kind: "ai", name: null, away: false });
+  });
+
+  it("holds the deal as long as the felt takes to show it", () => {
+    const flowers = state.players.reduce((n, p) => n + p.flowers.length, 0);
+    expect(dealShowMs(state)).toBe(DEAL_MS + flowers * FLOWER_STEP_MS);
   });
 });
 

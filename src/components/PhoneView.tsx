@@ -12,6 +12,8 @@ import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useHandOrder } from "@/hooks/useHandOrder";
+import { useFlip } from "@/hooks/useFlip";
+import { useHaptics } from "@/hooks/useHaptics";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
@@ -162,6 +164,7 @@ export function PhoneView({
   const fullscreen = useFullscreen("landscape");
   const layout = useCompactLayout();
   const display = usePhoneDisplay();
+  useHaptics(view, display.vibrate === "on");
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
@@ -228,6 +231,9 @@ export function PhoneView({
   const [dragging, setDragging] = useState<string | null>(null);
   const [flicking, setFlicking] = useState<string | null>(null);
   const canThrow = Boolean(yourTurn) && !api.busy;
+  // Tiles slide into a new sort or round a closing gap; a finger placing
+  // them itself gets them where it puts them, without a slide fighting it.
+  useFlip(handRef, dragging === null && flicking === null);
 
   const displayIds = () => [...order.tiles.map((t) => t.id), ...(order.drawn ? [order.drawn.id] : [])];
 
@@ -384,7 +390,7 @@ export function PhoneView({
   // is waiting on the person being asked about it.
   const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
-  if (view.phase === "gameOver") prompt = `${winText} The round is over.`;
+  if (view.phase === "gameOver") prompt = `${winText} That is the game.`;
   else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
   else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;

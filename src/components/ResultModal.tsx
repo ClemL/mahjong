@@ -1,7 +1,8 @@
 "use client";
 
 import type { GameState } from "@/game/engine";
-import { SEAT_NAMES, type Seat } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, tileGlyph } from "@/game/tiles";
+import { describeRounds, roundsInGame } from "@/game/rules";
 import { TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
 import { SERIES_COLORS, ScoreChart } from "./ScoreChart";
@@ -35,11 +36,11 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
     const wins = state.history.filter((h) => h.type === "win").length;
     return (
       <div className="modal__backdrop">
-        <div className="modal modal--wide" role="dialog" aria-modal="true" aria-label="Round complete">
-          <h2 className="modal__title">East round complete</h2>
+        <div className="modal modal--wide" role="dialog" aria-modal="true" aria-label="Game complete">
+          <h2 className="modal__title">Game complete</h2>
           <p className="modal__subtitle">
-            {state.history.length} hands played — {wins} won, {state.history.length - wins}{" "}
-            washed out.
+            {state.history.length} hands over {describeRounds(roundsInGame(state.config))} —{" "}
+            {wins} won, {state.history.length - wins} washed out.
           </p>
 
           <Standings scores={state.scores} />
@@ -66,7 +67,11 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
             <tbody>
               {state.history.map((h) => (
                 <tr key={`row-${h.handNumber}`}>
-                  <td>{h.handNumber}</td>
+                  {/* The round wind beside the number, once there is more than one round. */}
+                  <td>
+                    {roundsInGame(state.config) > 1 ? `${tileGlyph(h.roundWind)} ` : null}
+                    {h.handNumber}
+                  </td>
                   <td>
                     {h.type === "washout"
                       ? "Washed out"

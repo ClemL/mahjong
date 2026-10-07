@@ -8,6 +8,7 @@ import {
   grantMoreTime,
   hasAnyPlayer,
   identify,
+  isOpeningTurn,
   seatName,
   isHumanSeat,
   pendingHumanClaimants,
@@ -37,8 +38,10 @@ import {
   nextHand,
   setFlowers,
   setMinFaan,
+  setRounds,
   startHand,
 } from "@/game/engine";
+import { ROUND_CHOICES } from "@/game/rules";
 import type { Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
 import { RoomError } from "./errors";
@@ -265,6 +268,8 @@ export type TableCommand =
   | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
+  | { type: "rounds"; value: number }
+  | { type: "skipOpening" }
   | { type: "flowers"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "turnLimit"; value: number }
@@ -334,6 +339,19 @@ export async function control(
         break;
       case "minFaan":
         r.state = setMinFaan(r.state, command.value);
+        break;
+      // The table has cut its deal short: play starts now instead of when the
+      // deal would have finished. Anything later than the opening is not a
+      // hold to cut, so it is left alone.
+      case "skipOpening":
+        if (r.started && isOpeningTurn(r.state) && r.lastStepAt > now) r.lastStepAt = now;
+        break;
+      // Like the minimum, it can change mid-game: it is read when a round ends.
+      case "rounds":
+        if (!(ROUND_CHOICES as readonly number[]).includes(command.value)) {
+          throw new RoomError("No such game length", 400);
+        }
+        r.state = setRounds(r.state, command.value);
         break;
       // The tile set is fixed when a hand is dealt, so it can only change
       // between hands: before the first, or once one is over.

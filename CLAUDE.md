@@ -12,10 +12,12 @@ These apply to every request in this repo.
   restart from the latest `main` rather than adding commits on top of merged history.
 * **Open a pull request when the work is done.** Once changes are committed and pushed, open a PR
   against `main` summarizing what changed and why, so it can be reviewed before merging.
-* **Verify before opening the PR.** All three must pass:
+* **Verify before opening the PR.** All four must pass; CI (`.github/workflows/ci.yml`) runs the same
+  four on every pull request, but run them locally first:
   * `npm run typecheck`
   * `npm test` — the engine suite, including the fuzz run over full hands
   * `npm run build`
+  * `npm run test:e2e` — the Playwright smoke tests in `e2e/`, against that build
 * **Add a line to `public/updates.txt` when you ship a user-visible change.** One entry per line,
   **oldest first** (append to the end), formatted `<ISO timestamp> - <what changed>`. The footer
   shows the last line; the changelog dialog shows them all, newest first. Engine refactors and test
@@ -30,8 +32,10 @@ These apply to every request in this repo.
 ## What this project is
 
 A Hong Kong old-style mahjong table for the browser. You play East; three computer opponents play
-the other seats. Next.js App Router, deployed to Vercel as a fully static site — the whole game runs
-client-side, with no backend, database, or environment variables.
+the other seats. Next.js App Router, deployed to Vercel. The solo game runs entirely client-side;
+multiplayer rooms go through a few API routes backed by Upstash Redis (`UPSTASH_REDIS_REST_URL`,
+`UPSTASH_REDIS_REST_TOKEN`), and fall back to process memory without them — enough for local runs and
+the browser tests, not for production.
 
 ## Layout
 
@@ -61,6 +65,7 @@ src/film/          The explainer film — hand-drawn canvas animation, no React
   film.ts          renderFrame(ctx, t) — the whole film from a timestamp
 src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, footer
 src/app/           Next.js entry and all styles
+e2e/               Playwright smoke tests against the production build
 public/updates.txt Changelog, oldest first
 ```
 
@@ -82,7 +87,9 @@ public/updates.txt Changelog, oldest first
 * **Verify UI work in a real browser.** Component tests (`src/components/__tests__/*.test.tsx`, jsdom
   + Testing Library) cover behavior, not layout or rendering. Every UI bug
   found so far — a double discard, a broken mobile grid, an invisible suit mark — was caught by
-  driving the built app in Chromium, not by the test suite. Do that before claiming a UI change works.
+  driving the built app in Chromium, not by the test suite. Do that before claiming a UI change works,
+  and when a flow breaks, add the check to `e2e/` so it stays caught. `/solo?seed=<n>` deals a known
+  hand for exactly that.
 * **Before writing chart code, load the `dataviz` skill and run its palette validator** against the
   surface the chart actually sits on. The existing chart's colors are validated; do not add series
   colors by eye.
@@ -113,4 +120,5 @@ npm run dev        # http://localhost:3000
 npm test           # engine unit tests + fuzz run
 npm run typecheck  # tsc --noEmit
 npm run build      # production build; must pass before a PR
+npm run test:e2e   # browser smoke tests; needs the build (npx playwright install chromium once)
 ```

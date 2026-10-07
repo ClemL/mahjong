@@ -22,7 +22,7 @@ import {
 import { type Meld, chowPartners, removeTiles, takeTiles } from "./melds";
 import { analyzeShape, waitingTiles } from "./winning";
 import { type ScoreResult, scoreHand } from "./scoring";
-import { DEFAULT_RULES, type RuleConfig, flowersInPlay } from "./rules";
+import { DEFAULT_RULES, type RuleConfig, describeRounds, flowersInPlay, roundsInGame } from "./rules";
 import { createRng, shuffle } from "./rng";
 
 export type Phase = "action" | "claiming" | "handOver" | "gameOver";
@@ -347,8 +347,6 @@ export interface TurnActions {
   kongs: KongOption[];
   canWin: boolean;
   winScore: ScoreResult | null;
-  /** Tile codes that would complete the hand after the best discard, if any. */
-  waits: TileCode[];
 }
 
 /** Kongs the seat may declare on its own turn. */
@@ -409,19 +407,14 @@ export function turnActions(state: GameState, seat: Seat): TurnActions {
   // A settled discard still sitting on the table means this seat has already
   // acted and the turn has yet to pass on.
   if (state.phase !== "action" || state.turn !== seat || state.lastDiscard !== null) {
-    return { canDiscard: false, kongs: [], canWin: false, winScore: null, waits: [] };
+    return { canDiscard: false, kongs: [], canWin: false, winScore: null };
   }
-  const p = player(state, seat);
   const winScore = selfDrawScore(state, seat);
   return {
     canDiscard: true,
     kongs: kongOptions(state, seat),
     canWin: winScore !== null,
     winScore,
-    waits: waitingTiles(
-      p.hand.filter((t) => !isFlower(t.code)).map((t) => t.code),
-      p.melds,
-    ),
   };
 }
 
@@ -945,7 +938,20 @@ export function setFlowers(previous: GameState, flowers: boolean): GameState {
   return state;
 }
 
-/** Move to the next hand, rotating the dealership when required. */
+/**
+ * Change how many wind rounds the game runs. It takes effect at the end of the
+ * current round: a game already in its last round under the new length ends
+ * there.
+ */
+export function setRounds(previous: GameState, rounds: number): GameState {
+  if (roundsInGame(previous.config) === rounds) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, rounds };
+  log(state, null, `The game now runs ${describeRounds(roundsInGame(state.config))}`);
+  return state;
+}
+
+/** Move to the next hand, rotating the dealership and the round wind when required. */
 export function nextHand(previous: GameState): GameState {
   let state = clone(previous);
   if (state.phase !== "handOver") return state;
@@ -955,9 +961,18 @@ export function nextHand(previous: GameState): GameState {
     state.dealer = nextSeat(state.dealer, 1);
   }
   if (state.dealership >= 4) {
-    state.phase = "gameOver";
-    log(state, null, "The East round is complete.");
-    return state;
+    // Four dealerships brings the deal back to the first dealer, and the
+    // round wind moves on — unless that was the game's last round.
+    const round = WINDS.indexOf(state.roundWind);
+    const name = SEAT_NAMES[round as Seat];
+    if (round + 1 >= roundsInGame(state.config)) {
+      state.phase = "gameOver";
+      log(state, null, `The ${name} round is complete.`);
+      return state;
+    }
+    state.roundWind = WINDS[round + 1];
+    state.dealership = 0;
+    log(state, null, `The ${name} round is complete; the ${SEAT_NAMES[(round + 1) as Seat]} round begins.`);
   }
   state = startHand(state);
   return state;

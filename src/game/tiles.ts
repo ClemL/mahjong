@@ -185,3 +185,8 @@ export function tileName(code: TileCode): string {
 }
 
 export const SEAT_NAMES = ["East", "South", "West", "North"] as const;
+
+/** The round a prevailing wind names: "South" in the South round. */
+export function roundName(roundWind: TileCode): string {
+  return SEAT_NAMES[WINDS.indexOf(roundWind) as Seat] ?? SEAT_NAMES[0];
+}
