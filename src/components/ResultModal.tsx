@@ -4,7 +4,7 @@ import type { GameState } from "@/game/engine";
 import { SEAT_NAMES, type Seat, tileGlyph } from "@/game/tiles";
 import { describeRounds, roundsInGame } from "@/game/rules";
 import { TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./SeatPanel";
 import { SERIES_COLORS, ScoreChart } from "./ScoreChart";
 
 interface Props {
@@ -144,7 +144,7 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
             {winnerPlayer.flowers.length > 0 ? (
               <span className="meld">
                 {winnerPlayer.flowers.map((t) => (
-                  <TileFace key={t.id} code={t.code} size="sm" />
+                  <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, winnerPlayer)} />
                 ))}
               </span>
             ) : null}

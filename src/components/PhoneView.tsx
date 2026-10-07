@@ -16,7 +16,7 @@ import { useFlip } from "@/hooks/useFlip";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileBack, TileButton, TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./SeatPanel";
 import { ChipStack, Confetti, chipsOf, confettiCount } from "./TableEffects";
 import type { SoundToggle } from "./TableView";
 import { SettingsMenu } from "./SettingsMenu";
@@ -33,6 +33,9 @@ const FLICK_REACH = 0.9;
 const FLICK_SPEED = 0.45;
 
 const KEEP_AWAKE_KEY = "hk-mahjong.keepAwake";
+
+/** Open tiles compact fits on its header line beside everything else. */
+const COMPACT_HEADER_TILES = 5;
 
 /** Keep-awake is remembered per device: whoever wanted it once wants it every game. */
 function useKeepAwake() {
@@ -192,11 +195,15 @@ export function PhoneView({
   const [sent, setSent] = useState<Sent | null>(null);
   // The claim being pressed or hovered, whose tiles the hand lifts.
   const [preview, setPreview] = useState<ClaimOption | null>(null);
+  // Your open sets and flowers drawn large, for reading across a table.
+  const [zoomed, setZoomed] = useState(false);
   useEffect(() => {
     // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
     setPreview(null);
     setFlung(null);
+    // A move to make should not open under the enlarged sets.
+    setZoomed(false);
   }, [view.turn, view.handNumber, view.phase]);
 
   // The first touch asks for full screen. It cannot be asked for without one,
@@ -460,21 +467,42 @@ export function PhoneView({
           />
         ))
       : null;
+  const sets = (
+    <>
+      {me.melds.map((m, i) => (
+        <MeldRow key={`m${i}`} meld={m} />
+      ))}
+      {me.flowers.length > 0 ? (
+        <span className="meld phone__flowers">
+          {me.flowers.map((t) => (
+            <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, me)} />
+          ))}
+        </span>
+      ) : null}
+    </>
+  );
+  const hasSets = me.melds.length > 0 || me.flowers.length > 0;
   const exposed =
-    me.melds.length > 0 || me.flowers.length > 0 || ghosts ? (
+    hasSets || ghosts ? (
       <div className="seat__row phone__melds">
-        {me.melds.map((m, i) => (
-          <MeldRow key={`m${i}`} meld={m} />
-        ))}
-        {me.flowers.map((t) => (
-          <TileFace key={t.id} code={t.code} size="sm" />
-        ))}
+        {hasSets ? (
+          <button
+            type="button"
+            className="phone__sets"
+            aria-label="Enlarge your open sets and flowers"
+            onClick={() => setZoomed(true)}
+          >
+            {sets}
+          </button>
+        ) : null}
         {ghosts}
       </div>
     ) : null;
-  // Compact keeps open melds on its one header line — until ghosts need the
-  // room, and then they get a row of their own.
-  const exposedInHeader = compact && !ghosts;
+  // Compact keeps open melds on its one header line while they are few; past
+  // that, or when ghosts need the room, they get a row of their own so they
+  // can be drawn large enough to read.
+  const exposedTiles = me.melds.reduce((n, m) => n + m.tiles.length, 0) + me.flowers.length;
+  const exposedInHeader = compact && !ghosts && exposedTiles <= COMPACT_HEADER_TILES;
 
   const handTile = (t: Tile, drawn: boolean) => (
     <TileButton
@@ -712,6 +740,19 @@ export function PhoneView({
           )}
         </div>
       </div>
+      {zoomed && hasSets ? (
+        <button
+          type="button"
+          className="phone__zoom"
+          aria-label="Close the enlarged sets"
+          onClick={() => setZoomed(false)}
+        >
+          <span className="phone__zoom-sets">{sets}</span>
+          {me.flowers.some((t) => bonusClass(t.code, me)) ? (
+            <span className="phone__zoom-note">Faded flowers score nothing for your seat.</span>
+          ) : null}
+        </button>
+      ) : null}
       {landscape && youWon && result?.score ? (
         <Confetti
           key={`confetti-${view.handNumber}`}
