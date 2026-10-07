@@ -8,3 +8,5 @@ build/
 next-env.d.ts
 coverage/
 results/
+playwright-report/
+test-results/

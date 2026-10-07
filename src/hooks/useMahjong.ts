@@ -65,6 +65,16 @@ export interface MahjongApi extends GameSettings {
   newGame: () => void;
 }
 
+/**
+ * A `?seed=` on the address deals that game, so a reported deal can be played
+ * again and the browser tests start from a known table. Only the first deal
+ * reads it; New game is a fresh shuffle.
+ */
+function seedFromAddress(): number | undefined {
+  const asked = Number(new URLSearchParams(window.location.search).get("seed"));
+  return Number.isInteger(asked) && asked > 0 ? asked >>> 0 : undefined;
+}
+
 export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const [state, setState] = useState<GameState | null>(null);
   const settings = usePreferences();
@@ -74,8 +84,8 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
   const mutedRef = useRef(muted);
   mutedRef.current = muted;
 
-  const start = useCallback(() => {
-    const seed = Math.floor(Math.random() * 0xffffffff);
+  const start = useCallback((asked?: number) => {
+    const seed = asked ?? Math.floor(Math.random() * 0xffffffff);
     rngRef.current = createRng(seed ^ 0x5bf03635);
     // Read straight from storage: this runs on mount, before the hook's own
     // copy of the stored choices has landed in state.
@@ -83,9 +93,11 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     setState(createGame({ seed, humanSeat, config: { ...DEFAULT_RULES, minFaan } }));
   }, [humanSeat]);
 
+  const newGame = useCallback(() => start(), [start]);
+
   // Deal on the client so the server render stays deterministic.
   useEffect(() => {
-    start();
+    start(seedFromAddress());
   }, [start]);
 
   // Cues are derived by comparing each state to the one before it, so the
@@ -250,7 +262,7 @@ export function useMahjong(humanSeat: Seat = 0): MahjongApi {
     claim,
     pass,
     nextHand,
-    newGame: start,
+    newGame,
     minFaan: state?.config.minFaan ?? DEFAULT_RULES.minFaan,
     setMinFaan,
   };
