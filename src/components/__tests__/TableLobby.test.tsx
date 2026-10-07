@@ -19,8 +19,10 @@ describe("TableLobby on the table", () => {
     const view = tableView(lobby([0]));
     render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
 
-    // Seat 1 is taken, so only the other three have a code to scan.
-    expect(screen.queryByRole("img", { name: /take seat 1/ })).toBeNull();
+    // Seat 1 is taken; its code takes it over rather than asking for a name.
+    expect(
+      screen.getByRole("img", { name: /take over seat 1, East, from Kris/ }).getAttribute("data-value"),
+    ).toMatch(/\/room\/TEST\?seat=0&replace=1$/);
     expect(seatCode(2)).toMatch(/\/room\/TEST\?seat=1$/);
 
     fireEvent.change(screen.getByLabelText("Name for seat 2"), { target: { value: "Srini" } });
@@ -155,5 +157,30 @@ describe("TableLobby on a phone", () => {
     fireEvent.click(screen.getByRole("button", { name: "Deal" }));
     expect(api.control).toHaveBeenCalledWith({ type: "deal" });
     expect(screen.queryByRole("button", { name: "Reset table" })).toBeNull();
+  });
+});
+
+describe("moving between chairs", () => {
+  it("lets the table move any seated player either way round", () => {
+    const view = tableView(lobby([0, 1]));
+    const api = fakeApi(view);
+    render(<TableLobby api={api} view={view} sound={sound} />);
+
+    // Empty chairs have nobody to move.
+    expect(screen.getAllByRole("button", { name: /^(Move|Swap) / })).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: "Swap Kris with Srini, seat 2, South" }));
+    expect(api.control).toHaveBeenCalledWith({ type: "moveSeat", seat: 0, step: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Move Kris to seat 4, North" }));
+    expect(api.control).toHaveBeenCalledWith({ type: "moveSeat", seat: 0, step: -1 });
+  });
+
+  it("only offers a phone its own player's buttons", () => {
+    const view = playerView(lobby([0, 1]), 1);
+    render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
+    const buttons = screen.getAllByRole("button", { name: /^(Move|Swap) / });
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      "Swap Srini with Kris, seat 1, East",
+      "Move Srini to seat 3, West",
+    ]);
   });
 });

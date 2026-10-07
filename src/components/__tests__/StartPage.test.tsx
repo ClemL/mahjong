@@ -118,7 +118,7 @@ describe("normalizePreferences", () => {
       normalizePreferences({ version: 2, minFaan: 5, speed: "warp", showHints: false, opponents: "random" }),
     ).toEqual({
       minFaan: 5,
-      rounds: 1,
+      rounds: 4,
       speed: "normal",
       showHints: false,
       muted: false,
@@ -130,8 +130,10 @@ describe("normalizePreferences", () => {
     expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(3);
     expect(normalizePreferences({ version: 2, minFaan: 0 }).minFaan).toBe(0);
     expect(normalizePreferences({ version: 2, minFaan: 4 }).minFaan).toBe(3);
-    // A game runs one, two or four wind rounds; anything else is the one-round default.
-    expect(normalizePreferences({ rounds: 2 }).rounds).toBe(2);
-    expect(normalizePreferences({ rounds: 3 }).rounds).toBe(1);
+    // A game runs one, two or four wind rounds; anything else is the all-four default.
+    expect(normalizePreferences({ version: 3, rounds: 2 }).rounds).toBe(2);
+    expect(normalizePreferences({ version: 3, rounds: 3 }).rounds).toBe(4);
+    // Builds before version 3 saved the old one-round default with every change.
+    expect(normalizePreferences({ version: 2, rounds: 1 }).rounds).toBe(4);
   });
 });
