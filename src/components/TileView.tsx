@@ -11,6 +11,7 @@ import {
   tileSuitGlyph,
 } from "@/game/tiles";
 import { TilePips, hasPips } from "./TilePips";
+import { TraditionalFlower } from "./TraditionalFlower";
 import { TraditionalPips } from "./TraditionalPips";
 
 export type TileSize = "sm" | "md" | "lg";
@@ -61,6 +62,7 @@ function TileArt({ code }: { code: TileCode }) {
       {pips ? <TraditionalPips code={code} /> : null}
       {/* Parlour sets paint the White Dragon as an empty blue frame. */}
       {code === "dw" ? <span className="tile__frame" aria-hidden /> : null}
+      <TraditionalFlower code={code} />
       <span
         className={[
           "tile__glyph",

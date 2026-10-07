@@ -87,6 +87,11 @@
   --trad-green: #137a3e;
   --trad-blue: #1d4f9c;
   --trad-ink: #17233d;
+  --trad-pink: #e0699a;
+  --trad-purple: #7a3fa8;
+  --trad-yellow: #e9b018;
+  --trad-orange: #e0701c;
+  --trad-brown: #6b4423;
 }
 
 * {
@@ -1619,6 +1624,48 @@ details[open] > summary::after {
 
 [data-tiles="traditional"] .tile--dw .tile__glyph {
   display: none;
+}
+
+/* Bonus tiles: a painted motif under a large corner number, which replaces
+   the faint Latin name. */
+.tile__flower,
+.tile__flower-num {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile--f {
+  --flower-tint: transparent;
+}
+
+[data-tiles="traditional"] .tile--f .tile__glyph,
+[data-tiles="traditional"] .tile--f .tile__label {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__flower {
+  display: block;
+  width: 90%;
+  aspect-ratio: 1;
+  margin-top: calc(var(--tile-w) * 0.22);
+}
+
+[data-tiles="traditional"] .tile__flower-num {
+  display: block;
+  position: absolute;
+  top: calc(var(--tile-w) * 0.03);
+  left: calc(var(--tile-w) * 0.1);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: calc(var(--tile-w) * 0.34);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tile__flower-num--flower {
+  color: var(--trad-red);
+}
+
+.tile__flower-num--season {
+  color: var(--trad-blue);
 }
 
 /* A heavy outer rule and a fine inner one, as the tile is engraved. */
