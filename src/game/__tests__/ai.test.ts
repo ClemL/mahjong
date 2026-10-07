@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { type GameState, createGame } from "../engine";
 import { autoPlayHand, shouldPromptClaim } from "../controller";
-import { bestImprovingClaim, greedyAi, randomAi } from "../ai";
+import { bestImprovingClaim, greedyAi, plannedClaim, randomAi } from "../ai";
 import { createRng } from "../rng";
+import { DEFAULT_RULES } from "../rules";
 import { shantenOfCodes } from "../shanten";
 import { isFlower, type Seat, type Tile } from "../tiles";
 
@@ -87,6 +88,37 @@ describe("greedy claims", () => {
   });
 });
 
+describe("claims at a faan minimum", () => {
+  it("keeps a hand concealed rather than open it for a set that costs the minimum", () => {
+    const state = seatedGame(6);
+    const seat: Seat = 1;
+    // Concealed runs are worth 3 faan; opened with a chow they are worth 2.
+    state.players[seat].hand = hand("m1 m2 p1 p2 p3 s7 s8 s9 m5 m6 p7 p8 wn");
+    state.players[seat].melds = [];
+    state.players[seat].flowers = [];
+    const options = [
+      { id: "chow:m1-m2", type: "chow" as const, tileIds: ["h0-m1", "h1-m2"], codes: ["m1", "m2", "m3"] },
+    ];
+    expect(state.config.minFaan).toBe(3);
+    expect(bestImprovingClaim(state, seat, options)?.id).toBe("chow:m1-m2");
+    expect(plannedClaim(state, seat, options)).toBeNull();
+    // With no minimum to protect, the chow is worth taking.
+    state.config = { ...state.config, minFaan: 0 };
+    expect(plannedClaim(state, seat, options)?.id).toBe("chow:m1-m2");
+  });
+
+  it("pungs a dragon when the hand stays worth the minimum", () => {
+    const state = seatedGame(6);
+    const seat: Seat = 1;
+    state.players[seat].hand = hand("m1 m2 m3 p4 p5 p6 s7 s8 s9 dr dr wn ww");
+    state.players[seat].melds = [];
+    // South's own flower and season: 2 faan that opening the hand does not cost.
+    state.players[seat].flowers = [{ id: "f2", code: "f2" }, { id: "f6", code: "f6" }];
+    const options = [{ id: "pung:dr", type: "pung" as const, tileIds: ["h9-dr", "h10-dr"], codes: ["dr", "dr", "dr"] }];
+    expect(plannedClaim(state, seat, options)?.id).toBe("pung:dr");
+  });
+});
+
 describe("claim prompting", () => {
   const state = () => {
     const s = seatedGame(6);
@@ -163,5 +195,16 @@ describe("greedy play holds the engine's invariants", () => {
       return wins;
     };
     expect(play(greedyAi)).toBeGreaterThan(play(randomAi) + 10);
+  }, 120000);
+
+  it("rarely washes out at the default 3 faan minimum", () => {
+    expect(DEFAULT_RULES.minFaan).toBe(3);
+    let washouts = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      const { state } = autoPlayHand(seatedGame(seed * 7919 + 3), createRng(seed + 101), greedyAi);
+      if (state.result?.type !== "win") washouts += 1;
+    }
+    // These seeds wash out 4 times; an opponent blind to the minimum lost about 14.
+    expect(washouts).toBeLessThanOrEqual(6);
   }, 120000);
 });

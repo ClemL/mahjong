@@ -12,7 +12,9 @@ import { isFlower, isTerminalOrHonor } from "./tiles";
 import type { Seat, TileCode } from "./tiles";
 import type { ClaimOption, GameState, KongOption } from "./engine";
 import { kongOptions, selfDrawScore } from "./engine";
-import { CODE_INDEX, countsFromCodes } from "./winning";
+import { CODE_INDEX, type CountVector, countsFromCodes } from "./winning";
+import type { Meld } from "./melds";
+import { type RoutePlan, type Seating, bestPlan, comparePlans, routes } from "./plan";
 import { acceptance, handShanten, seenCounts } from "./shanten";
 import type { Rng } from "./rng";
 
@@ -121,25 +123,29 @@ export const greedyAi: AiStrategy = {
       if (after <= current) return { type: "kong", option: kong };
     }
 
-    const seen = visibleCounts(state, seat);
-    let bestShanten = 99;
+    // Every discard is judged by the best route it leaves open: on a table
+    // with a minimum, a quick hand that cannot be declared is worth nothing.
+    const minFaan = state.config.minFaan;
+    const seating = seatingOf(state, seat);
+    let best: RoutePlan | null = null;
     let candidates: { id: string; code: TileCode }[] = [];
-    const shantenByCode = new Map<TileCode, number>();
+    const planByCode = new Map<TileCode, RoutePlan>();
 
     for (const tile of player.hand) {
       if (isFlower(tile.code)) continue;
-      let value = shantenByCode.get(tile.code);
-      if (value === undefined) {
+      let plan = planByCode.get(tile.code);
+      if (plan === undefined) {
         const index = CODE_INDEX.get(tile.code)!;
         counts[index] -= 1;
-        value = handShanten(counts, player.melds);
+        plan = bestPlan(routes(counts, player.melds, seating), minFaan);
         counts[index] += 1;
-        shantenByCode.set(tile.code, value);
+        planByCode.set(tile.code, plan);
       }
-      if (value < bestShanten) {
-        bestShanten = value;
+      const order = best === null ? -1 : comparePlans(plan, best, minFaan);
+      if (order < 0) {
+        best = plan;
         candidates = [{ id: tile.id, code: tile.code }];
-      } else if (value === bestShanten) {
+      } else if (order === 0) {
         candidates.push({ id: tile.id, code: tile.code });
       }
     }
@@ -149,23 +155,26 @@ export const greedyAi: AiStrategy = {
       return { type: "discard", tileId: fallback?.id ?? "" };
     }
 
-    // Among equally good discards, keep the hand with the most live outs.
-    let bestOuts = -1;
+    // Among equally good discards, keep the hand closest to finished any
+    // way at all, then the one with the most live outs.
+    const seen = visibleCounts(state, seat);
+    let bestKey: [number, number] = [99, -1];
     let finalists: typeof candidates = [];
-    const outsByCode = new Map<TileCode, number>();
+    const keyByCode = new Map<TileCode, [number, number]>();
     for (const candidate of candidates) {
-      let outs = outsByCode.get(candidate.code);
-      if (outs === undefined) {
+      let key = keyByCode.get(candidate.code);
+      if (key === undefined) {
         const index = CODE_INDEX.get(candidate.code)!;
         counts[index] -= 1;
-        outs = acceptance(counts, player.melds, seen).count;
+        key = [handShanten(counts, player.melds), acceptance(counts, player.melds, seen).count];
         counts[index] += 1;
-        outsByCode.set(candidate.code, outs);
+        keyByCode.set(candidate.code, key);
       }
-      if (outs > bestOuts) {
-        bestOuts = outs;
+      const order = key[0] - bestKey[0] || bestKey[1] - key[1];
+      if (order < 0) {
+        bestKey = key;
         finalists = [candidate];
-      } else if (outs === bestOuts) {
+      } else if (order === 0) {
         finalists.push(candidate);
       }
     }
@@ -178,9 +187,81 @@ export const greedyAi: AiStrategy = {
 
   chooseClaim(state, seat, options) {
     const win = options.find((o) => o.type === "win");
-    return win ?? bestImprovingClaim(state, seat, options);
+    return win ?? plannedClaim(state, seat, options);
   },
 };
+
+/** What a seat's faan depends on beyond its tiles. */
+function seatingOf(state: GameState, seat: Seat): Seating {
+  return {
+    seat,
+    roundWind: state.roundWind,
+    flowers: state.players[seat].flowers.map((t) => t.code),
+    config: state.config,
+  };
+}
+
+/**
+ * The best plan a hand can play for once a claimed set is laid down. A chow
+ * or pung is followed by a discard; a kong by a replacement draw, so its hand
+ * is already the shape it waits in.
+ */
+function bestPlanAfter(
+  claim: ClaimOption["type"],
+  counts: CountVector,
+  melds: Meld[],
+  seating: Seating,
+  minFaan: number,
+): RoutePlan | null {
+  if (claim === "kong") return bestPlan(routes(counts, melds, seating), minFaan);
+  let best: RoutePlan | null = null;
+  for (let i = 0; i < 34; i++) {
+    if (counts[i] === 0) continue;
+    counts[i] -= 1;
+    const plan = bestPlan(routes(counts, melds, seating), minFaan);
+    counts[i] += 1;
+    if (best === null || comparePlans(plan, best, minFaan) < 0) best = plan;
+  }
+  return best;
+}
+
+/**
+ * The meld claim worth making, or null. A claim has to leave a route that
+ * reaches the table's minimum, and get there sooner than the hand would
+ * without it — so a concealed hand is not opened for a set that costs the
+ * faan it was counting on, and a dragon is punged when it pays its way.
+ */
+export function plannedClaim(state: GameState, seat: Seat, options: ClaimOption[]): ClaimOption | null {
+  const melds = options.filter((o) => o.type !== "win");
+  if (melds.length === 0) return null;
+  const minFaan = state.config.minFaan;
+  const seating = seatingOf(state, seat);
+  const player = state.players[seat];
+  const now = bestPlan(routes(countsFromCodes(concealedCodes(state, seat)), player.melds, seating), minFaan);
+  const nowOk = now.faan >= minFaan;
+
+  let best: ClaimOption | null = null;
+  let bestAfter: RoutePlan | null = null;
+  for (const option of melds) {
+    const used = new Set(option.tileIds);
+    const remaining = player.hand.filter((t) => !used.has(t.id) && !isFlower(t.code)).map((t) => t.code);
+    const meld: Meld = {
+      type: option.type as Meld["type"],
+      tiles: option.codes.map((code, i) => ({ id: `claim-${i}`, code })),
+      concealed: false,
+    };
+    const after = bestPlanAfter(option.type, countsFromCodes(remaining), [...player.melds, meld], seating, minFaan);
+    if (!after || after.faan < minFaan) continue;
+    // Closer than before, or the first way to a hand that can be declared at all.
+    const worth = nowOk ? after.shanten < now.shanten : after.shanten <= now.shanten + 1;
+    if (!worth) continue;
+    if (bestAfter === null || comparePlans(after, bestAfter, minFaan) < 0) {
+      best = option;
+      bestAfter = after;
+    }
+  }
+  return best;
+}
 
 /**
  * The meld claim that leaves the hand closest to ready, or null when none of
