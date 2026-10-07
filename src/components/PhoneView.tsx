@@ -12,6 +12,8 @@ import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useHandOrder } from "@/hooks/useHandOrder";
+import { useFlip } from "@/hooks/useFlip";
+import { useHaptics } from "@/hooks/useHaptics";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
@@ -162,6 +164,7 @@ export function PhoneView({
   const fullscreen = useFullscreen("landscape");
   const layout = useCompactLayout();
   const display = usePhoneDisplay();
+  useHaptics(view, display.vibrate === "on");
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
@@ -228,6 +231,9 @@ export function PhoneView({
   const [dragging, setDragging] = useState<string | null>(null);
   const [flicking, setFlicking] = useState<string | null>(null);
   const canThrow = Boolean(yourTurn) && !api.busy;
+  // Tiles slide into a new sort or round a closing gap; a finger placing
+  // them itself gets them where it puts them, without a slide fighting it.
+  useFlip(handRef, dragging === null && flicking === null);
 
   const displayIds = () => [...order.tiles.map((t) => t.id), ...(order.drawn ? [order.drawn.id] : [])];
 

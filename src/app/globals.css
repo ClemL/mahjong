@@ -3477,6 +3477,50 @@ a.btn {
   color: var(--ink);
 }
 
+/* The turn clock: a bar along the rack that drains as the time runs out, so
+   whose clock is short reads from across the table. Its last seconds pulse;
+   the pill keeps the count in words for anyone who cannot tell the colours. */
+.rack__clock {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rack__clock::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--gold);
+  transform-origin: left center;
+  transform: scaleX(var(--left, 1));
+  transition: transform 250ms linear;
+}
+
+.rack__clock--urgent::after {
+  background: #e0645a;
+  animation: clock-pulse 1s ease-in-out infinite;
+}
+
+@keyframes clock-pulse {
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rack__clock::after {
+    transition: none;
+  }
+
+  .rack__clock--urgent::after {
+    animation: none;
+  }
+}
+
 .rack--active .rack__status,
 .rack--deciding .rack__status {
   background: var(--gold);

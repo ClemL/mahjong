@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import type { MahjongApi } from "@/hooks/useMahjong";
+import { useFlip } from "@/hooks/useFlip";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow } from "./SeatPanel";
@@ -27,6 +29,8 @@ export function PlayerHand({
   showSets?: boolean;
 }) {
   const { state, humanSeat, actions, claimOptions, awaitingClaim, readyDiscards, dealing } = api;
+  const row = useRef<HTMLDivElement>(null);
+  useFlip(row);
   if (!state) return null;
   const me = state.players[humanSeat];
   const drawn = me.hand.find((t) => t.id === state.drawnTileId);
@@ -71,12 +75,13 @@ export function PlayerHand({
       )}
 
       {/* Your tiles stay face down until the deal has reached you. */}
-      <div className="hand__tiles">
+      <div className="hand__tiles" ref={row}>
         {dealing
           ? me.hand.map((t) => <TileBack key={t.id} size="lg" />)
           : rest.map((t) => (
               <TileButton
                 key={t.id}
+                tileId={t.id}
                 code={t.code}
                 size="lg"
                 ready={readyDiscards.has(t.id)}
@@ -88,6 +93,7 @@ export function PlayerHand({
           <>
             <span className="hand__gap" aria-hidden />
             <TileButton
+              tileId={drawn.id}
               code={drawn.code}
               size="lg"
               drawn

@@ -32,6 +32,9 @@ import {
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
+/** Under this much time left, the rack's clock starts to pulse. */
+const URGENT_MS = 5000;
+
 /** Ponds are sized for a full hand's worth from the start, so tiles do not shrink as it fills. */
 const POND_CAPACITY = 24;
 
@@ -187,6 +190,15 @@ function Rack({
         ) : null}
       </div>
       {status ? <span className="rack__status">{status}</span> : null}
+      {left !== null && view.turnAllowance > 0 ? (
+        // The clock drawn along the rack, to read from across the table; the
+        // seconds stay in the pill above for anyone close enough.
+        <span
+          className={left <= URGENT_MS ? "rack__clock rack__clock--urgent" : "rack__clock"}
+          style={{ "--left": Math.max(0, Math.min(1, left / view.turnAllowance)) } as Vars}
+          aria-hidden
+        />
+      ) : null}
     </section>
   );
 }

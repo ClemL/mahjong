@@ -5,6 +5,7 @@ import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { CompactLayout } from "@/hooks/useCompactLayout";
 import type { OnOff, PhoneDisplay, PhoneSize } from "@/hooks/useLocalSetting";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
+import { canVibrate } from "@/hooks/useHaptics";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
@@ -33,6 +34,11 @@ const SIZE: ChoiceOption<PhoneSize>[] = [
 const PLAY_LOG: ChoiceOption<OnOff>[] = [
   { value: "on", label: "Show", hint: "The last four plays: discards, chows, pungs and kongs" },
   { value: "off", label: "Hide", hint: "Just the prompt" },
+];
+
+const VIBRATE: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "On", hint: "A buzz when it is your turn, when you can claim, and when you win" },
+  { value: "off", label: "Off", hint: "Never buzzes" },
 ];
 
 const SORT: ChoiceOption<SortMode>[] = [
@@ -112,6 +118,14 @@ export function PhoneSettings({
                 options={PLAY_LOG}
                 value={display.playLog}
                 onChange={display.setPlayLog}
+              />
+              <Choice
+                label="Vibrate"
+                options={VIBRATE}
+                value={canVibrate() ? display.vibrate : "off"}
+                onChange={display.setVibrate}
+                disabled={!canVibrate()}
+                note={canVibrate() ? undefined : "This browser cannot vibrate the phone (iPhones never can)"}
               />
             </>
           ) : null}

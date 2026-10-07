@@ -78,3 +78,6 @@
 2026-10-07T02:48:46Z - Computer opponents now play for the faan minimum: they keep a hand concealed, chase a flush, all triplets or all runs, and only claim a set when the hand stays worth enough to win, so far fewer hands wash out at 3 faan
 2026-10-07T11:58:10Z - Play solo on the same felt as the shared table: the wall is built and dealt from, claims fly to their sets, chips cross to the winner and confetti goes up; play waits for the deal. A phone held upright keeps the compact table
 2026-10-07T11:58:10Z - Fixed: on the hand result, each seat's payment showed as a coin drawn over its text
+2026-10-07T12:06:46Z - Tiles slide into place when your hand is sorted, a tile is thrown or the drawn tile joins the hand, on phones and in solo
+2026-10-07T12:06:46Z - The table draws whoever is on the clock as a bar draining along their rack, pulsing in the last five seconds
+2026-10-07T12:06:46Z - Phones buzz when it is your turn, when you can claim, and when you win (Settings → This phone → Vibrate). Android only: iPhones cannot vibrate from a web page

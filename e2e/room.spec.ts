@@ -25,6 +25,15 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   await expect(deal).toBeVisible();
 
   const phone = await open(browser, PHONE_LANDSCAPE, true);
+  // Every buzz the phone asks for, in order, so the test can read them back.
+  await phone.page.addInitScript(() => {
+    const buzzes: unknown[] = [];
+    (window as unknown as { buzzes: unknown[] }).buzzes = buzzes;
+    navigator.vibrate = ((pattern: unknown) => {
+      buzzes.push(pattern);
+      return true;
+    }) as typeof navigator.vibrate;
+  });
   await phone.page.goto(`/room/${ROOM}?seat=0&name=Tester`);
   // The table's chair fills in from its own poll.
   await expect(table.page.getByText("Tester").first()).toBeVisible();
@@ -38,6 +47,11 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   const live = phone.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");
   await expect(live.first()).toBeVisible({ timeout: 45_000 });
   await expect(phoneTiles(phone.page)).toHaveCount(14);
+  // The turn arriving buzzes the phone, and the table runs East's clock.
+  await expect
+    .poll(() => phone.page.evaluate(() => (window as unknown as { buzzes: unknown[] }).buzzes))
+    .toContainEqual([35]);
+  await expect(table.page.locator('.rack[data-seat="0"] .rack__clock')).toBeVisible();
 
   // First tap arms the tile, the second throws it.
   const tile = live.first();
