@@ -83,3 +83,5 @@
 2026-10-07T12:06:46Z - Phones buzz when it is your turn, when you can claim, and when you win (Settings → This phone → Vibrate). Android only: iPhones cannot vibrate from a web page
 2026-10-07T12:21:46Z - Hints now count your waits: on your turn, which throw leaves you ready and on how many tiles; between turns, each tile you win on and how many are still unseen, with a dead wait struck through
 2026-10-07T12:21:46Z - Game length: play the East round alone, East and South, or all four winds (start page, solo settings and the table settings). The round wind moves on after every four dealerships
+2026-10-07T12:49:52Z - Skip the deal or a win's celebration: a Skip button in the corner of the felt, in solo and on the table screen. A table screen that shows no motion no longer holds play while it would have dealt
+2026-10-07T12:49:52Z - Wins worth retelling get their own moment on the felt: petals for 槓上開花, the robbed tile snatched across the table for 搶槓, a moon for 海底撈月, ripples for 河底撈魚, and gold rays for a limit hand, whose sets then turn over one by one on the result sheet. They share a longer flourish in place of the usual win sound

@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
@@ -14,7 +14,17 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
 import { TableResult } from "./TableResult";
-import { ChipStack, DealOverlay, WinOverlay, chipsOf, useWindow } from "./TableEffects";
+import {
+  ChipStack,
+  DealOverlay,
+  MOMENT_MS,
+  MomentOverlay,
+  WinOverlay,
+  chipsOf,
+  useWindow,
+  winFxMs,
+} from "./TableEffects";
+import { signatureMoment, winningTileOf } from "./moments";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
@@ -31,6 +41,9 @@ import {
 } from "./tableLayout";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
+
+/** A deal shown without its opening flowers being laid down one by one. */
+const NO_FLOWERS = new Map<string, number>();
 
 /** Under this much time left, the rack's clock starts to pulse. */
 const URGENT_MS = 5000;
@@ -574,12 +587,15 @@ export function Felt({
   display,
   sheet,
   onNextHand,
+  onSkipDeal,
   busy = false,
 }: {
   view: RoomView;
   display: TabletDisplay;
   sheet: ResultSheet;
   onNextHand: () => void;
+  /** The deal has been skipped here; whoever holds play for it should stop. */
+  onSkipDeal?: () => void;
   busy?: boolean;
 }) {
   const felt = useRef<HTMLDivElement>(null);
@@ -613,10 +629,35 @@ export function Felt({
   useClaimFlight(felt, view, position);
   usePondArrival(felt, view, position);
   const opening = useOpening(view);
-  const dealing = useWindow(opening.dealKey, DEAL_MS + 100);
+  const won = over && view.result?.type === "win" ? view.result : null;
+  const winKey = won ? `win-${view.handNumber}` : null;
+  // Whichever ceremony was skipped, by its key: a deal or a win, never a later one.
+  const [skipped, setSkipped] = useState<string | null>(null);
+  const dealSkipped = opening.dealKey !== null && skipped === opening.dealKey;
+  const winSkipped = winKey !== null && skipped === winKey;
+  const opened = opening.live && !dealSkipped;
+  const dealing = useWindow(opening.dealKey, DEAL_MS + 100) && !dealSkipped;
+  const winLive = useWindow(winKey, winFxMs(won?.payments ?? [], won?.winner ?? null)) && !winSkipped;
+  const moment = signatureMoment(won);
+  const momentLive = useWindow(moment ? winKey : null, MOMENT_MS) && !winSkipped;
   const wall = wallGeometry(layout, flowersInPlay(view.config) ? 144 : 136, view.handNumber);
   const brk = wallBreak(wall, position(view.dealer), view.handNumber);
-  const won = over && view.result?.type === "win" ? view.result : null;
+  // A screen that does not animate the deal has nothing to wait for: the hold
+  // the room keeps for it is let go as soon as the hand is seen.
+  const skipRef = useRef(onSkipDeal);
+  skipRef.current = onSkipDeal;
+  useEffect(() => {
+    if (opening.dealKey === null) return;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) skipRef.current?.();
+  }, [opening.dealKey]);
+  const skip = () => {
+    if (opened) {
+      setSkipped(opening.dealKey);
+      onSkipDeal?.();
+    } else if (winKey) {
+      setSkipped(winKey);
+    }
+  };
 
   return (
     <div className="felt" ref={felt}>
@@ -627,7 +668,7 @@ export function Felt({
             geometry={wall}
             brk={brk}
             view={view}
-            opening={opening.live}
+            opening={opened}
             hidden={display.wall === "off"}
           />
           {SEATS.map((seat) => (
@@ -637,7 +678,7 @@ export function Felt({
               view={view}
               layout={layout}
               position={position(seat)}
-              flowerOrder={opening.flowerOrder}
+              flowerOrder={dealSkipped ? NO_FLOWERS : opening.flowerOrder}
             />
           ))}
           {SEATS.map((seat) => (
@@ -670,9 +711,10 @@ export function Felt({
               const r = layout.racks[position(seat)];
               return { x: r.cx, y: r.cy };
             }}
-            enabled={display.wall === "on" && !opening.live}
+            enabled={display.wall === "on" && !opened}
           />
-          {sheet.open ? (
+          {/* A moment has the felt to itself; the sheet follows it, or a skip. */}
+          {sheet.open && !momentLive ? (
             <TableResult
               view={view}
               name={(seat) => occupantName(view.players[seat])}
@@ -683,13 +725,33 @@ export function Felt({
             />
           ) : null}
           <WinOverlay
-            winKey={won ? `win-${view.handNumber}` : null}
+            live={winLive}
             layout={layout}
             winner={won?.winner ?? null}
             payments={won?.payments ?? []}
             faan={won?.score?.scoredFaan ?? 0}
             position={position}
           />
+          <MomentOverlay
+            moment={moment}
+            live={momentLive}
+            layout={layout}
+            winner={won?.winner ?? null}
+            robbedFrom={moment?.kind === "robbing" ? (won?.from ?? null) : null}
+            tile={moment?.kind === "robbing" ? winningTileOf(view.log) : null}
+            position={position}
+          />
+          {opened || winLive || momentLive ? (
+            // Seen it before: the deal, or a win's chips and confetti, can be cut short.
+            <button
+              type="button"
+              className="felt__skip"
+              onClick={skip}
+              aria-label={opened ? "Skip the deal" : "Skip the celebration"}
+            >
+              Skip ⏭
+            </button>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -794,6 +856,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         display={display}
         sheet={sheet}
         onNextHand={() => void api.control({ type: "nextHand" })}
+        onSkipDeal={() => void api.control({ type: "skipOpening" })}
         busy={api.busy}
       />
     </div>

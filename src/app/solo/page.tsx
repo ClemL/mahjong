@@ -159,7 +159,14 @@ function SoloFelt({ api, view, display }: { api: MahjongApi; view: RoomView; dis
     <div className="solo">
       <div className="solo__felt">
         {/* A new game is dealt from hand 1 again; a fresh felt sees it as a deal. */}
-        <Felt key={api.game} view={view} display={display} sheet={sheet} onNextHand={api.nextHand} />
+        <Felt
+          key={api.game}
+          view={view}
+          display={display}
+          sheet={sheet}
+          onNextHand={api.nextHand}
+          onSkipDeal={api.skipDeal}
+        />
         {sheet.aside && api.state?.phase === "handOver" ? (
           <div className="solo__after">
             <button type="button" className="btn btn--sm" onClick={sheet.show}>

@@ -32,6 +32,7 @@ import { type GameSettings, type Speed, readPreferences, usePreferences } from "
 import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
 import { DEFAULT_RULES, roundsInGame } from "@/game/rules";
+import { signatureMoment } from "@/components/moments";
 
 export type { Speed };
 
@@ -58,6 +59,8 @@ export interface MahjongApi extends GameSettings {
   readyDiscards: Set<string>;
   /** The felt is still building the wall and dealing; nobody plays until it has. */
   dealing: boolean;
+  /** Stop holding play for the deal: the player has skipped it. */
+  skipDeal: () => void;
   paused: boolean;
   setPaused: (value: boolean) => void;
   discard: (tileId: string) => void;
@@ -121,6 +124,10 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
   }
   const [, wake] = useState(0);
   const dealing = hold.current.until > Date.now();
+  const skipDeal = useCallback(() => {
+    hold.current = { ...hold.current, until: 0 };
+    wake((n) => n + 1);
+  }, []);
   useEffect(() => {
     const left = hold.current.until - Date.now();
     if (left <= 0) return;
@@ -155,7 +162,9 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     );
 
     if (state.phase === "handOver" && previous.phase !== "handOver") {
-      cues.push(state.result?.type === "win" ? "win" : "washout");
+      cues.push(
+        state.result?.type !== "win" ? "washout" : signatureMoment(state.result) ? "flourish" : "win",
+      );
     } else if (kongsAfter > kongsBefore) {
       cues.push("kong");
     } else if (meldsAfter > meldsBefore) {
@@ -298,6 +307,7 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     awaitingClaim,
     readyDiscards,
     dealing,
+    skipDeal,
     paused,
     setPaused,
     discard,

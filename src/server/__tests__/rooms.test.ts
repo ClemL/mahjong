@@ -281,6 +281,16 @@ describe("table control", () => {
     );
   });
 
+  it("lets the table cut the deal short, so the opening turn starts now", async () => {
+    const { id, table } = await dealtRoom([0]);
+    const before = await readRoom(id, table);
+    expect(before.turnDeadlineIn).not.toBeNull();
+    const after = await control(id, table, { type: "skipOpening" });
+    // The deal's hold is gone from the clock; the turn's own allowance is not.
+    expect(after.turnDeadlineIn!).toBeLessThan(before.turnDeadlineIn!);
+    expect(after.turnDeadlineIn!).toBeGreaterThan(after.turnAllowance - 2000);
+  });
+
   it("sets how many wind rounds the game runs, and only to a length there is", async () => {
     const { id, table } = await dealtRoom([0]);
     expect((await control(id, table, { type: "rounds", value: 2 })).config.rounds).toBe(2);

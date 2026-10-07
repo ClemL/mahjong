@@ -2,10 +2,12 @@
 
 import { type CSSProperties, useEffect, useMemo, useState } from "react";
 import { DEAL_FLIGHT_MS, DEAL_STACKS, DEAL_STEP_MS, WALL_BUILD_MS } from "@/game/room";
-import type { Seat } from "@/game/tiles";
+import type { Seat, TileCode } from "@/game/tiles";
 import { createRng } from "@/game/rng";
 import { STARTING_CHIPS } from "@/game/rules";
 import { POSITION_ROTATION, type TableLayout } from "./tableLayout";
+import { TileFace } from "./TileView";
+import type { Moment } from "./moments";
 
 /** Custom properties are not in React's style typing. */
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
@@ -124,8 +126,10 @@ export function confettiCount(faan: number): number {
 }
 
 const CONFETTI_HUES = [44, 4, 150, 205, 285, 330];
+/** Plum-blossom pinks and a white, for the flower that opens on a kong. */
+const PETAL_HUES = [330, 340, 350, 0, 320];
 
-function confettiPieces(count: number, seed: number, spread: number, delay: number) {
+function confettiPieces(count: number, seed: number, spread: number, delay: number, petals: boolean) {
   const rng = createRng(seed);
   return Array.from({ length: count }, (_, i) => {
     const angle = rng.next() * Math.PI * 2;
@@ -137,7 +141,7 @@ function confettiPieces(count: number, seed: number, spread: number, delay: numb
         "--cy": `${Math.sin(angle) * reach - spread * 0.25}px`,
         "--fall": `${spread * (0.4 + rng.next() * 0.5)}px`,
         "--spin": `${Math.round((rng.next() - 0.5) * 1440)}deg`,
-        "--hue": CONFETTI_HUES[i % CONFETTI_HUES.length],
+        "--hue": petals ? PETAL_HUES[i % PETAL_HUES.length] : CONFETTI_HUES[i % CONFETTI_HUES.length],
         animationDelay: `${delay + Math.round(rng.next() * 400)}ms`,
         width: `${6 + Math.round(rng.next() * 6)}px`,
         height: `${4 + Math.round(rng.next() * 6)}px`,
@@ -153,6 +157,7 @@ export function Confetti({
   spread,
   delay = 0,
   style,
+  petals = false,
 }: {
   count: number;
   seed: number;
@@ -160,15 +165,21 @@ export function Confetti({
   /** Milliseconds before the first piece goes up. */
   delay?: number;
   style?: CSSProperties;
+  /** Blossom petals instead of paper. */
+  petals?: boolean;
 }) {
   const pieces = useMemo(
-    () => confettiPieces(count, seed, spread, delay),
-    [count, seed, spread, delay],
+    () => confettiPieces(count, seed, spread, delay, petals),
+    [count, seed, spread, delay, petals],
   );
   return (
     <span className="confetti" style={style} aria-hidden>
       {pieces.map((p) => (
-        <span key={p.i} className="confetti__piece" style={p.style} />
+        <span
+          key={p.i}
+          className={petals ? "confetti__piece confetti__piece--petal" : "confetti__piece"}
+          style={p.style}
+        />
       ))}
     </span>
   );
@@ -181,20 +192,40 @@ const CHIP_STEP_MS = 170;
 /** How long the confetti takes to go up and come down, its stragglers included. */
 const CONFETTI_MS = 3000;
 
+/** Chips in one seat's stream: one for every four points, so a big payment is a visibly longer stream. */
+function chipsFor(paid: number): number {
+  return Math.max(3, Math.min(14, Math.round(paid / 4)));
+}
+
+/** How long a won hand's chips and confetti take, from the settle to the last piece down. */
+export function winFxMs(payments: number[], winner: Seat | null): number {
+  if (winner === null) return 0;
+  let last = 0;
+  let payer = 0;
+  for (let seat = 0; seat < 4; seat++) {
+    const paid = -(payments[seat] ?? 0);
+    if (seat === winner || paid <= 0) continue;
+    last = Math.max(last, payer * 60 + (chipsFor(paid) - 1) * CHIP_STEP_MS);
+    payer++;
+  }
+  return Math.round(last + CHIP_FLIGHT_MS * 0.6 + CONFETTI_MS + 400);
+}
+
 /**
  * The end of a won hand on the felt: chips leave every seat that pays and
  * cross to the winner's rack, then confetti goes up from it — more of it the
- * bigger the hand.
+ * bigger the hand. The felt decides how long it is live (`winFxMs`), so it
+ * can be cut short.
  */
 export function WinOverlay({
-  winKey,
+  live,
   layout,
   winner,
   payments,
   faan,
   position,
 }: {
-  winKey: string | null;
+  live: boolean;
   layout: TableLayout;
   winner: Seat | null;
   payments: number[];
@@ -210,10 +241,9 @@ export function WinOverlay({
       const paid = -(payments[seat] ?? 0);
       if (seat === winner || paid <= 0) continue;
       const from = layout.racks[position(seat as Seat)];
-      // One chip for every four points, so a big payment is a visibly longer
-      // stream. Every seat that pays starts at once, a beat apart, so the
-      // streams cross the table together rather than one after another.
-      const n = Math.max(3, Math.min(14, Math.round(paid / 4)));
+      // Every seat that pays starts at once, a beat apart, so the streams
+      // cross the table together rather than one after another.
+      const n = chipsFor(paid);
       for (let k = 0; k < n; k++) {
         const delay = payer * 60 + k * CHIP_STEP_MS;
         last = Math.max(last, delay);
@@ -233,7 +263,6 @@ export function WinOverlay({
     }
   }
   const landed = last + CHIP_FLIGHT_MS * 0.6;
-  const live = useWindow(winKey, Math.round(landed + CONFETTI_MS + 400));
   if (!live || winner === null) return null;
   const to = layout.racks[position(winner)];
   return (
@@ -248,6 +277,93 @@ export function WinOverlay({
         delay={Math.round(landed)}
         style={{ left: to.cx, top: to.cy }}
       />
+    </div>
+  );
+}
+
+/** How long a signature moment holds the felt. */
+export const MOMENT_MS = 2800;
+
+/**
+ * A retold win's own moment, over everything else on the felt for a few
+ * seconds: its name, said large, and a sign of what happened — petals for a
+ * flower on the kong, the robbed tile snatched across the table, a moon or a
+ * ripple for the last tile, rays for a limit hand. The result sheet under it
+ * carries the same names for anyone who looks away.
+ */
+export function MomentOverlay({
+  moment,
+  live,
+  layout,
+  winner,
+  robbedFrom,
+  tile,
+  position,
+}: {
+  moment: Moment | null;
+  live: boolean;
+  layout: TableLayout;
+  winner: Seat | null;
+  /** For a robbed kong: whose kong it was. */
+  robbedFrom: Seat | null;
+  /** The tile won on, where it is known. */
+  tile: TileCode | null;
+  position: (seat: Seat) => number;
+}) {
+  if (!live || !moment || winner === null) return null;
+  const to = layout.racks[position(winner)];
+  const centre = { x: layout.console.cx, y: layout.console.cy };
+  const reach = Math.min(layout.console.w, layout.console.h);
+  const from = robbedFrom !== null ? layout.racks[position(robbedFrom)] : null;
+
+  return (
+    <div className={`moment moment--${moment.kind}`} style={{ "--ms": `${MOMENT_MS}ms` } as Vars}>
+      {moment.kind === "kongBlossom" ? (
+        <Confetti
+          petals
+          count={70}
+          seed={(winner + 1) * 4409}
+          spread={reach * 0.8 + 60}
+          style={{ left: to.cx, top: to.cy }}
+        />
+      ) : null}
+      {moment.kind === "robbing" && from && tile ? (
+        <span
+          className="moment__snatch"
+          style={
+            {
+              left: from.cx,
+              top: from.cy,
+              "--dx": `${to.cx - from.cx}px`,
+              "--dy": `${to.cy - from.cy}px`,
+              "--tile-md": `${layout.tile}px`,
+            } as Vars
+          }
+          aria-hidden
+        >
+          <TileFace code={tile} size="md" />
+        </span>
+      ) : null}
+      {moment.kind === "seaMoon" ? (
+        <span className="moment__moon" style={{ left: centre.x, top: centre.y, "--r": `${reach * 0.32}px` } as Vars} aria-hidden />
+      ) : null}
+      {moment.kind === "riverFish" ? (
+        <span className="moment__ripples" style={{ left: centre.x, top: centre.y, "--r": `${reach * 0.5}px` } as Vars} aria-hidden>
+          <span />
+          <span />
+          <span />
+        </span>
+      ) : null}
+      {moment.kind === "limit" ? (
+        <span className="moment__rays" style={{ left: centre.x, top: centre.y, "--r": `${reach * 0.9}px` } as Vars} aria-hidden />
+      ) : null}
+      <div className="moment__card" role="status" style={{ left: centre.x, top: centre.y }}>
+        <span className="moment__chinese" lang="zh-Hant">
+          {moment.chinese}
+        </span>
+        <span className="moment__name">{moment.name}</span>
+        {moment.detail ? <span className="moment__detail">{moment.detail}</span> : null}
+      </div>
     </div>
   );
 }

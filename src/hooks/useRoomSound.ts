@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RoomView } from "@/game/room";
 import { type SoundName, playSound, primeAudio } from "@/game/sound";
+import { signatureMoment } from "@/components/moments";
 
 const STORAGE_KEY = "hk-mahjong.muted";
 
@@ -55,7 +56,7 @@ export function useRoomSound(view: RoomView | null): {
 
     let cue: SoundName | null = null;
     if (view.phase === "handOver" && before.phase !== "handOver") {
-      cue = view.result?.type === "win" ? "win" : "washout";
+      cue = view.result?.type !== "win" ? "washout" : signatureMoment(view.result) ? "flourish" : "win";
     } else if (kongs(view) > kongs(before)) {
       cue = "kong";
     } else if (melds(view) > melds(before)) {

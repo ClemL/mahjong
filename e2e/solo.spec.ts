@@ -41,6 +41,13 @@ test.describe("solo table", () => {
     await expect(page.locator(".felt .rack")).toHaveCount(4);
     const pause = page.getByRole("button", { name: /^(Pause|Resume)$/ });
 
+    // Play waits for the deal, and skipping it hands play over at once.
+    const playable = yourHand(page).locator("button.tile--button:not([disabled])");
+    await expect(yourHand(page)).toContainText("Dealing");
+    await expect(playable).toHaveCount(0);
+    await page.getByRole("button", { name: "Skip the deal" }).click();
+    await expect(playable.first()).toBeVisible({ timeout: 2_000 });
+
     let turns = 0;
     while (turns < TURNS) {
       const decision = await nextDecision(page);

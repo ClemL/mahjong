@@ -10,7 +10,7 @@
  * no-op until then, and any failure is swallowed — sound is never load-bearing.
  */
 
-export type SoundName = "discard" | "draw" | "claim" | "kong" | "win" | "washout";
+export type SoundName = "discard" | "draw" | "claim" | "kong" | "win" | "flourish" | "washout";
 
 let context: AudioContext | null = null;
 
@@ -97,6 +97,14 @@ export function playSound(name: SoundName): void {
         // A pentatonic run — unmistakably different from a claim.
         const notes = [523.25, 659.25, 783.99, 1046.5];
         notes.forEach((f, i) => blip(ctx, now + i * 0.1, f, 0.34, 0.13));
+        break;
+      }
+      case "flourish": {
+        // A retold win: the win's run carried up another octave, then a held
+        // chord under it, long enough to turn heads.
+        const run = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
+        run.forEach((f, i) => blip(ctx, now + i * 0.08, f, 0.42, 0.12));
+        [523.25, 659.25, 783.99].forEach((f) => blip(ctx, now + 0.6, f, 1.1, 0.07));
         break;
       }
       case "washout":

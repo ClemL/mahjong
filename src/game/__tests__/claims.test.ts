@@ -4,6 +4,7 @@ import {
   answerClaim,
   claimTurn,
   createGame,
+  declareAddedKong,
   discard,
   passClaim,
 } from "../engine";
@@ -117,5 +118,35 @@ describe("claim order", () => {
     const state = table({ 1: ["p4", "p6"], 3: ["p5", "p5"] });
     expect(answerClaim(state, 1, state.pendingClaims.find((c) => c.seat === 1)!.options[0].id)).toBe(state);
     expect(passClaim(state, 1)).toBe(state);
+  });
+});
+
+describe("robbing the kong", () => {
+  // The robbed tile stands in as the discard while the kong is open to robbing,
+  // so the log names it like any other tile won on.
+  it("wins on the tile added to a pung, and logs that tile as the one won on", () => {
+    const state = createGame({ seed: 7, humanSeat: 0 });
+    state.config = { ...state.config, minFaan: 0 };
+    const pung = ["p5#a", "p5#b", "p5#c"].map((id) => ({ id, code: "p5" }));
+    // East has a pung of 5 Dots out and has just drawn the fourth.
+    state.players[0].melds = [{ type: "pung", tiles: pung, concealed: false, claimedFrom: 2 }];
+    state.players[0].hand = [...hand(0, []).slice(0, 10), { id: "p5#d", code: "p5" }];
+    // West waits on 4-6 of dots for its last set.
+    state.players[2].hand = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "dr", "dr", "p4", "p6"].map(
+      (code, i) => ({ id: `${code}#r${i}`, code }),
+    );
+    for (const seat of [1, 3] as Seat[]) state.players[seat].hand = hand(seat, []);
+    state.turn = 0;
+    state.phase = "action";
+    state.lastDiscard = null;
+    state.drawnTileId = "p5#d";
+
+    const exposed = declareAddedKong(state, 0, "p5");
+    const asked = claimTurn(exposed);
+    expect(asked?.seat).toBe(2);
+    const won = answerClaim(exposed, 2, asked!.options.find((o) => o.type === "win")!.id);
+    expect(won.result?.winner).toBe(2);
+    expect(won.result?.score?.patterns.map((p) => p.key)).toContain("robbingKong");
+    expect(won.log.at(-1)?.play).toMatchObject({ kind: "win", tiles: ["p5"] });
   });
 });
