@@ -10,9 +10,10 @@ import { AppearancePanel } from "./AppearancePanel";
 import { Choice, type ChoiceOption } from "./Choice";
 import { FilmDialog } from "./FilmPlayer";
 import { BuildFooter } from "./BuildFooter";
+import { TABLES, type TableInfo, findTable } from "@/game/tables";
 
-/** The one multiplayer table this deployment serves; see FIXED_ROOM_ID on the server. */
-export const TABLE_ROOM = "TABLE";
+/** Which table this device last chose, so a returning player lands on it again. */
+const TABLE_KEY = "hk-mahjong.table";
 
 const LAYOUT: ChoiceOption<"standard" | "compact">[] = [
   { value: "standard", label: "Standard", hint: "A line for the prompt, roomy buttons" },
@@ -30,28 +31,49 @@ interface Mode {
   detail: string;
 }
 
-const MODES: Mode[] = [
-  {
-    href: "/solo",
-    glyph: "獨",
-    name: "Play solo",
-    detail: "You against three computer opponents, on this device",
-  },
-  {
-    href: `/room/${TABLE_ROOM}`,
-    glyph: "眾",
-    name: "Multiplayer",
-    detail: "Take a seat at the shared table from your phone",
-  },
-  {
-    href: `/room/${TABLE_ROOM}?seat=table`,
-    glyph: "枱",
-    name: "Tablet mode",
-    detail: "This device becomes the table in the middle that everyone watches",
-  },
-];
+function modes(table: TableInfo): Mode[] {
+  return [
+    {
+      href: "/solo",
+      glyph: "獨",
+      name: "Play solo",
+      detail: "You against three computer opponents, on this device",
+    },
+    {
+      href: `/room/${table.id}`,
+      glyph: "眾",
+      name: "Multiplayer",
+      detail: `Take a seat at ${table.name} from your phone`,
+    },
+    {
+      href: `/room/${table.id}?seat=table`,
+      glyph: "枱",
+      name: "Tablet mode",
+      detail: `This device becomes ${table.name}, in the middle where everyone watches`,
+    },
+  ];
+}
 
-type ResetState = { kind: "idle" } | { kind: "busy" } | { kind: "done" } | { kind: "error"; message: string };
+type ResetState =
+  | { kind: "idle" }
+  | { kind: "busy" }
+  | { kind: "done"; table: string }
+  | { kind: "error"; message: string };
+
+/** Enough of a table's public view to say whether it is free. */
+interface TableStatus {
+  started: boolean;
+  seatedCount: number;
+  tablePresent: boolean;
+}
+
+function statusLine(status: TableStatus | undefined): string {
+  if (!status) return "\u00a0";
+  const players = `${status.seatedCount} ${status.seatedCount === 1 ? "player" : "players"}`;
+  if (status.started) return `In play · ${players}`;
+  if (status.seatedCount > 0) return `${players} waiting`;
+  return status.tablePresent ? "Screen up, no players" : "Empty";
+}
 
 /**
  * Where every visit starts: the options that are set once, then the way in.
@@ -66,23 +88,68 @@ export function StartPage() {
   const layout = useCompactLayout();
   const [film, setFilm] = useState(false);
   const [reset, setReset] = useState<ResetState>({ kind: "idle" });
+  const [table, setTable] = useState<TableInfo>(TABLES[0]);
+  const [statuses, setStatuses] = useState<Record<string, TableStatus>>({});
 
   // The phone layout is read from storage during the first render, which the
   // server cannot do; hold that one control back until hydration is over.
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const stored = findTable(window.localStorage.getItem(TABLE_KEY) ?? "");
+      if (stored) setTable(stored);
+    } catch {
+      // No storage: Table 1, as before there were three.
+    }
+  }, []);
+
+  // One look at each table, so people can pick a free one. A table that cannot
+  // be read just shows no status; the links still work.
+  const [statusEpoch, setStatusEpoch] = useState(0);
+  useEffect(() => {
+    let live = true;
+    for (const t of TABLES) {
+      fetch(`/api/rooms/${t.id}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((body: Partial<TableStatus> | null) => {
+          if (!live || !body || typeof body.seatedCount !== "number") return;
+          const status: TableStatus = {
+            started: Boolean(body.started),
+            seatedCount: body.seatedCount,
+            tablePresent: Boolean(body.tablePresent),
+          };
+          setStatuses((current) => ({ ...current, [t.id]: status }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      live = false;
+    };
+  }, [statusEpoch]);
+
+  const choose = (next: TableInfo) => {
+    setTable(next);
+    setReset({ kind: "idle" });
+    try {
+      window.localStorage.setItem(TABLE_KEY, next.id);
+    } catch {
+      // The choice still holds for this visit.
+    }
+  };
 
   const resetTable = async () => {
+    const target = table;
     if (
       !confirm(
-        "Reset the multiplayer table? Everyone at it — the players and the table screen — goes back to choosing a seat, and the scores and house rules go back to the defaults.",
+        `Reset ${target.name}? Everyone at it — the players and the table screen — goes back to choosing a seat, and the scores and house rules go back to the defaults. The other tables are not touched.`,
       )
     ) {
       return;
     }
     setReset({ kind: "busy" });
     try {
-      const response = await fetch(`/api/rooms/${TABLE_ROOM}/reset`, { method: "POST" });
+      const response = await fetch(`/api/rooms/${target.id}/reset`, { method: "POST" });
       if (!response.ok) {
         const body = (await response.json().catch(() => ({}))) as { error?: string };
         setReset({ kind: "error", message: body.error ?? "Could not reset the table" });
@@ -90,11 +157,12 @@ export function StartPage() {
       }
       // The seat this device held is gone with everyone else's.
       try {
-        window.localStorage.removeItem(`hk-mahjong.room.${TABLE_ROOM}`);
+        window.localStorage.removeItem(`hk-mahjong.room.${target.id}`);
       } catch {
         // Nothing stored, or storage blocked — either way there is no stale seat.
       }
-      setReset({ kind: "done" });
+      setReset({ kind: "done", table: target.name });
+      setStatusEpoch((n) => n + 1);
     } catch {
       setReset({ kind: "error", message: "Could not reach the table" });
     }
@@ -112,8 +180,34 @@ export function StartPage() {
         </p>
       </header>
 
+      <div className="start__tables" role="group" aria-label="Table">
+        <span className="choice__label">Table</span>
+        <div className="start__table-row">
+          {TABLES.map((t) => {
+            const on = t.id === table.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={`start__table${on ? " start__table--on" : ""}`}
+                aria-pressed={on}
+                onClick={() => choose(t)}
+              >
+                <span className="start__table-name">
+                  {/* The tick carries the choice for anyone who cannot tell the gold apart. */}
+                  {on ? <span aria-hidden="true">✓</span> : null}
+                  {t.name}
+                </span>
+                <span className="start__table-status">{statusLine(statuses[t.id])}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span className="choice__hint">Multiplayer, Tablet mode and Reset use the chosen table</span>
+      </div>
+
       <nav className="start__modes" aria-label="How to play">
-        {MODES.map((mode) => (
+        {modes(table).map((mode) => (
           <a key={mode.name} className="start__mode" href={mode.href}>
             <span className="start__mode-glyph" aria-hidden="true">
               {mode.glyph}
@@ -135,12 +229,12 @@ export function StartPage() {
           disabled={reset.kind === "busy"}
           onClick={() => void resetTable()}
         >
-          Reset multiplayer table
+          Reset {table.name}
         </button>
       </div>
       {reset.kind === "done" ? (
         <p className="lobby__warn" role="status">
-          The multiplayer table is empty. Everyone goes back to choosing a seat.
+          {reset.table} is empty. Everyone at it goes back to choosing a seat.
         </p>
       ) : null}
       {reset.kind === "error" ? <p className="lobby__error">{reset.message}</p> : null}

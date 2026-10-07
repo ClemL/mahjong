@@ -4,9 +4,10 @@
  */
 import type { Seat } from "./tiles";
 import {
-  type ClaimDecision,
   type GameState,
   advanceTurn,
+  answerClaim,
+  claimTurn,
   declareAddedKong,
   declareConcealedKong,
   declareSelfDraw,
@@ -21,9 +22,10 @@ export function needsTurnAdvance(state: GameState): boolean {
   return state.phase === "action" && state.lastDiscard !== null && state.drawnTileId === null;
 }
 
-/** Seats waiting on a claim decision. */
+/** The seat being asked about the discard right now, if any. */
 export function claimingSeats(state: GameState): Seat[] {
-  return state.pendingClaims.map((c) => c.seat);
+  const turn = claimTurn(state);
+  return turn ? [turn.seat] : [];
 }
 
 /** Seat controlled by the player, or null when every seat is an AI. */
@@ -47,7 +49,8 @@ export function shouldPromptClaim(
   seat: Seat,
   mode: ClaimPrompt,
 ): boolean {
-  const options = state.pendingClaims.find((c) => c.seat === seat)?.options ?? [];
+  const turn = claimTurn(state);
+  const options = turn?.seat === seat ? turn.options : [];
   if (options.length === 0) return false;
   if (options.some((o) => o.type === "win")) return true;
   if (mode === "always") return true;
@@ -55,10 +58,10 @@ export function shouldPromptClaim(
   return bestImprovingClaim(state, seat, options) !== null;
 }
 
-/** True when the human is being asked to claim a discard. */
+/** True when the human is the one being asked about the discard. */
 export function awaitingHumanClaim(state: GameState): boolean {
   const seat = humanSeat(state);
-  return seat !== null && state.phase === "claiming" && claimingSeats(state).includes(seat);
+  return seat !== null && claimTurn(state)?.seat === seat;
 }
 
 /** Perform one action for the AI whose turn it is. */
@@ -85,30 +88,16 @@ export function stepAiTurn(
   }
 }
 
-/** Claim decisions for every AI seat with pending options. */
-export function aiClaimDecisions(
-  state: GameState,
-  rng: Rng,
-  strategy: AiStrategy = greedyAi,
-): ClaimDecision[] {
-  return state.pendingClaims
-    .filter((c) => !state.players[c.seat].isHuman)
-    .map((c) => ({
-      seat: c.seat,
-      optionId: strategy.chooseClaim(state, c.seat, c.options, rng)?.id ?? null,
-    }));
-}
-
-/** Resolve a claim round, folding in the human's answer when there is one. */
-export function resolveWithAi(
-  state: GameState,
-  rng: Rng,
-  humanDecision?: ClaimDecision,
-  strategy: AiStrategy = greedyAi,
-): GameState {
-  const decisions = aiClaimDecisions(state, rng, strategy);
-  if (humanDecision) decisions.push(humanDecision);
-  return resolveClaims(state, decisions);
+/**
+ * The computer answers the claim it is being asked about. Claims go one seat
+ * at a time, strongest first, so this is only ever one seat's decision.
+ */
+export function answerAiClaim(state: GameState, rng: Rng, strategy: AiStrategy = greedyAi): GameState {
+  const turn = claimTurn(state);
+  if (!turn) return state.phase === "claiming" ? resolveClaims(state, []) : state;
+  if (state.players[turn.seat].isHuman) return state;
+  const choice = strategy.chooseClaim(state, turn.seat, turn.options, rng);
+  return answerClaim(state, turn.seat, choice?.id ?? null);
 }
 
 /**
@@ -120,7 +109,7 @@ export function stepTable(state: GameState, rng: Rng, strategy: AiStrategy = gre
 
   if (state.phase === "claiming") {
     if (awaitingHumanClaim(state)) return state;
-    return resolveWithAi(state, rng, undefined, strategy);
+    return answerAiClaim(state, rng, strategy);
   }
   if (needsTurnAdvance(state)) return advanceTurn(state);
   if (state.players[state.turn].isHuman) return state;

@@ -11,7 +11,7 @@ const { roomStore } = await import("../store");
 
 const ID = FIXED_ROOM_ID;
 
-/** The one table, wiped back to an empty lobby. */
+/** Table 1, wiped back to an empty lobby. */
 async function room(): Promise<string> {
   await roomStore().delete(ID);
   return ID;
@@ -51,6 +51,53 @@ describe("the single table", () => {
   it("refuses any other room id", async () => {
     await expect(readRoom("XYZW", null)).rejects.toMatchObject({ status: 404 });
     await expect(claimSeat("XYZW", { seat: 0 })).rejects.toMatchObject({ status: 404 });
+    await expect(readRoom("TABLE4", null)).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("three tables", () => {
+  async function fresh(...ids: string[]) {
+    for (const id of ids) await roomStore().delete(id);
+  }
+
+  it("keeps each table's seats to itself", async () => {
+    await fresh("TABLE", "TABLE2", "TABLE3");
+    const { token } = await claimSeat("TABLE2", { seat: 1, name: "Srini" });
+    expect((await readRoom("TABLE2", token)).you).toEqual({ role: "player", seat: 1 });
+    // The same token means nothing at another table.
+    expect((await readRoom("TABLE", token)).you.role).toBe("spectator");
+    expect((await readRoom("TABLE", null)).players[1].occupant.kind).toBe("open");
+    expect((await readRoom("TABLE3", null)).players[1].occupant.kind).toBe("open");
+    // So the same chair can be taken at each.
+    await claimSeat("TABLE3", { seat: 1, name: "Parth" });
+    expect((await readRoom("TABLE3", null)).players[1].occupant.name).toBe("Parth");
+  });
+
+  it("deals one table without dealing the others", async () => {
+    await fresh("TABLE", "TABLE2");
+    await claimSeat("TABLE2", { seat: 0 });
+    const table = (await claimSeat("TABLE2", { seat: "table" })).token;
+    await control("TABLE2", table, { type: "deal" });
+    expect((await readRoom("TABLE2", null)).started).toBe(true);
+    expect((await readRoom("TABLE", null)).started).toBe(false);
+  });
+
+  it("takes TABLE1 and any case as Table 1", async () => {
+    await fresh("TABLE");
+    await claimSeat("table1", { seat: 0, name: "Kris" });
+    const view = await readRoom("TABLE", null);
+    expect(view.roomId).toBe("TABLE");
+    expect(view.players[0].occupant.name).toBe("Kris");
+    expect((await readRoom("table2", null)).roomId).toBe("TABLE2");
+  });
+
+  it("resets only the table it is asked to", async () => {
+    await fresh("TABLE", "TABLE2");
+    await claimSeat("TABLE", { seat: 0, name: "Kris" });
+    await claimSeat("TABLE2", { seat: 0, name: "Teja" });
+    await resetTable("TABLE2");
+    expect((await readRoom("TABLE2", null)).seatedCount).toBe(0);
+    expect((await readRoom("TABLE", null)).players[0].occupant.name).toBe("Kris");
   });
 });
 

@@ -5,6 +5,7 @@ import type { ClaimOption } from "@/game/engine";
 import { MORE_TIME_MS, type RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
@@ -379,12 +380,17 @@ export function PhoneView({
     result?.type === "win" && result.winner !== null && result.score
       ? `${result.winner === seat ? "You win" : `${nameOf(result.winner)} wins`} with ${result.score.scoredFaan} faan.`
       : "Washed-out hand.";
+  // During a claim the turn still belongs to whoever discarded, but the table
+  // is waiting on the person being asked about it.
+  const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
   if (view.phase === "gameOver") prompt = `${winText} The round is over.`;
   else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
   else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;
   else if (yourTurn) prompt = "Your turn — discard a tile.";
+  else if (view.phase === "claiming" && deciding !== undefined && view.lastDiscard)
+    prompt = `Waiting for ${nameOf(deciding)} to decide on ${tileName(view.lastDiscard.tile.code)}…`;
   else prompt = `Waiting for ${nameOf(view.turn)}…`;
 
   // The newest discard at the table, with the wind of whoever threw it — just
@@ -485,6 +491,9 @@ export function PhoneView({
         landscape ? "phone--landscape" : "",
         compact ? "phone--compact" : "",
         landscape ? `phone--size-${display.size}` : "",
+        // Your move — your turn or your call on a discard — lit in the same
+        // colour the table lights your rack with.
+        yourTurn || view.claim ? "phone--acting" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -577,6 +586,7 @@ export function PhoneView({
               layout={landscape ? layout : undefined}
               display={landscape ? display : undefined}
               sort={order}
+              table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
             />
           </SettingsMenu>

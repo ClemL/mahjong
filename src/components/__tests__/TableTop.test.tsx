@@ -29,11 +29,11 @@ const racks = (container: HTMLElement) => Array.from(container.querySelectorAll(
 describe("TableTop", () => {
   it("places nothing on the felt until it has been measured", () => {
     feltSize(0, 0);
-    const view = tableView(dealt());
+    const view = { ...tableView(dealt()), roomId: "TABLE2" };
     const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
 
     expect(container.querySelector(".felt")!.childElementCount).toBe(0);
-    expect(screen.getByText("Room TEST")).toBeTruthy();
+    expect(screen.getByText("Table 2")).toBeTruthy();
   });
 
   it("draws a rack for every seat with who sits there and how many tiles they hold", () => {

@@ -10,6 +10,7 @@ import {
   identify,
   seatName,
   isHumanSeat,
+  pendingHumanClaimants,
   mayDeal,
   mayRegroup,
   newRoom,
@@ -28,6 +29,7 @@ import {
   TURN_LIMITS,
 } from "@/game/room";
 import {
+  claimTurn,
   declareAddedKong,
   declareConcealedKong,
   declareSelfDraw,
@@ -38,18 +40,19 @@ import {
   startHand,
 } from "@/game/engine";
 import type { Seat } from "@/game/tiles";
+import { TABLES, findTable } from "@/game/tables";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
 /**
- * One table, no password.
+ * Three fixed tables, no password.
  *
- * There is a single room rather than a code per game: everyone goes to the
- * same place and takes a seat. Anyone who can reach the URL can sit down, so
- * this suits a group who already share the link and not much else — the rate
+ * Rooms are not made up per game: there are Table 1, 2 and 3, and everyone
+ * goes to one and takes a seat. Anyone who can reach the URL can sit down, so
+ * this suits groups who already share the link and not much else — the rate
  * limiter is what stops seat-grabbing, not authentication.
  */
-export const FIXED_ROOM_ID = "TABLE";
+export const FIXED_ROOM_ID = TABLES[0].id;
 
 /** Flip to true, and set MAHJONG_ROOM_PASSWORD, to ask for a password again. */
 const REQUIRE_PASSWORD = false;
@@ -74,17 +77,18 @@ export function multiplayerEnabled(): boolean {
 }
 
 /**
- * Load the one room, opening it the first time anyone arrives. It opens in its
+ * Load a table, opening it the first time anyone arrives. It opens in its
  * lobby with nothing dealt, so everybody who turns up starts the same hand.
  * `create` is NX, so two people opening the page together cannot both win —
  * the loser simply reads what the winner wrote.
  */
 async function load(id: string): Promise<Room> {
-  if (id.toUpperCase() !== FIXED_ROOM_ID) throw new RoomError("No such room", 404);
-  const existing = await roomStore().get(FIXED_ROOM_ID);
+  const table = findTable(id);
+  if (!table) throw new RoomError("No such table", 404);
+  const existing = await roomStore().get(table.id);
   if (existing) return normalizeRoom(existing);
-  await roomStore().create(newRoom(FIXED_ROOM_ID));
-  const room = await roomStore().get(FIXED_ROOM_ID);
+  await roomStore().create(newRoom(table.id));
+  const room = await roomStore().get(table.id);
   if (!room) throw new RoomError("Could not open the table", 500);
   return room;
 }
@@ -193,9 +197,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
 
     if (action.type === "claim") {
       if (r.state.phase !== "claiming") throw new RoomError("Nothing to claim", 409);
-      const pending = r.state.pendingClaims.find((c) => c.seat === seat);
-      if (!pending) throw new RoomError("You have no claim on this tile", 403);
-      if (action.optionId && !pending.options.some((o) => o.id === action.optionId)) {
+      if (!r.state.pendingClaims.some((c) => c.seat === seat)) {
+        throw new RoomError("You have no claim on this tile", 403);
+      }
+      // A stronger claim elsewhere is asked first; this seat's turn comes
+      // only if that one is passed.
+      const turn = claimTurn(r.state);
+      if (turn?.seat !== seat) throw new RoomError("Another player is deciding first", 409);
+      if (action.optionId && !turn.options.some((o) => o.id === action.optionId)) {
         throw new RoomError("That claim is not available", 409);
       }
       r.claimResponses[String(seat)] = action.optionId;
@@ -364,11 +373,7 @@ export async function control(
         break;
       }
       case "forcePass":
-        for (const claim of r.state.pendingClaims) {
-          if (isHumanSeat(r, claim.seat) && !(String(claim.seat) in r.claimResponses)) {
-            r.claimResponses[String(claim.seat)] = null;
-          }
-        }
+        for (const seat of pendingHumanClaimants(r, now)) r.claimResponses[String(seat)] = null;
         break;
     }
   });
