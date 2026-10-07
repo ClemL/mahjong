@@ -35,6 +35,9 @@ export interface FaanTable {
 export const MIN_FAAN_CHOICES = [0, 1, 3, 5] as const;
 export type MinFaan = (typeof MIN_FAAN_CHOICES)[number];
 
+/** Wind rounds a game can run: East only, East and South, or all four. */
+export const ROUND_CHOICES = [1, 2, 4] as const;
+
 export interface RuleConfig {
   /**
    * Minimum faan required to declare a win. The Hong Kong standard is 3;
@@ -54,6 +57,11 @@ export interface RuleConfig {
    * and nothing is scored for them, No Bonus Tiles included.
    */
   flowers: boolean;
+  /**
+   * Wind rounds in a game, four dealerships each: 1 is the East round alone,
+   * 2 adds the South round, 4 plays every wind.
+   */
+  rounds: number;
   faan: FaanTable;
 }
 
@@ -100,8 +108,21 @@ export const DEFAULT_RULES: RuleConfig = {
   discarderPaysAll: true,
   dealerKeepsOnWashout: false,
   flowers: true,
+  rounds: 1,
   faan: DEFAULT_FAAN,
 };
+
+/** Wind rounds this game runs. A table saved before the option existed ran one. */
+export function roundsInGame(config: Pick<RuleConfig, "rounds">): number {
+  return (ROUND_CHOICES as readonly number[]).includes(config.rounds) ? config.rounds : 1;
+}
+
+/** The game's length in words, e.g. "the East and South rounds". */
+export function describeRounds(rounds: number): string {
+  if (rounds >= 4) return "all four wind rounds";
+  if (rounds === 2) return "the East and South rounds";
+  return "the East round";
+}
 
 /** Whether this table plays with the bonus tiles. A table saved before the option existed did. */
 export function flowersInPlay(config: Pick<RuleConfig, "flowers">): boolean {
@@ -173,7 +194,8 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
       title: "Dealership",
       body:
         "The dealer keeps the deal after winning (連莊); a loss or a washout passes it to the right. " +
-        "A game runs one East round — four dealerships.",
+        `A game runs ${describeRounds(roundsInGame(config))} — four dealerships each, ` +
+        "the round wind moving on once the deal has been all the way round.",
     },
   ];
 }

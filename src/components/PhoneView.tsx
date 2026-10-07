@@ -390,7 +390,7 @@ export function PhoneView({
   // is waiting on the person being asked about it.
   const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
-  if (view.phase === "gameOver") prompt = `${winText} The round is over.`;
+  if (view.phase === "gameOver") prompt = `${winText} That is the game.`;
   else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
   else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;

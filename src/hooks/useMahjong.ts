@@ -15,6 +15,7 @@ import {
   discard as discardTile,
   nextHand as nextHandOf,
   setMinFaan as setMinFaanOf,
+  setRounds as setRoundsOf,
   turnActions,
   waitsAfterDiscard,
 } from "@/game/engine";
@@ -30,7 +31,7 @@ import { type SoundName, playSound, primeAudio } from "@/game/sound";
 import { type GameSettings, type Speed, readPreferences, usePreferences } from "@/hooks/usePreferences";
 import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
-import { DEFAULT_RULES } from "@/game/rules";
+import { DEFAULT_RULES, roundsInGame } from "@/game/rules";
 
 export type { Speed };
 
@@ -41,7 +42,6 @@ const IDLE_ACTIONS: TurnActions = {
   kongs: [],
   canWin: false,
   winScore: null,
-  waits: [],
 };
 
 export interface MahjongApi extends GameSettings {
@@ -104,8 +104,8 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     rngRef.current = createRng(seed ^ 0x5bf03635);
     // Read straight from storage: this runs on mount, before the hook's own
     // copy of the stored choices has landed in state.
-    const { minFaan } = readPreferences();
-    setState(createGame({ seed, humanSeat, config: { ...DEFAULT_RULES, minFaan } }));
+    const { minFaan, rounds } = readPreferences();
+    setState(createGame({ seed, humanSeat, config: { ...DEFAULT_RULES, minFaan, rounds } }));
     setGame((n) => n + 1);
   }, [humanSeat]);
 
@@ -279,6 +279,15 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     [rememberMinFaan],
   );
 
+  const rememberRounds = settings.setRounds;
+  const setRounds = useCallback(
+    (value: number) => {
+      rememberRounds(value);
+      setState((current) => (current ? setRoundsOf(current, value) : current));
+    },
+    [rememberRounds],
+  );
+
   return {
     ...settings,
     state,
@@ -300,5 +309,7 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     newGame,
     minFaan: state?.config.minFaan ?? DEFAULT_RULES.minFaan,
     setMinFaan,
+    rounds: state ? roundsInGame(state.config) : DEFAULT_RULES.rounds,
+    setRounds,
   };
 }

@@ -77,9 +77,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       }
       setJoiningTable(true);
       void claim("table", "")
-        // The start page's house minimum goes onto a table that has not dealt
-        // yet; once tiles are out, the table's own settings are the ones to use.
-        .then(() => (view.started ? undefined : api.control({ type: "minFaan", value: readPreferences().minFaan })))
+        // The start page's house minimum and game length go onto a table that
+        // has not dealt yet; once tiles are out, the table's own settings are
+        // the ones to use.
+        .then(async () => {
+          if (view.started) return;
+          const { minFaan, rounds } = readPreferences();
+          await api.control({ type: "minFaan", value: minFaan });
+          await api.control({ type: "rounds", value: rounds });
+        })
         .catch((error: Error) => setJoinError(error.message))
         .finally(() => setJoiningTable(false));
       return;

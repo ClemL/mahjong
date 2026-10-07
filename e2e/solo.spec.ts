@@ -9,7 +9,7 @@ const TURNS = 8;
 
 const yourHand = (page: Page) => page.getByRole("region", { name: "Your hand" });
 const handTiles = (page: Page) => yourHand(page).locator(".hand__tiles button.tile--button");
-const handResult = (page: Page) => page.getByRole("dialog", { name: /Hand result|Round complete/ });
+const handResult = (page: Page) => page.getByRole("dialog", { name: /Hand result|Game complete/ });
 
 /**
  * Waits for whatever the table asks of you next: a tile to throw, a claim to

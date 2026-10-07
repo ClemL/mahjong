@@ -4,7 +4,7 @@ import { useState } from "react";
 import { type MahjongApi, useMahjong } from "@/hooks/useMahjong";
 import type { GameState } from "@/game/engine";
 import { type RoomView, dealShowMs } from "@/game/room";
-import { SEAT_NAMES, type Seat, nextSeat, tileGlyph } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, nextSeat, roundName, tileGlyph } from "@/game/tiles";
 import { useSoloTable } from "@/hooks/useSoloTable";
 import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
@@ -73,7 +73,7 @@ export default function Page() {
         <div className="stat">
           <span className="stat__label">Round</span>
           <span className="stat__value">
-            {tileGlyph(state.roundWind)} East · hand {state.handNumber}
+            {tileGlyph(state.roundWind)} {roundName(state.roundWind)} · hand {state.handNumber}
           </span>
         </div>
         <div className="stat">

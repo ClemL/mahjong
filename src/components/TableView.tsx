@@ -1,7 +1,7 @@
 "use client";
 
 import type { PublicPlayer, RoomView } from "@/game/room";
-import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { TileBack, TileFace } from "./TileView";
 import { MeldRow, isFreshClaim } from "./SeatPanel";
@@ -129,14 +129,14 @@ export function TableView({ view }: { view: RoomView }) {
       <header className="tableview__bar">
         <span className="tableview__code">{tableName(view.roomId)}</span>
         <span className="stat__value">
-          {tileGlyph(view.roundWind)} East · hand {view.handNumber}
+          {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
         </span>
         <span className="seat__meta">{view.wallCount} tiles left</span>
         <span className="seat__meta">
           {view.phase === "handOver"
             ? "Hand over"
             : view.phase === "gameOver"
-              ? "Round complete"
+              ? "Game over"
               : `${SEAT_NAMES[view.turn]} to play`}
         </span>
       </header>

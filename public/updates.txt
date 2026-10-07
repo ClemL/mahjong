@@ -81,3 +81,5 @@
 2026-10-07T12:06:46Z - Tiles slide into place when your hand is sorted, a tile is thrown or the drawn tile joins the hand, on phones and in solo
 2026-10-07T12:06:46Z - The table draws whoever is on the clock as a bar draining along their rack, pulsing in the last five seconds
 2026-10-07T12:06:46Z - Phones buzz when it is your turn, when you can claim, and when you win (Settings → This phone → Vibrate). Android only: iPhones cannot vibrate from a web page
+2026-10-07T12:21:46Z - Hints now count your waits: on your turn, which throw leaves you ready and on how many tiles; between turns, each tile you win on and how many are still unseen, with a dead wait struck through
+2026-10-07T12:21:46Z - Game length: play the East round alone, East and South, or all four winds (start page, solo settings and the table settings). The round wind moves on after every four dealerships

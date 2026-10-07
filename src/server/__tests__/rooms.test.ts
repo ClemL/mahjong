@@ -281,6 +281,12 @@ describe("table control", () => {
     );
   });
 
+  it("sets how many wind rounds the game runs, and only to a length there is", async () => {
+    const { id, table } = await dealtRoom([0]);
+    expect((await control(id, table, { type: "rounds", value: 2 })).config.rounds).toBe(2);
+    await expect(control(id, table, { type: "rounds", value: 3 })).rejects.toMatchObject({ status: 400 });
+  });
+
   it("takes the flowers out of the set between hands, never during one", async () => {
     const id = await room();
     await claimSeat(id, { seat: 0 });

@@ -5,7 +5,8 @@ import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay, roundsInGame } from "@/game/rules";
+import { GAME_LENGTHS } from "./gameLength";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
@@ -90,6 +91,14 @@ export function TableSettings({
                 ))}
               </select>
             </label>
+
+            <Choice
+              label="Game length"
+              options={GAME_LENGTHS}
+              value={String(roundsInGame(view.config)) as `${number}`}
+              disabled={api.busy}
+              onChange={(value) => void api.control({ type: "rounds", value: Number(value) })}
+            />
 
             {/* The tile set is fixed by the deal, so it only changes between hands. */}
             <Choice

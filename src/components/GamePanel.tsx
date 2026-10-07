@@ -2,6 +2,7 @@
 
 import type { GameSettings, Speed } from "@/hooks/usePreferences";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
+import { GAME_LENGTHS } from "./gameLength";
 import { Choice, type ChoiceOption } from "./Choice";
 
 const SPEEDS: ChoiceOption<Speed>[] = [
@@ -17,7 +18,10 @@ const ON_OFF: ChoiceOption<"on" | "off">[] = [
 
 const HINTS = ON_OFF.map((o) => ({
   ...o,
-  hint: o.value === "on" ? "Marks the tiles worth keeping in your hand" : "No help with your hand",
+  hint:
+    o.value === "on"
+      ? "Marks the throws that leave you ready, and counts the tiles you are waiting on"
+      : "No help with your hand",
 }));
 
 const SOUND = ON_OFF.map((o) => ({
@@ -48,6 +52,12 @@ export function GamePanel({ api, note }: { api: GameSettings; note?: string }) {
             {note ? <span className="choice__hint">{note}</span> : null}
           </label>
 
+          <Choice
+            label="Game length"
+            options={GAME_LENGTHS}
+            value={String(api.rounds) as `${number}`}
+            onChange={(value) => api.setRounds(Number(value))}
+          />
           <Choice
             label="Speed"
             options={SPEEDS}

@@ -182,7 +182,7 @@ export function TableResult({
               </button>
             </>
           ) : (
-            <span className="seat__meta">Round complete — Restart to play again</span>
+            <span className="seat__meta">Game complete — Restart to play again</span>
           )}
         </footer>
       </section>

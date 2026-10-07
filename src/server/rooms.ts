@@ -37,8 +37,10 @@ import {
   nextHand,
   setFlowers,
   setMinFaan,
+  setRounds,
   startHand,
 } from "@/game/engine";
+import { ROUND_CHOICES } from "@/game/rules";
 import type { Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
 import { RoomError } from "./errors";
@@ -265,6 +267,7 @@ export type TableCommand =
   | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
+  | { type: "rounds"; value: number }
   | { type: "flowers"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "turnLimit"; value: number }
@@ -334,6 +337,13 @@ export async function control(
         break;
       case "minFaan":
         r.state = setMinFaan(r.state, command.value);
+        break;
+      // Like the minimum, it can change mid-game: it is read when a round ends.
+      case "rounds":
+        if (!(ROUND_CHOICES as readonly number[]).includes(command.value)) {
+          throw new RoomError("No such game length", 400);
+        }
+        r.state = setRounds(r.state, command.value);
         break;
       // The tile set is fixed when a hand is dealt, so it can only change
       // between hands: before the first, or once one is over.

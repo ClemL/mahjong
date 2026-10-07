@@ -4,7 +4,7 @@ import { type CSSProperties, type RefObject, useLayoutEffect, useRef, useState }
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
-import { SEAT_NAMES, type Seat, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCountdown } from "@/hooks/useCountdown";
@@ -713,7 +713,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
       <header className="tabletop__bar">
         <span className="tableview__code">{tableName(view.roomId)}</span>
         <span className="stat__value">
-          {tileGlyph(view.roundWind)} East · hand {view.handNumber}
+          {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
         </span>
         <span className="seat__meta">{view.wallCount} tiles left</span>
         {wakeLock !== "held" ? (

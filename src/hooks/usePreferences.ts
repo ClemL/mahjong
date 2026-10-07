@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ClaimPrompt } from "@/game/controller";
 import type { StrategyName } from "@/game/ai";
-import { DEFAULT_RULES, MIN_FAAN_CHOICES } from "@/game/rules";
+import { DEFAULT_RULES, MIN_FAAN_CHOICES, ROUND_CHOICES } from "@/game/rules";
 import { primeAudio } from "@/game/sound";
 
 export type Speed = "slow" | "normal" | "fast";
@@ -11,6 +11,8 @@ export type Speed = "slow" | "normal" | "fast";
 /** The game options a player sets before sitting down, kept per device. */
 export interface Preferences {
   minFaan: number;
+  /** Wind rounds in a game: 1, 2 or 4. */
+  rounds: number;
   speed: Speed;
   showHints: boolean;
   muted: boolean;
@@ -20,6 +22,7 @@ export interface Preferences {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   minFaan: DEFAULT_RULES.minFaan,
+  rounds: DEFAULT_RULES.rounds,
   speed: "normal",
   showHints: true,
   muted: false,
@@ -49,6 +52,7 @@ export function normalizePreferences(raw: unknown): Preferences {
       r.version === PREFS_VERSION
         ? pick(r.minFaan, MIN_FAAN_CHOICES as readonly number[], d.minFaan)
         : d.minFaan,
+    rounds: pick(r.rounds, ROUND_CHOICES as readonly number[], d.rounds),
     speed: pick<Speed>(r.speed as Speed, ["slow", "normal", "fast"], d.speed),
     showHints: typeof r.showHints === "boolean" ? r.showHints : d.showHints,
     muted: typeof r.muted === "boolean" ? r.muted : d.muted,
@@ -85,6 +89,8 @@ function writePreferences(prefs: Preferences): void {
 export interface GameSettings {
   minFaan: number;
   setMinFaan: (value: number) => void;
+  rounds: number;
+  setRounds: (value: number) => void;
   speed: Speed;
   setSpeed: (value: Speed) => void;
   showHints: boolean;
@@ -126,6 +132,7 @@ export function usePreferences(): PreferencesApi {
     loaded,
     ...prefs,
     setMinFaan: useCallback((value: number) => set("minFaan", value), [set]),
+    setRounds: useCallback((value: number) => set("rounds", value), [set]),
     setSpeed: useCallback((value: Speed) => set("speed", value), [set]),
     setShowHints: useCallback((value: boolean) => set("showHints", value), [set]),
     setMuted: useCallback(

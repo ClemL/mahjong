@@ -598,6 +598,41 @@ button {
   border: 1px solid var(--panel-border);
 }
 
+/* What a ready hand wins on: each tile with how many are still unseen. A
+   dead wait is struck through and dimmed, and its count says 0 in words. */
+.waits__line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.waits {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.waits__tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.waits__left {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.waits__tile--dead {
+  opacity: 0.5;
+}
+
+.waits__tile--dead .waits__left {
+  text-decoration: line-through;
+}
+
 .hand__tiles {
   display: flex;
   flex-wrap: wrap;
