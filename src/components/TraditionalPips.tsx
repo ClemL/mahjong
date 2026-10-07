@@ -130,11 +130,11 @@ const STICKS: Record<number, Stick[]> = {
     ...row(50, 26, [22, 50, 78], ["g", "g", "g"]),
     ...row(83, 26, [22, 50, 78], ["g", "g", "g"]),
   ],
-  // A W over an M: the sticks lean alternately, so the two rows meet in
-  // diamonds instead of standing in a row of eight.
+  // A W over an M: the outer sticks stand upright and parallel, and only the
+  // inner pair leans — together at the foot on top, at the head below.
   8: [
-    ...row(27, 40, [20, 40, 60, 80], ["g", "g", "g", "g"], [-24, 24, -24, 24]),
-    ...row(73, 40, [20, 40, 60, 80], ["b", "b", "b", "b"], [24, -24, 24, -24]),
+    ...row(27, 40, [14, 38, 62, 86], ["g", "g", "g", "g"], [0, -22, 22, 0]),
+    ...row(73, 40, [14, 38, 62, 86], ["b", "b", "b", "b"], [0, 22, -22, 0]),
   ],
   // Three columns of three; the middle column is red.
   9: [
