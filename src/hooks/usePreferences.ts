@@ -35,9 +35,10 @@ const STORAGE_KEY = "hk-mahjong.prefs";
 /**
  * Stamped on every save. Builds before version 2 wrote their 0 faan default
  * alongside whatever was actually changed, so a minimum stored by one of them
- * is not a choice anybody made, and the current default replaces it.
+ * is not a choice anybody made, and the current default replaces it. Version 3
+ * did the same for the one-round game length when the default became all four.
  */
-const PREFS_VERSION = 2;
+const PREFS_VERSION = 3;
 
 function pick<T>(value: unknown, allowed: readonly T[], fallback: T): T {
   return allowed.includes(value as T) ? (value as T) : fallback;
@@ -49,10 +50,13 @@ export function normalizePreferences(raw: unknown): Preferences {
   const d = DEFAULT_PREFERENCES;
   return {
     minFaan:
-      r.version === PREFS_VERSION
+      typeof r.version === "number" && r.version >= 2
         ? pick(r.minFaan, MIN_FAAN_CHOICES as readonly number[], d.minFaan)
         : d.minFaan,
-    rounds: pick(r.rounds, ROUND_CHOICES as readonly number[], d.rounds),
+    rounds:
+      typeof r.version === "number" && r.version >= 3
+        ? pick(r.rounds, ROUND_CHOICES as readonly number[], d.rounds)
+        : d.rounds,
     speed: pick<Speed>(r.speed as Speed, ["slow", "normal", "fast"], d.speed),
     showHints: typeof r.showHints === "boolean" ? r.showHints : d.showHints,
     muted: typeof r.muted === "boolean" ? r.muted : d.muted,

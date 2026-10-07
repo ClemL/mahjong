@@ -159,6 +159,12 @@ export interface Room {
    * when the turn ends and nothing has to remember to clear it.
    */
   moreTime: { seat: Seat; from: number } | null;
+  /**
+   * Seat tokens taken over by somebody scanning that chair's code, newest
+   * last, so the phone that lost its chair can be told why rather than just
+   * dropping back to the seat picker.
+   */
+  displaced: { token: string; seat: Seat }[];
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -203,6 +209,8 @@ export interface RoomView {
   log: LogEntry[];
   config: RuleConfig;
   you: { role: Role; seat: Seat | null };
+  /** The chair this viewer held until somebody else scanned its code, if that happened. */
+  displacedFrom: Seat | null;
   tablePresent: boolean;
   /** Seats still waiting to answer the discard on the table. */
   awaitingClaimSeats: Seat[];
@@ -247,6 +255,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     lastStepAt: Date.now(),
     lastPlayed: null,
     moreTime: null,
+    displaced: [],
   };
 }
 
@@ -256,6 +265,7 @@ export function normalizeRoom(room: Room): Room {
   room.lastStepAt ??= room.updatedAt ?? Date.now();
   room.lastPlayed ??= null;
   room.moreTime ??= null;
+  room.displaced ??= [];
   return room;
 }
 
@@ -332,6 +342,7 @@ export function resetRoom(room: Room, seed = Date.now(), { keepTable = true } = 
   room.rngCalls = 0;
   room.settings = fresh.settings;
   room.lastPlayed = null;
+  room.displaced = [];
   returnToLobby(room, fresh.state);
 }
 
@@ -367,6 +378,56 @@ export function grantMoreTime(room: Room, seat: Seat): string | null {
 /** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's default. */
 export function seatName(name: string | undefined, seat: Seat): string {
   return (name ?? "").trim().slice(0, 16) || DEFAULT_NAMES[seat];
+}
+
+/** How many taken-over tokens a room remembers; older ones just see the seat picker. */
+const DISPLACED_KEPT = 8;
+
+/**
+ * Put a person in a chair. An occupied chair is refused unless `replace` is
+ * set, which is what scanning a taken chair's code does: whoever was there is
+ * put out, and their phone is told so the next time it looks.
+ */
+export function sitDown(
+  room: Room,
+  seat: Seat,
+  input: { token: string; name?: string; replace?: boolean },
+  now = Date.now(),
+): string | null {
+  const occupant = room.seats[seat];
+  if (occupant.kind === "human") {
+    if (!input.replace) return "That seat is taken";
+    room.displaced = [...room.displaced, { token: occupant.token, seat }].slice(-DISPLACED_KEPT);
+  }
+  room.seats[seat] = { kind: "human", name: seatName(input.name, seat), token: input.token, lastSeen: now };
+  syncSeats(room, now);
+  return null;
+}
+
+/** The chair one step round from `seat`: +1 is the next wind on, -1 the one before. */
+export function neighbourSeat(seat: Seat, step: 1 | -1): Seat {
+  return ((seat + step + 4) % 4) as Seat;
+}
+
+/**
+ * Move a seated person one chair over before the deal. If the chair is taken
+ * the two trade places. A name that was only ever the chair's default follows
+ * the chair, so nobody ends up called after the seat they just left.
+ */
+export function moveSeat(room: Room, seat: Seat, step: 1 | -1): string | null {
+  if (room.started) return "Seats can only be swapped before the deal";
+  const from = room.seats[seat];
+  if (from.kind !== "human") return "Nobody is sitting there";
+  const to = neighbourSeat(seat, step);
+  const other = room.seats[to];
+  const rename = (occupant: Occupant, was: Seat, now: Seat): Occupant =>
+    occupant.kind === "human" && occupant.name === DEFAULT_NAMES[was]
+      ? { ...occupant, name: DEFAULT_NAMES[now] }
+      : occupant;
+  room.seats[to] = rename(from, seat, to);
+  room.seats[seat] = rename(other, to, seat);
+  syncSeats(room);
+  return null;
 }
 
 /** True when a seated player has gone quiet for long enough to be counted away. */
@@ -707,6 +768,10 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     log: state.log,
     config: state.config,
     you,
+    displacedFrom:
+      you.role === "spectator" && token
+        ? (room.displaced.filter((d) => d.token === token).pop()?.seat ?? null)
+        : null,
     tablePresent: room.table !== null,
     awaitingClaimSeats: pendingHumanClaimants(room, now),
     claim,
@@ -780,6 +845,7 @@ export function soloTableView(
     log: state.log,
     config: state.config,
     you: { role: "table", seat: null },
+    displacedFrom: null,
     tablePresent: false,
     awaitingClaimSeats,
     claim: null,

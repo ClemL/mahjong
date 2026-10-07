@@ -122,6 +122,30 @@ describe("claiming seats", () => {
     await expect(claimSeat(id, { seat: "table" })).rejects.toMatchObject({ status: 409 });
   });
 
+  it("lets a taken chair's code put out whoever is there, and tells them so", async () => {
+    const id = await room();
+    const kris = (await claimSeat(id, { seat: 1, name: "Kris" })).token;
+    const { token, view } = await claimSeat(id, { seat: 1, name: "Srini", replace: true });
+    expect(view.you).toEqual({ role: "player", seat: 1 });
+    expect(view.players[1].occupant.name).toBe("Srini");
+    expect(view.displacedFrom).toBeNull();
+
+    const theirs = await readRoom(id, kris);
+    expect(theirs.you).toEqual({ role: "spectator", seat: null });
+    expect(theirs.displacedFrom).toBe(1);
+    // Only the phone that was put out hears about it.
+    expect((await readRoom(id, null)).displacedFrom).toBeNull();
+    expect((await readRoom(id, token)).displacedFrom).toBeNull();
+  });
+
+  it("forgets who was put out once the table is reset", async () => {
+    const id = await room();
+    const kris = (await claimSeat(id, { seat: 1 })).token;
+    await claimSeat(id, { seat: 1, replace: true });
+    await resetTable(id);
+    expect((await readRoom(id, kris)).displacedFrom).toBeNull();
+  });
+
   it("falls back to the chair's default name when no name is given", async () => {
     const id = await room();
     const { view } = await claimSeat(id, { seat: 3, name: "   " });
@@ -320,6 +344,46 @@ describe("table control", () => {
       status: 403,
     });
     expect((await readRoom(id, null)).players[1].occupant.name).toBe("Srini");
+  });
+
+  it("moves a player one chair round, trading places when it is taken", async () => {
+    const id = await room();
+    const table = (await claimSeat(id, { seat: "table" })).token;
+    const kris = (await claimSeat(id, { seat: 0, name: "Kris" })).token;
+    await claimSeat(id, { seat: 1, name: "Srini" });
+
+    let view = await control(id, kris, { type: "moveSeat", seat: 0, step: 1 });
+    expect(view.you).toEqual({ role: "player", seat: 1 });
+    expect(view.players.map((p) => p.occupant.name)).toEqual(["Srini", "Kris", null, null]);
+
+    // The table can move anybody, and backwards from East wraps round to North.
+    view = await control(id, table, { type: "moveSeat", seat: 0, step: -1 });
+    expect(view.players.map((p) => p.occupant.kind)).toEqual(["open", "human", "open", "human"]);
+    expect(view.players[3].occupant.name).toBe("Srini");
+  });
+
+  it("lets a chair's default name follow the chair", async () => {
+    const id = await room();
+    const me = (await claimSeat(id, { seat: 0 })).token;
+    const view = await control(id, me, { type: "moveSeat", seat: 0, step: 1 });
+    expect(view.players[1].occupant.name).toBe("Louis");
+  });
+
+  it("only moves a player's own seat, and only before the deal", async () => {
+    const id = await room();
+    const kris = (await claimSeat(id, { seat: 0 })).token;
+    await claimSeat(id, { seat: 1 });
+    await expect(control(id, kris, { type: "moveSeat", seat: 1, step: 1 })).rejects.toMatchObject({
+      status: 403,
+    });
+    const table = (await claimSeat(id, { seat: "table" })).token;
+    await expect(control(id, table, { type: "moveSeat", seat: 2, step: 1 })).rejects.toMatchObject({
+      status: 409,
+    });
+    await control(id, table, { type: "deal" });
+    await expect(control(id, kris, { type: "moveSeat", seat: 0, step: 1 })).rejects.toMatchObject({
+      status: 409,
+    });
   });
 
   it("lets the table rename any seated chair, and only a seated one", async () => {
