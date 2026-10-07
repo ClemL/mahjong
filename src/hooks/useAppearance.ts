@@ -6,7 +6,9 @@ import {
   DEFAULT_APPEARANCE,
   STORAGE_KEY,
   applyAppearance,
+  needsMigration,
   normalizeAppearance,
+  serializeAppearance,
 } from "@/game/appearance";
 
 export interface AppearanceApi {
@@ -24,7 +26,12 @@ export function useAppearance(): AppearanceApi {
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) setAppearance(normalizeAppearance(JSON.parse(raw)));
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const appearance = normalizeAppearance(saved);
+      setAppearance(appearance);
+      // Stamp a migrated save so the move to the new default happens once.
+      if (needsMigration(saved)) window.localStorage.setItem(STORAGE_KEY, serializeAppearance(appearance));
     } catch {
       // Storage can be unavailable (private mode, blocked cookies) — the
       // defaults are already applied.
@@ -35,7 +42,7 @@ export function useAppearance(): AppearanceApi {
     setAppearance(next);
     applyAppearance(next);
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      window.localStorage.setItem(STORAGE_KEY, serializeAppearance(next));
     } catch {
       // A preference that cannot be saved is still applied for this session.
     }

@@ -80,6 +80,24 @@ export const DEFAULT_APPEARANCE: Appearance = {
 
 export const STORAGE_KEY = "hk-mahjong.appearance";
 
+/**
+ * Stamped on every saved appearance. Pips was the default face before the Hong
+ * Kong one, so a save without this stamp holding "pips" most likely never
+ * chose it; it moves to Hong Kong once. A save made after this — including an
+ * explicit return to Pips — carries the stamp and is left alone.
+ */
+export const APPEARANCE_REVISION = 2;
+
+/** What goes into storage: the appearance plus the revision it was saved at. */
+export function serializeAppearance(appearance: Appearance): string {
+  return JSON.stringify({ ...appearance, rev: APPEARANCE_REVISION });
+}
+
+/** True when a stored value predates the revision stamp and needs migrating. */
+export function needsMigration(raw: unknown): boolean {
+  return (raw as { rev?: unknown } | null)?.rev !== APPEARANCE_REVISION;
+}
+
 /** Every setting, its allowed values and its data- attribute, in one table so
  *  normalizing, applying and the pre-paint script cannot drift apart. */
 const FIELDS: { [K in keyof Appearance]: readonly Option<Appearance[K]>[] } = {
@@ -99,6 +117,7 @@ export function normalizeAppearance(raw: unknown): Appearance {
   for (const key of FIELD_KEYS) {
     if (FIELDS[key].some((o) => o.value === value[key])) result[key] = value[key] as string;
   }
+  if (needsMigration(raw) && result.tiles === "pips") result.tiles = "traditional";
   return result as Appearance;
 }
 
@@ -122,6 +141,7 @@ export const APPEARANCE_INIT_SCRIPT = `
       Object.fromEntries(FIELD_KEYS.map((key) => [key, FIELDS[key].map((o) => o.value)])),
     )};
     var defaults = ${JSON.stringify(DEFAULT_APPEARANCE)};
+    if (saved.rev !== ${APPEARANCE_REVISION} && saved.tiles === "pips") saved.tiles = "traditional";
     for (var key in fields) {
       root.dataset[key] = fields[key].indexOf(saved[key]) >= 0 ? saved[key] : defaults[key];
     }
