@@ -11,6 +11,7 @@ import {
   tileSuitGlyph,
 } from "@/game/tiles";
 import { TilePips, hasPips } from "./TilePips";
+import { TraditionalPips } from "./TraditionalPips";
 
 export type TileSize = "sm" | "md" | "lg";
 
@@ -39,9 +40,10 @@ const WIND_INDEX: Record<string, string> = { we: "E", ws: "S", ww: "W", wn: "N" 
 /**
  * The face itself. Every face a tile can wear is rendered and CSS shows the
  * ones the chosen tile style calls for, so switching is instant and no
- * component has to know the setting. Dots and Bamboo carry a pip drawing and
- * a numeral face; every suited tile also carries an Arabic numeral for the
- * Western style, and suited tiles and winds a corner index.
+ * component has to know the setting. Dots and Bamboo carry a plain and a
+ * painted pip drawing and a numeral face; every suited tile also carries an
+ * Arabic numeral for the Western style, and suited tiles and winds a corner
+ * index.
  */
 function TileArt({ code }: { code: TileCode }) {
   const pips = hasPips(code);
@@ -56,6 +58,9 @@ function TileArt({ code }: { code: TileCode }) {
         </span>
       ) : null}
       {pips ? <TilePips code={code} /> : null}
+      {pips ? <TraditionalPips code={code} /> : null}
+      {/* Parlour sets paint the White Dragon as an empty blue frame. */}
+      {code === "dw" ? <span className="tile__frame" aria-hidden /> : null}
       <span
         className={[
           "tile__glyph",

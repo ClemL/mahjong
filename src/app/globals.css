@@ -82,6 +82,11 @@
   --dragon-w: #2b4ea8;
   --flower: #7c2ba8;        /* Bonus tiles — purple */
   --flower-tint: #7c2ba812;
+  /* The Hong Kong face's fixed inks, as a parlour set paints them. */
+  --trad-red: #c4231c;
+  --trad-green: #137a3e;
+  --trad-blue: #1d4f9c;
+  --trad-ink: #17233d;
 }
 
 * {
@@ -1566,6 +1571,67 @@ details[open] > summary::after {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-weight: 800;
   font-variant-numeric: lining-nums;
+}
+
+/* Hong Kong: painted pips, the set's own inks on an untinted face, and an
+   empty frame for the White Dragon. The inks are fixed rather than taken from
+   the suit palette because the colors are part of how the tiles look; the
+   pip counts and layouts still name every tile without them. */
+.tile__pips--trad,
+.tile__frame {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__pips--plain {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__pips--trad {
+  display: block;
+}
+
+[data-tiles="traditional"] {
+  --suit-m-tint: transparent;
+  --suit-p-tint: transparent;
+  --suit-s-tint: transparent;
+}
+
+/* Characters: the numeral in dark ink over a red 萬. */
+[data-tiles="traditional"] .tile--m .tile__glyph {
+  color: var(--trad-ink);
+}
+
+[data-tiles="traditional"] .tile--m .tile__suit {
+  color: var(--trad-red);
+}
+
+[data-tiles="traditional"] .tile--w {
+  color: var(--trad-ink);
+}
+
+[data-tiles="traditional"] .tile--dr {
+  color: var(--trad-red);
+}
+
+[data-tiles="traditional"] .tile--dg {
+  color: var(--trad-green);
+}
+
+[data-tiles="traditional"] .tile--dw .tile__glyph {
+  display: none;
+}
+
+/* A heavy outer rule and a fine inner one, as the tile is engraved. */
+[data-tiles="traditional"] .tile__frame {
+  display: block;
+  width: 62%;
+  height: 64%;
+  margin-top: calc(var(--tile-w) * 0.06);
+  border: max(calc(var(--tile-w) * 0.06), 1.5px) solid var(--trad-blue);
+  border-radius: calc(var(--tile-w) * 0.04);
+  box-shadow:
+    inset 0 0 0 max(calc(var(--tile-w) * 0.04), 1px) var(--tile-face),
+    inset 0 0 0 max(calc(var(--tile-w) * 0.07), 1.5px) var(--trad-blue);
 }
 
 /* The corner index replaces the faint Latin label wherever a tile has one;
