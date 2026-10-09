@@ -4,7 +4,7 @@ import type { PublicPlayer, RoomView } from "@/game/room";
 import { SEAT_NAMES, type Seat, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { TileBack, TileFace } from "./TileView";
-import { MeldRow, isFreshClaim } from "./SeatPanel";
+import { MeldRow, bonusClass, isFreshClaim } from "./SeatPanel";
 
 /** Where each seat sits relative to the tablet lying on the table. */
 const EDGE: Record<Seat, "top" | "right" | "bottom" | "left"> = {
@@ -80,7 +80,7 @@ function SeatBlock({
       {player.flowers.length > 0 ? (
         <div className="seat__row tseat__flowers">
           {player.flowers.map((t) => (
-            <TileFace key={t.id} code={t.code} size="sm" />
+            <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, player)} />
           ))}
         </div>
       ) : null}

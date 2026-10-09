@@ -2,7 +2,8 @@
 
 import type { GameState } from "@/game/engine";
 import { claimingSeats } from "@/game/controller";
-import { SEAT_NAMES, type Seat, tileGlyph, seatWind } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, type Tile, tileGlyph, seatWind } from "@/game/tiles";
+import { bonusTileScores } from "@/game/scoring";
 import type { Meld } from "@/game/melds";
 import { TileBack, TileFace } from "./TileView";
 
@@ -51,6 +52,15 @@ export function MeldRow({ meld, fresh = false }: { meld: Meld; fresh?: boolean }
       })}
     </span>
   );
+}
+
+/**
+ * The class that ghosts a bonus tile which would add nothing to its owner's
+ * win — someone else's flower that only came along with the draw.
+ */
+export function bonusClass(code: Tile["code"], owner: { seat: Seat; flowers: Tile[] }): string {
+  const held = owner.flowers.map((t) => t.code);
+  return bonusTileScores(code, owner.seat, held) ? "" : "tile--idle";
 }
 
 /** Whether a meld was just made from this discard. */
@@ -114,7 +124,7 @@ export function SeatPanel({ state, seat }: Props) {
       {player.flowers.length > 0 ? (
         <div className="seat__row">
           {player.flowers.map((t) => (
-            <TileFace key={t.id} code={t.code} size="sm" />
+            <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, player)} />
           ))}
         </div>
       ) : null}
