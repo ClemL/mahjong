@@ -25,7 +25,7 @@ export async function presetPreferences(page: Page, prefs: Record<string, unknow
   await page.addInitScript((stored) => {
     window.localStorage.setItem(
       "hk-mahjong.prefs",
-      JSON.stringify({ muted: true, ...stored, version: 2 }),
+      JSON.stringify({ muted: true, ...stored, version: 3 }),
     );
     window.localStorage.setItem("hk-mahjong.muted", "1");
   }, prefs);

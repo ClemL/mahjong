@@ -2583,6 +2583,20 @@ a.btn {
   flex: 0 0 auto;
 }
 
+/* A taken chair's code is still there for a takeover, but it should not be
+   what draws the eye from across the table. */
+.qr--taken {
+  opacity: 0.55;
+}
+
+/* Move one chair round, either way. */
+.gather__move {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
 .gather__seatinfo {
   display: flex;
   flex-direction: column;

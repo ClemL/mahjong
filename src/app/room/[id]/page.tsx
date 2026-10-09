@@ -30,11 +30,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [joinError, setJoinError] = useState<string | null>(null);
 
   const claim = useCallback(
-    async (seat: Seat | "table", name: string) => {
+    async (seat: Seat | "table", name: string, replace = false) => {
       const response = await fetch(`/api/rooms/${roomId}/claim`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ seat, name }),
+        body: JSON.stringify({ seat, name, replace }),
       });
       const body = (await response.json()) as { token?: string; error?: string };
       if (response.ok && body.token) {
@@ -63,6 +63,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     if (view.you.role !== "spectator") {
       url.searchParams.delete("seat");
       url.searchParams.delete("name");
+      url.searchParams.delete("replace");
       window.history.replaceState(null, "", url.pathname + url.search);
       return;
     }
@@ -91,8 +92,11 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
     const name = url.searchParams.get("name") ?? "";
+    // A taken chair's code says so: scanning it puts out whoever is there.
+    const replace = url.searchParams.get("replace") === "1";
     url.searchParams.delete("seat");
     url.searchParams.delete("name");
+    url.searchParams.delete("replace");
     window.history.replaceState(null, "", url.pathname + url.search);
 
     const seat = Number(asked);
@@ -101,7 +105,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       return;
     }
     setJoining(seat as Seat);
-    void claim(seat as Seat, name)
+    void claim(seat as Seat, name, replace)
       .catch((error: Error) => setJoinError(error.message))
       .finally(() => setJoining(null));
   }, [view, claim, api]);
