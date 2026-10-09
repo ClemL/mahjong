@@ -108,7 +108,7 @@ export const DEFAULT_RULES: RuleConfig = {
   discarderPaysAll: true,
   dealerKeepsOnWashout: false,
   flowers: true,
-  rounds: 1,
+  rounds: 4,
   faan: DEFAULT_FAAN,
 };
 

@@ -10,6 +10,8 @@ import {
   identify,
   isOpeningTurn,
   seatName,
+  sitDown,
+  moveSeat,
   isHumanSeat,
   pendingHumanClaimants,
   mayDeal,
@@ -150,7 +152,7 @@ async function admitted(input: { password?: string }): Promise<void> {
 
 export async function claimSeat(
   id: string,
-  input: { seat: Seat | "table"; password?: string; name?: string },
+  input: { seat: Seat | "table"; password?: string; name?: string; replace?: boolean },
 ): Promise<{ token: string; view: RoomView }> {
   await admitted(input);
   const token = randomUUID();
@@ -160,15 +162,8 @@ export async function claimSeat(
       r.table = { token, lastSeen: now };
       return;
     }
-    const occupant = r.seats[input.seat];
-    if (occupant.kind === "human") throw new RoomError("That seat is taken", 409);
-    r.seats[input.seat] = {
-      kind: "human",
-      name: seatName(input.name, input.seat),
-      token,
-      lastSeen: now,
-    };
-    syncSeats(r);
+    const refused = sitDown(r, input.seat, { token, name: input.name, replace: input.replace }, now);
+    if (refused) throw new RoomError(refused, 409);
   });
   return { token, view: viewFor(room, token) };
 }
@@ -276,6 +271,7 @@ export type TableCommand =
   | { type: "rotate" }
   | { type: "freeSeat"; seat: Seat }
   | { type: "rename"; seat: Seat; name: string }
+  | { type: "moveSeat"; seat: Seat; step: 1 | -1 }
   | { type: "forcePass" };
 
 /**
@@ -295,7 +291,8 @@ export async function control(
     else if (
       !(command.type === "deal" && mayDeal(r, token)) &&
       !(command.type === "regroup" && mayRegroup(r, token)) &&
-      !(command.type === "rename" && identify(r, token).seat === command.seat)
+      !(command.type === "rename" && identify(r, token).seat === command.seat) &&
+      !(command.type === "moveSeat" && identify(r, token).seat === command.seat)
     ) {
       throw new RoomError("Not the table", 403);
     }
@@ -388,6 +385,12 @@ export async function control(
         const occupant = r.seats[command.seat];
         if (occupant?.kind !== "human") throw new RoomError("Nobody is sitting there", 409);
         occupant.name = seatName(command.name, command.seat);
+        break;
+      }
+      case "moveSeat": {
+        if (command.step !== 1 && command.step !== -1) throw new RoomError("No such seat", 400);
+        const refused = moveSeat(r, command.seat, command.step);
+        if (refused) throw new RoomError(refused, 409);
         break;
       }
       case "forcePass":

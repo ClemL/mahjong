@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_NAMES, type RoomView } from "@/game/room";
+import { DEFAULT_NAMES, type RoomView, neighbourSeat } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
@@ -56,11 +56,22 @@ export function TableLobby({
   // and nothing to type once it has been scanned.
   const joinUrl = origin ? `${origin}/room/${view.roomId}` : null;
 
-  /** A seat's own link: which chair, and the name the table typed for it. */
-  const seatUrl = (seat: Seat): string | null => {
+  /**
+   * A seat's own link: which chair, and the name the table typed for it. A
+   * taken chair's link also says to put out whoever is there, so a dead phone
+   * or a swap of players never needs the table to free the seat first.
+   */
+  const seatUrl = (seat: Seat, taken: boolean): string | null => {
     if (!joinUrl) return null;
     const name = (names[seat] ?? "").trim();
-    return `${joinUrl}?seat=${seat}${name ? `&name=${encodeURIComponent(name)}` : ""}`;
+    return `${joinUrl}?seat=${seat}${name && !taken ? `&name=${encodeURIComponent(name)}` : ""}${taken ? "&replace=1" : ""}`;
+  };
+
+  // Typed names belong to the chair, so they trade places with whoever moves.
+  const move = (seat: Seat, step: 1 | -1) => {
+    const to = neighbourSeat(seat, step);
+    setNames((n) => ({ ...n, [seat]: n[to] ?? "", [to]: n[seat] ?? "" }));
+    void api.control({ type: "moveSeat", seat, step });
   };
 
   const seats: Seat[] = [0, 1, 2, 3];
@@ -130,7 +141,10 @@ export function TableLobby({
           {seats.map((seat) => {
             const occupant = view.players[seat].occupant;
             const here = occupant.kind === "human";
-            const url = seatUrl(seat);
+            const url = seatUrl(seat, here);
+            const name = occupant.name ?? DEFAULT_NAMES[seat];
+            // The table can move anybody; a phone only its own player.
+            const canMove = here && (isTable || view.you.seat === seat);
             return (
               <div
                 key={seat}
@@ -177,16 +191,49 @@ export function TableLobby({
                   </span>
                   {/* Joined state must not rest on the colour of the card alone. */}
                   <span className="gather__state">{here ? "✓ Seated" : "Open"}</span>
+
+                  {/* One chair either way round the table; a taken chair
+                      means the two players trade places. Labelled with where
+                      they land, since left and right depend on where you stand. */}
+                  {here && isTable ? (
+                    <span className="gather__hint">Scanning this chair&apos;s code takes it over</span>
+                  ) : null}
+
+                  {canMove ? (
+                    <span className="gather__move">
+                      {([-1, 1] as const).map((step) => {
+                        const to = neighbourSeat(seat, step);
+                        const swap = view.players[to].occupant.kind === "human";
+                        return (
+                          <button
+                            key={step}
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            disabled={api.busy}
+                            aria-label={`${swap ? "Swap" : "Move"} ${name} ${swap ? `with ${view.players[to].occupant.name}, seat ${to + 1}` : `to seat ${to + 1}`}, ${SEAT_NAMES[to]}`}
+                            onClick={() => move(seat, step)}
+                          >
+                            {step < 0 ? `‹ ${tileGlyph(seatWind(to))} ${SEAT_NAMES[to]}` : `${SEAT_NAMES[to]} ${tileGlyph(seatWind(to))} ›`}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  ) : null}
                 </div>
 
                 {/* Each chair has its own code, so scanning it sits you down
                     there rather than dropping you on a seat picker to choose
-                    the one you are already standing behind. */}
-                {!here && isTable && url ? (
+                    the one you are already standing behind. A taken chair
+                    keeps its code: scanning it takes the seat over. */}
+                {isTable && url ? (
                   <QrCode
                     value={url}
-                    label={`Scan to take seat ${seat + 1}, ${SEAT_NAMES[seat]}`}
-                    className="qr--seat"
+                    label={
+                      here
+                        ? `Scan to take over seat ${seat + 1}, ${SEAT_NAMES[seat]}, from ${name}`
+                        : `Scan to take seat ${seat + 1}, ${SEAT_NAMES[seat]}`
+                    }
+                    className={here ? "qr--seat qr--taken" : "qr--seat"}
                   />
                 ) : null}
               </div>

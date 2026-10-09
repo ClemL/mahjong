@@ -15,12 +15,18 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       seat?: number | "table";
       password?: string;
       name?: string;
+      replace?: boolean;
     };
     const seat = body.seat === "table" ? "table" : ((body.seat ?? -1) as Seat);
     if (seat !== "table" && ![0, 1, 2, 3].includes(seat)) {
       return NextResponse.json({ error: "Pick a seat" }, { status: 400 });
     }
-    const result = await claimSeat(id, { seat, password: body.password, name: body.name });
+    const result = await claimSeat(id, {
+      seat,
+      password: body.password,
+      name: body.name,
+      replace: body.replace === true,
+    });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RoomError) {

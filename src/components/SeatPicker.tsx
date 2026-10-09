@@ -36,6 +36,13 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
   return (
     <div className="lobby">
       <h1 className="lobby__title">Take a seat at {tableName(view.roomId)}</h1>
+      {/* Dropping back here without a word reads as the app losing the seat. */}
+      {view.displacedFrom !== null ? (
+        <p className="lobby__warn" role="status">
+          Somebody else scanned the code for seat {view.displacedFrom + 1},{" "}
+          {SEAT_NAMES[view.displacedFrom]}, and took your place. Pick a seat to sit back down.
+        </p>
+      ) : null}
       <p className="lobby__lead">
         Everyone here plays at the same table. Any seat still open when the table deals is played by
         the computer, and the tablet in the middle takes the Table seat.
