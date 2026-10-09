@@ -5348,6 +5348,50 @@ body:has(.app--handset) {
   box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 45%, transparent);
 }
 
+/* ------------------------------------------------------- tile reference */
+
+/* Opened from settings drawers that sit above ordinary modals. */
+.modal__backdrop:has(.tile-ref) {
+  z-index: 100;
+}
+
+.tile-ref__row {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  gap: 4px;
+  container-type: inline-size;
+}
+
+/* Bonus tiles carry a two-line caption, so their four get wider cells. */
+.tile-ref__row--named {
+  grid-template-columns: repeat(4, minmax(0, 6rem));
+}
+
+.tile-ref__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+/* Nine to a row at any width: the tile takes its cell, up to a size worth
+   studying on a desktop. */
+.tile-ref .tile {
+  --tile-w: clamp(24px, calc((100cqw - 32px) / 9), 58px);
+}
+
+.tile-ref__caption {
+  font-size: 11px;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  text-align: center;
+  white-space: pre-line;
+}
+
 /* ---- your open sets and flowers, tapped to read them large ---- */
 
 .phone__sets {
