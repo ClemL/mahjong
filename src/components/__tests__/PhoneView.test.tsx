@@ -54,6 +54,32 @@ describe("PhoneView", () => {
     expect(container.querySelector(".phone__name")!.textContent).toBe(view.players[seat].occupant.name);
   });
 
+  it("enlarges your open sets on a tap, ghosting flowers that score nothing", () => {
+    const { seat, view } = onTurn();
+    const own = (seat + 1) as 1 | 2 | 3 | 4;
+    const other = own === 1 ? 2 : 1;
+    // One flower is this seat's own, so it scores; the other came along with the draw.
+    const flowers = [
+      { id: "fa", code: `f${own}` },
+      { id: "fb", code: `f${other}` },
+    ];
+    const seated = {
+      ...view,
+      players: view.players.map((p, i) => (i === seat ? { ...p, flowers } : p)),
+    } as typeof view;
+    const { container } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+
+    expect(container.querySelectorAll(".phone__melds .tile--idle")).toHaveLength(1);
+    expect(container.querySelector(".phone__zoom")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Enlarge your open sets and flowers" }));
+    expect(container.querySelectorAll(".phone__zoom .tile")).toHaveLength(2);
+    expect(container.querySelectorAll(".phone__zoom .tile--idle")).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close the enlarged sets" }));
+    expect(container.querySelector(".phone__zoom")).toBeNull();
+  });
+
   it("discards on a double-click with a mouse, never a single one", () => {
     const { seat, view } = onTurn();
     const api = fakeApi(view);

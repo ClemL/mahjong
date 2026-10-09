@@ -28,7 +28,7 @@ import { signatureMoment, winningTileOf } from "./moments";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
-import { MeldRow, isFreshClaim } from "./SeatPanel";
+import { MeldRow, bonusClass, isFreshClaim } from "./SeatPanel";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
 import type { SoundToggle } from "./TableView";
@@ -188,14 +188,14 @@ function Rack({
               const order = flowerOrder.get(t.id);
               // An opening flower waits for the deal, then is laid down in its turn.
               return order === undefined ? (
-                <TileFace key={t.id} code={t.code} size="sm" />
+                <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, player)} />
               ) : (
                 <span
                   key={t.id}
                   className="flower-in"
                   style={{ animationDelay: `${DEAL_MS + order * FLOWER_STEP_MS}ms` }}
                 >
-                  <TileFace code={t.code} size="sm" />
+                  <TileFace code={t.code} size="sm" className={bonusClass(t.code, player)} />
                 </span>
               );
             })}

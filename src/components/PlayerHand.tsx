@@ -7,7 +7,7 @@ import type { GameState } from "@/game/engine";
 import { type Wait, bestReadyDiscard, liveTiles, standingWaits } from "@/game/waits";
 import { SEAT_NAMES, type Seat, tileName } from "@/game/tiles";
 import { TileBack, TileButton, TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./SeatPanel";
 
 function claimLabel(type: string): string {
   switch (type) {
@@ -113,7 +113,7 @@ export function PlayerHand({
             <MeldRow key={`my-meld-${i}`} meld={m} />
           ))}
           {me.flowers.map((t) => (
-            <TileFace key={t.id} code={t.code} size="sm" />
+            <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, me)} />
           ))}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type WinContext, faanValue, scoreHand } from "../scoring";
+import { type WinContext, bonusTileScores, faanValue, scoreHand } from "../scoring";
 import { DEFAULT_RULES } from "../rules";
 import type { Tile, TileCode } from "../tiles";
 import type { Meld } from "../melds";
@@ -134,6 +134,16 @@ describe("scoreHand", () => {
     const south = scoreHand(ctx({ concealed: base, seat: 1, flowers: tiles("f1 f6") }));
     expect(keys(south)).toContain("ownSeason");
     expect(keys(south)).not.toContain("ownFlower");
+  });
+
+  it("marks only the bonus tiles that would score as counting", () => {
+    // West (seat 2) owns flower 3 and season 7.
+    const held: TileCode[] = ["f1", "f3", "f7", "f8"];
+    expect(held.filter((c) => bonusTileScores(c, 2, held))).toEqual(["f3", "f7"]);
+    // A complete group counts every tile in it, whoever's seat it is.
+    const flowers: TileCode[] = ["f1", "f2", "f3", "f4", "f6"];
+    expect(flowers.filter((c) => bonusTileScores(c, 0, flowers))).toEqual(["f1", "f2", "f3", "f4"]);
+    expect(bonusTileScores("m1", 0, ["m1"])).toBe(false);
   });
 
   it("scores a complete set of flowers instead of the single flower", () => {

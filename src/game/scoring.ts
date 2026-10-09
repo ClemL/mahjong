@@ -66,6 +66,19 @@ interface SetUnit {
 const FLOWER_SET = ["f1", "f2", "f3", "f4"];
 const SEASON_SET = ["f5", "f6", "f7", "f8"];
 
+/**
+ * Whether a bonus tile laid down by `seat` would add faan to a win: its own
+ * flower or season, or any tile of a group the seat holds all four of. Lets
+ * the table ghost the rest, which only came along with the draw.
+ */
+export function bonusTileScores(code: TileCode, seat: Seat, held: readonly TileCode[]): boolean {
+  for (const group of [FLOWER_SET, SEASON_SET]) {
+    if (!group.includes(code)) continue;
+    return code === group[seat] || group.every((c) => held.includes(c));
+  }
+  return false;
+}
+
 function unitsFor(decomposition: Decomposition, melds: Meld[]): { sets: SetUnit[]; pair: TileCode } {
   const sets: SetUnit[] = melds.map((m) => ({
     type: m.type,

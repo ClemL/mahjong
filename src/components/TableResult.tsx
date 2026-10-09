@@ -6,7 +6,7 @@ import type { ScoreResult } from "@/game/scoring";
 import { arrangeWinningHand } from "@/game/winning";
 import { type Seat, isFlower } from "@/game/tiles";
 import { TileFace } from "./TileView";
-import { MeldRow } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./SeatPanel";
 import { FaanBreakdown } from "./FaanBreakdown";
 import { ChipStack, chipsOf } from "./TableEffects";
 
@@ -80,7 +80,7 @@ export function WinningHand({ player, score }: { player: PublicPlayer; score: Sc
         <Group order={order++} label="Flowers">
           <span className="meld">
             {player.flowers.map((t) => (
-              <TileFace key={t.id} code={t.code} size="sm" />
+              <TileFace key={t.id} code={t.code} size="sm" className={bonusClass(t.code, player)} />
             ))}
           </span>
         </Group>
