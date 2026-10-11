@@ -66,6 +66,13 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-4: #c98500;
+  /* Set hints under the phone hand: a run, three of a kind, and three of a
+     kind that scores. Three reference slots, validated against every pair on
+     each theme's hand surface — four could not clear the pairs, so +1 and +2
+     share the scoring colour and differ by a doubled line and the badge. */
+  --set-run: #3987e5;
+  --set-pung: #199e70;
+  --set-score: #d95926;
 
   /* Suits are set far apart in hue AND lightness so they read at any size,
      and stay separable for red-green color vision deficiency. */
@@ -1502,6 +1509,9 @@ details[open] > summary::after {
   --chart-surface: #efe9d8;
   --chart-grid: rgba(0, 0, 0, 0.1);
   --chart-zero: rgba(0, 0, 0, 0.3);
+  --set-run: #2a78d6;
+  --set-pung: #1baf7a;
+  --set-score: #eb6834;
   --series-1: #2a78d6;
   --series-2: #eb6834;
   --series-3: #1baf7a;
@@ -4297,13 +4307,97 @@ body:has(.app--handset) {
   grid-area: melds;
 }
 
-/* A tile being dragged into a new place in the hand. */
-.tile--dragging {
-  transform: translateY(-8px) scale(1.06);
+/* Sets already in the hand (Settings → Set hints): a line under their three
+   tiles. Each kind has its own line as well as its own colour — dashed for a
+   run, solid for three of a kind, doubled where it scores two — and a scoring
+   set says +1 or +2 in words, so none of it rests on colour alone. */
+.tile__set {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: calc(var(--tile-w) * -0.06 - 7px);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--set-color);
+  pointer-events: none;
+}
+
+.tile__set--run {
+  --set-color: var(--set-run);
+  background: repeating-linear-gradient(90deg, var(--set-color) 0 7px, transparent 7px 11px);
+}
+
+.tile__set--set { --set-color: var(--set-pung); }
+.tile__set--score { --set-color: var(--set-score); }
+
+.tile__set--double {
+  height: 7px;
+  bottom: calc(var(--tile-w) * -0.06 - 11px);
+  background: linear-gradient(
+    var(--set-color) 0 2.5px,
+    transparent 2.5px 4.5px,
+    var(--set-color) 4.5px 7px
+  );
+}
+
+/* What a scoring set is worth, in ink on a dark chip ringed in the set's colour. */
+.tile__set-faan {
+  position: absolute;
+  top: calc(var(--tile-w) * -0.14);
+  right: calc(var(--tile-w) * -0.14);
+  min-width: 1.7em;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 2px solid var(--set-score);
+  background: #111a16;
+  color: #fff;
+  font-size: max(10px, calc(var(--tile-w) * 0.2));
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Room under the hand for the lines. */
+.phone__hand,
+.phone--landscape .phone__hand {
+  padding-bottom: 16px;
+}
+
+/* A tile under a finger grows and rises out from under it, so it can be read
+   while it is touched. Touch only needs no hover gate: it lasts the press. */
+.phone__hand .tile--peek {
+  transform: translateY(-30%) scale(1.45);
+  z-index: 40;
+  box-shadow: 0 10px 2px var(--tile-shadow), 0 18px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* A tile picked up to move: enlarged, riding the finger (translate, so the
+   lift and the scale stay in transform). */
+.phone__hand .tile--dragging {
+  translate: var(--drag-x, 0) var(--drag-y, 0);
+  transform: translateY(-14%) scale(1.3);
   outline: 2px solid var(--gold);
   outline-offset: 2px;
-  z-index: 30;
-  box-shadow: 0 10px 2px var(--tile-shadow), 0 16px 26px rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  box-shadow: 0 12px 2px var(--tile-shadow), 0 20px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* The rest part to open the gap where it would land. Only while dragging, so
+   the drop — which moves them into those places for real — does not slide. */
+.phone__hand--dragging .tile[data-tile-id]:not(.tile--dragging) {
+  translate: var(--part-x, 0) var(--part-y, 0);
+  transition:
+    translate 170ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 140ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__hand--dragging .tile[data-tile-id]:not(.tile--dragging),
+  .phone__hand .tile--peek {
+    transition: none;
+  }
 }
 
 /* The page still scrolls under a finger moving up and down the column; only

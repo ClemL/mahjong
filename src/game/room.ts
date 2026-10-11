@@ -225,6 +225,12 @@ export interface RoomView {
   turnExtended: boolean;
   /** The whole of the current turn's time, extra time and the opening minute included; 0 is no limit. */
   turnAllowance: number;
+  /**
+   * How much longer the table screen is showing this hand's deal, in ms; 0
+   * once it has finished or been skipped, or with no table screen. Phones
+   * deal their own hands in time with it.
+   */
+  openingLeft: number;
 }
 
 const HIDDEN: TileCode = "back";
@@ -791,6 +797,10 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         : null,
     turnExtended: turnExtended(room),
     turnAllowance: turnAllowanceMs(room),
+    openingLeft:
+      room.started && room.table !== null && isOpeningTurn(state)
+        ? Math.max(0, room.lastStepAt - now)
+        : 0,
   };
 }
 
@@ -855,6 +865,7 @@ export function soloTableView(
     turnDeadlineIn: null,
     turnExtended: false,
     turnAllowance: 0,
+    openingLeft: 0,
   };
 }
 

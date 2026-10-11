@@ -41,6 +41,15 @@ const VIBRATE: ChoiceOption<OnOff>[] = [
   { value: "off", label: "Off", hint: "Never buzzes" },
 ];
 
+const SET_HINTS: ChoiceOption<OnOff>[] = [
+  {
+    value: "on",
+    label: "On",
+    hint: "A line under three tiles that already make a set: dashed for a run, solid for three of a kind, orange with +1 or +2 where it scores",
+  },
+  { value: "off", label: "Off", hint: "No marks under your tiles" },
+];
+
 const SORT: ChoiceOption<SortMode>[] = [
   { value: "suits", label: "Suits", hint: "Characters, dots, bamboo, then winds and dragons" },
   { value: "honors", label: "Honors first", hint: "Winds and dragons on the left, then the suits" },
@@ -63,6 +72,7 @@ export function PhoneSettings({
   fullscreenHint = false,
   layout,
   display,
+  controller = false,
   sort,
   table,
   onLeave,
@@ -74,8 +84,10 @@ export function PhoneSettings({
   fullscreenHint?: boolean;
   /** Only the controller has a density to choose. */
   layout?: CompactLayout;
-  /** The controller's size and play log. */
+  /** This phone's display choices. */
   display?: PhoneDisplay;
+  /** A sideways controller beside a table screen: it alone has a size and a play log. */
+  controller?: boolean;
   /** How the hand is laid out; absent where there is no hand yet. */
   sort?: HandOrder;
   /** Which of the tables this phone is at, e.g. "Table 2". */
@@ -110,7 +122,7 @@ export function PhoneSettings({
               onChange={(value) => layout.setCompact(value === "compact")}
             />
           ) : null}
-          {display ? (
+          {display && controller ? (
             <>
               <Choice label="Size" options={SIZE} value={display.size} onChange={display.setSize} />
               <Choice
@@ -118,6 +130,16 @@ export function PhoneSettings({
                 options={PLAY_LOG}
                 value={display.playLog}
                 onChange={display.setPlayLog}
+              />
+            </>
+          ) : null}
+          {display ? (
+            <>
+              <Choice
+                label="Set hints"
+                options={SET_HINTS}
+                value={display.setHints}
+                onChange={display.setSetHints}
               />
               <Choice
                 label="Vibrate"
