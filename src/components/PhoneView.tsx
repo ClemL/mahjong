@@ -1,8 +1,17 @@
 "use client";
 
-import { type CSSProperties, type PointerEvent, useEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type PointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ClaimOption } from "@/game/engine";
 import { MORE_TIME_MS, type RoomView } from "@/game/room";
+import { findSets } from "@/game/sets";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
@@ -14,6 +23,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { useHandOrder } from "@/hooks/useHandOrder";
 import { useFlip } from "@/hooks/useFlip";
 import { useHaptics } from "@/hooks/useHaptics";
+import { useDealIn } from "@/hooks/useDealIn";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow, bonusClass } from "./SeatPanel";
@@ -111,6 +121,15 @@ function intoFrame(dx: number, dy: number, angle: number): { x: number; y: numbe
   return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos };
 }
 
+/** How a tile already in a set is marked: the kind of set, and the faan an honor set scores. */
+type SetMark = { kind: "run" | "set" | "score"; faan: number; set: number };
+
+const SET_SPOKEN: Record<SetMark["kind"], string> = {
+  run: "part of a run",
+  set: "part of three of a kind",
+  score: "part of three of a kind that scores",
+};
+
 /** A discard on its way from this phone up to the table. */
 type Sent = { id: string; code: TileCode; x: number; y: number; w: number; h: number };
 
@@ -192,6 +211,7 @@ export function PhoneView({
   }, [view.handNumber]);
   const keepAwake = useKeepAwake();
   const rootRef = useRef<HTMLDivElement>(null);
+  const dealIn = useDealIn(view, seat, rootRef, hidden);
   const [sent, setSent] = useState<Sent | null>(null);
   // The claim being pressed or hovered, whose tiles the hand lifts.
   const [preview, setPreview] = useState<ClaimOption | null>(null);
@@ -231,20 +251,54 @@ export function PhoneView({
     el: HTMLElement;
     /** Where the tile has been pulled to, newest last, for how fast it was let go. */
     trail: { x: number; y: number; t: number }[];
+    /** A rearrangement: the hand as it was picked up, where each tile sat, and where this one would land. */
+    ids: string[];
+    els: HTMLElement[];
+    slots: { x: number; y: number }[];
+    from: number;
+    to: number;
+    lift: { x: number; y: number };
   } | null>(null);
   // A drag ends with the finger lifting over a tile; that must not also count
   // as a tap on it.
   const justDragged = useRef(false);
   const [dragging, setDragging] = useState<string | null>(null);
   const [flicking, setFlicking] = useState<string | null>(null);
+  // The tile under a finger, enlarged so it can be read past the finger.
+  const [pressed, setPressed] = useState<string | null>(null);
+  // A dragged tile just let go: where it was, by the finger, from where it now sits.
+  const [settle, setSettle] = useState<{ id: string; x: number; y: number } | null>(null);
   const canThrow = Boolean(yourTurn) && !api.busy;
-  // Tiles slide into a new sort or round a closing gap; a finger placing
-  // them itself gets them where it puts them, without a slide fighting it.
-  useFlip(handRef, dragging === null && flicking === null);
+  // Tiles slide into a new sort or round a closing gap. Not while a finger
+  // places them, nor as a drop lands: the rest are already where they belong.
+  useFlip(handRef, dragging === null && flicking === null && settle === null);
+
+  // A dropped tile is let go where the finger left it and settles into its
+  // new place; the tiles that parted for it are already in theirs.
+  useLayoutEffect(() => {
+    if (!settle) return;
+    const hand = handRef.current;
+    for (const el of hand?.querySelectorAll<HTMLElement>("[data-tile-id]") ?? []) {
+      for (const v of ["--part-x", "--part-y", "--drag-x", "--drag-y"]) el.style.removeProperty(v);
+    }
+    const el = hand?.querySelector<HTMLElement>(`[data-tile-id="${settle.id}"]`);
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (el && !still && typeof el.animate === "function") {
+      const x = settle.x - (el.offsetLeft + el.offsetWidth / 2);
+      const y = settle.y - (el.offsetTop + el.offsetHeight / 2);
+      el.animate([{ translate: `${x}px ${y}px` }, { translate: "0px 0px" }], {
+        duration: 200,
+        easing: "cubic-bezier(0.2, 0.8, 0.3, 1)",
+      });
+    }
+    setSettle(null);
+  }, [settle]);
 
   const displayIds = () => [...order.tiles.map((t) => t.id), ...(order.drawn ? [order.drawn.id] : [])];
 
   const onHandPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    // A touch on a hand still being dealt brings the rest of it straight in.
+    dealIn.finish();
     justDragged.current = false;
     const el = (e.target as Element).closest<HTMLElement>("[data-tile-id]");
     if (!el?.dataset.tileId) return;
@@ -257,7 +311,31 @@ export function PhoneView({
       angle: screenAngle(handRef.current),
       el,
       trail: [],
+      ids: [],
+      els: [],
+      slots: [],
+      from: 0,
+      to: 0,
+      lift: { x: 0, y: 0 },
     };
+    setPressed(el.dataset.tileId);
+  };
+
+  /**
+   * Opens the gap where the dragged tile would land: every tile between its
+   * old place and that one moves one place along, toward the hole it left.
+   * Places are the ones taken when the tile was picked up, so a row that wraps
+   * still parts along itself.
+   */
+  const part = (d: NonNullable<typeof drag.current>) => {
+    d.els.forEach((el, i) => {
+      if (i === d.from) return;
+      let j = i;
+      if (d.from < d.to && i > d.from && i <= d.to) j = i - 1;
+      else if (d.to < d.from && i >= d.to && i < d.from) j = i + 1;
+      el.style.setProperty("--part-x", `${d.slots[j].x - d.slots[i].x}px`);
+      el.style.setProperty("--part-y", `${d.slots[j].y - d.slots[i].y}px`);
+    });
   };
 
   const onHandPointerMove = (e: PointerEvent<HTMLDivElement>) => {
@@ -270,9 +348,20 @@ export function PhoneView({
       // or when it is not yours to throw, is moving the tile along the rack.
       d.mode = canThrow && -moved.y > Math.abs(moved.x) ? "flick" : "reorder";
       setArmed(null);
+      setPressed(null);
       handRef.current?.setPointerCapture?.(e.pointerId);
       if (d.mode === "flick") setFlicking(d.id);
-      else setDragging(d.id);
+      else {
+        // Where every tile sits now, in the hand's own frame, before anything moves.
+        d.els = [...(handRef.current?.querySelectorAll<HTMLElement>("[data-tile-id]") ?? [])];
+        d.ids = d.els.map((el) => el.dataset.tileId!);
+        d.slots = d.els.map((el) => ({
+          x: el.offsetLeft + el.offsetWidth / 2,
+          y: el.offsetTop + el.offsetHeight / 2,
+        }));
+        d.from = d.to = Math.max(0, d.ids.indexOf(d.id));
+        setDragging(d.id);
+      }
     }
     if (d.mode === "flick") {
       // The tile follows the finger up, and only a little sideways.
@@ -282,27 +371,26 @@ export function PhoneView({
       d.el.style.setProperty("--flick-y", `${at.y}px`);
       return;
     }
-    // Whichever tile's centre is nearest the finger is where this one goes.
-    // Measured on screen, so it holds when the whole controller is turned on
-    // its side.
-    let target: string | null = null;
+    // The tile rides on the finger, never far from the row; the place it
+    // would land is whichever of the places taken at pick-up is nearest.
+    const h = d.el.offsetHeight;
+    d.lift = { x: moved.x, y: Math.max(-h, Math.min(h * 0.4, moved.y)) };
+    d.el.style.setProperty("--drag-x", `${d.lift.x}px`);
+    d.el.style.setProperty("--drag-y", `${d.lift.y}px`);
+    const at = { x: d.slots[d.from].x + moved.x, y: d.slots[d.from].y + moved.y };
+    let to = d.from;
     let best = Infinity;
-    for (const el of handRef.current?.querySelectorAll<HTMLElement>("[data-tile-id]") ?? []) {
-      const box = el.getBoundingClientRect();
-      const distance = Math.hypot(
-        e.clientX - (box.left + box.width / 2),
-        e.clientY - (box.top + box.height / 2),
-      );
+    d.slots.forEach((slot, i) => {
+      const distance = Math.hypot(at.x - slot.x, at.y - slot.y);
       if (distance < best) {
         best = distance;
-        target = el.dataset.tileId ?? null;
+        to = i;
       }
+    });
+    if (to !== d.to) {
+      d.to = to;
+      part(d);
     }
-    if (!target || target === d.id) return;
-    const current = displayIds();
-    const next = current.filter((id) => id !== d.id);
-    next.splice(current.indexOf(target), 0, d.id);
-    order.arrange(next);
   };
 
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
@@ -331,9 +419,22 @@ export function PhoneView({
         });
       }
     }
+    if (d.mode === "reorder") {
+      // The hand may have changed under the finger — a tile drawn, a claim —
+      // and then the places taken at pick-up no longer describe it.
+      const same = d.ids.join() === displayIds().join();
+      if (e.type === "pointerup" && same && d.to !== d.from) {
+        const next = d.ids.filter((id) => id !== d.id);
+        next.splice(d.to, 0, d.id);
+        order.arrange(next);
+      }
+      const from = d.slots[d.from];
+      setSettle({ id: d.id, x: from.x + d.lift.x, y: from.y + d.lift.y });
+    }
     drag.current = null;
     setDragging(null);
     setFlicking(null);
+    setPressed(null);
   };
 
   // With a tablet on the table the discard is seen leaving the phone, thrown
@@ -368,6 +469,28 @@ export function PhoneView({
       setArmed(tileId);
     }
   };
+  // Sets the hand already holds, for the line under their tiles.
+  const marks = useMemo(() => {
+    const byTile = new Map<string, SetMark>();
+    if (display.setHints !== "on") return byTile;
+    findSets(me.hand, seatWind(seat), view.roundWind, view.config).forEach((found, set) => {
+      const kind = found.type === "chow" ? "run" : found.faan > 0 ? "score" : "set";
+      for (const id of found.tileIds) byTile.set(id, { kind, faan: found.faan, set });
+    });
+    return byTile;
+  }, [me.hand, seat, view.roundWind, view.config, display.setHints]);
+  // A scoring set says what it is worth once, on whichever of its tiles is leftmost.
+  const badged = new Set<string>();
+  {
+    const seen = new Set<number>();
+    for (const id of displayIds()) {
+      const mark = marks.get(id);
+      if (mark?.kind === "score" && !seen.has(mark.set)) {
+        seen.add(mark.set);
+        badged.add(id);
+      }
+    }
+  }
   const armedTile = me.hand.find((t) => t.id === armed);
   const previewed = view.claim?.options.find((o) => o.id === preview?.id);
   const using = new Set(previewed?.tileIds ?? []);
@@ -377,6 +500,7 @@ export function PhoneView({
       armed === tileId ? "tile--armed" : "",
       using.has(tileId) ? "tile--uses" : "",
       dragging === tileId ? "tile--dragging" : "",
+      pressed === tileId ? "tile--peek" : "",
       flicking === tileId ? "tile--flicking" : "",
       flung === tileId ? "tile--flung" : "",
     ]
@@ -504,19 +628,39 @@ export function PhoneView({
   const exposedTiles = me.melds.reduce((n, m) => n + m.tiles.length, 0) + me.flowers.length;
   const exposedInHeader = compact && !ghosts && exposedTiles <= COMPACT_HEADER_TILES;
 
-  const handTile = (t: Tile, drawn: boolean) => (
-    <TileButton
-      key={t.id}
-      tileId={t.id}
-      code={t.code}
-      size="lg"
-      drawn={drawn}
-      entry={drawn ? "draw" : null}
-      className={tileClass(t.id)}
-      inactive={!yourTurn || api.busy}
-      onClick={() => tapTile(t.id)}
-    />
-  );
+  const handTile = (t: Tile, drawn: boolean) => {
+    const mark = marks.get(t.id);
+    return (
+      <TileButton
+        key={t.id}
+        tileId={t.id}
+        code={t.code}
+        size="lg"
+        drawn={drawn}
+        entry={drawn ? "draw" : null}
+        className={tileClass(t.id)}
+        inactive={!yourTurn || api.busy}
+        onClick={() => tapTile(t.id)}
+        ariaLabel={
+          mark
+            ? `Discard ${tileName(t.code)}, ${SET_SPOKEN[mark.kind]}${mark.faan > 0 ? ` ${mark.faan} faan` : ""}`
+            : undefined
+        }
+      >
+        {mark ? (
+          <span
+            className={`tile__set tile__set--${mark.kind}${mark.faan >= 2 ? " tile__set--double" : ""}`}
+            aria-hidden
+          />
+        ) : null}
+        {badged.has(t.id) ? (
+          <span className="tile__set-faan" aria-hidden>
+            +{mark!.faan}
+          </span>
+        ) : null}
+      </TileButton>
+    );
+  };
 
   return (
     <div
@@ -618,7 +762,8 @@ export function PhoneView({
               appearance={appearance}
               fullscreenHint={landscape && !fullscreen.supported}
               layout={landscape ? layout : undefined}
-              display={landscape ? display : undefined}
+              display={display}
+              controller={landscape}
               sort={order}
               table={tableName(view.roomId)}
               onLeave={() => void api.leave()}

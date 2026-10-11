@@ -151,6 +151,28 @@ describe("redaction", () => {
   });
 });
 
+describe("the deal on the table screen", () => {
+  it("tells every view how long the table is still showing the deal", () => {
+    const room = newRoom("DEAL", undefined, 9);
+    seat(room, 0, "tok-0");
+    room.table = { token: "tok-table", lastSeen: Date.now() };
+    const now = Date.now();
+    startPlay(room, now);
+    const flowers = room.state.players.reduce((n, p) => n + p.flowers.length, 0);
+    expect(viewFor(room, "tok-0", now).openingLeft).toBe(DEAL_MS + flowers * FLOWER_STEP_MS);
+    expect(viewFor(room, "tok-table", now + 1000).openingLeft).toBe(DEAL_MS + flowers * FLOWER_STEP_MS - 1000);
+    // Done showing it: nothing left to wait for.
+    expect(viewFor(room, "tok-0", room.lastStepAt + 1).openingLeft).toBe(0);
+  });
+
+  it("is 0 without a table screen, which shows no deal", () => {
+    const room = newRoom("DEAL", undefined, 9);
+    seat(room, 0, "tok-0");
+    startPlay(room);
+    expect(viewFor(room, "tok-0").openingLeft).toBe(0);
+  });
+});
+
 describe("the solo felt", () => {
   const state = createGame({ seed: 11, humanSeat: 0 });
 

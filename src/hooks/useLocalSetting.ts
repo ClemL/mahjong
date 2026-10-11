@@ -69,6 +69,9 @@ export interface PhoneDisplay {
   /** A buzz when it is your turn, a claim is offered, or you win. */
   vibrate: OnOff;
   setVibrate: (value: OnOff) => void;
+  /** A line under three tiles in the hand that already make a set. */
+  setHints: OnOff;
+  setSetHints: (value: OnOff) => void;
 }
 
 export function usePhoneDisplay(): PhoneDisplay {
@@ -79,5 +82,6 @@ export function usePhoneDisplay(): PhoneDisplay {
     "comfy",
   ]);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
-  return { playLog, setPlayLog, size, setSize, vibrate, setVibrate };
+  const [setHints, setSetHints] = useLocalSetting<OnOff>("hk-mahjong.set-hints", "on", ON_OFF);
+  return { playLog, setPlayLog, size, setSize, vibrate, setVibrate, setHints, setSetHints };
 }

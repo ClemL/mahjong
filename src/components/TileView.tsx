@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   type TileCode,
   isFlower,
@@ -153,9 +154,11 @@ interface ButtonProps extends FaceProps {
   /** Identifies the tile to a container handling drags. */
   tileId?: string;
   ariaLabel?: string;
+  /** Drawn on and around the tile — a mark beneath it, say. */
+  children?: ReactNode;
 }
 
-export function TileButton({ onClick, disabled, inactive, tileId, ariaLabel, ...face }: ButtonProps) {
+export function TileButton({ onClick, disabled, inactive, tileId, ariaLabel, children, ...face }: ButtonProps) {
   return (
     <button
       type="button"
@@ -182,6 +185,7 @@ export function TileButton({ onClick, disabled, inactive, tileId, ariaLabel, ...
       </span>
       <TileArt code={face.code} />
       {face.ready ? <span className="tile__ready" aria-hidden /> : null}
+      {children}
     </button>
   );
 }

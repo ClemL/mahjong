@@ -49,11 +49,22 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   await expect(table.page.getByText("Tester").first()).toBeVisible();
 
   await table.page.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
-  // Skipping the deal clears it off the felt at once.
+  // The phone deals its hand in time with the table: stacks yet to reach
+  // this seat are held out of sight, face down as the hand is.
+  await expect(phone.page.getByRole("button", { name: /Hand hidden, \d+ tiles/ })).toBeVisible();
+  const held = () =>
+    phone.page.evaluate(
+      () =>
+        [...document.querySelectorAll(".phone__hand .tile")].filter((el) => Number(getComputedStyle(el).opacity) < 0.5)
+          .length,
+    );
+  expect(await held()).toBeGreaterThanOrEqual(8);
+  // Skipping the deal clears it off the felt at once, and the phone's hand comes straight in.
   const skip = table.page.getByRole("button", { name: "Skip the deal" });
   await skip.click();
   await expect(table.page.locator(".deal")).toHaveCount(0);
   await expect(skip).toHaveCount(0);
+  await expect.poll(held, { timeout: 3_000 }).toBe(0);
 
   // Every hand arrives face down on the phone; its owner turns it up.
   await phone.page.getByRole("button", { name: /Hand hidden, \d+ tiles/ }).tap();
@@ -62,6 +73,42 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   const live = phone.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");
   await expect(live.first()).toBeVisible({ timeout: 4_000 });
   await expect(phoneTiles(phone.page)).toHaveCount(14);
+  // Let the row finish tipping up and the drawn tile land before reading
+  // where anything is.
+  await phone.page.evaluate(() =>
+    Promise.all(
+      document
+        .querySelector(".phone__hand")!
+        .getAnimations({ subtree: true })
+        .filter((a) => a instanceof CSSAnimation)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+  // The deal is over, so a hand turned up now is simply there: nothing drops
+  // in again under a finger reaching for it.
+  expect(await held()).toBe(0);
+  // A tile dragged along the hand parts the rest to show where it would
+  // land, and lands there.
+  const order = () => phoneTiles(phone.page).evaluateAll((els) => els.map((el) => el.getAttribute("data-tile-id")));
+  const picked = (await order())[1];
+  const a = (await phoneTiles(phone.page).nth(1).boundingBox())!;
+  const b = (await phoneTiles(phone.page).nth(4).boundingBox())!;
+  await phone.page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  await phone.page.mouse.down();
+  // Held, it grows so it can be read past the finger.
+  await expect(phoneTiles(phone.page).nth(1)).toHaveClass(/tile--peek/);
+  for (let step = 1; step <= 10; step++) {
+    await phone.page.mouse.move(a.x + a.width / 2 + ((b.x - a.x) * step) / 10, a.y + a.height / 2 + 4);
+  }
+  await phone.page.waitForTimeout(300);
+  await expect(phone.page.locator(".phone__hand .tile--dragging")).toHaveCount(1);
+  const parted = await phoneTiles(phone.page).evaluateAll((els) =>
+    els.slice(2, 5).map((el) => getComputedStyle(el).translate),
+  );
+  expect(parted.every((t) => t !== "none" && !/^0px( 0px)?$/.test(t)), `parted: ${parted}`).toBe(true);
+  await phone.page.mouse.up();
+  await expect.poll(async () => (await order()).indexOf(picked)).toBe(4);
+
   // The turn arriving buzzes the phone, and the table runs East's clock.
   await expect
     .poll(() => phone.page.evaluate(() => (window as unknown as { buzzes: unknown[] }).buzzes))

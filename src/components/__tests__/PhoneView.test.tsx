@@ -2,7 +2,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
-import { SEAT_NAMES, tileName } from "@/game/tiles";
+import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
 import { PhoneView } from "../PhoneView";
 import { claimable, dealt, fakeApi, playerView, sound } from "./fixtures";
 
@@ -78,6 +78,46 @@ describe("PhoneView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Close the enlarged sets" }));
     expect(container.querySelector(".phone__zoom")).toBeNull();
+  });
+
+  it("underlines sets already in the hand, and can be told not to", () => {
+    const { seat, view } = onTurn();
+    // A run, three of a kind, a dragon triplet (1 faan) and the seat's own
+    // wind (1 faan, or 2 when it is the round's wind as well).
+    const wind = seatWind(seat);
+    const codes = ["m1", "m2", "m3", "p5", "p5", "p5", "dr", "dr", "dr", wind, wind, wind, "s9", "s9"];
+    const hand = codes.map((code, i) => ({ id: `${code}#t${i}`, code }));
+    const seated = {
+      ...view,
+      drawnTileId: null,
+      players: view.players.map((p, i) => (i === seat ? { ...p, hand, handCount: hand.length } : p)),
+    } as typeof view;
+    const windFaan = wind === view.roundWind ? 2 : 1;
+
+    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+    handButtons(container);
+    expect(container.querySelectorAll(".tile__set--run")).toHaveLength(3);
+    expect(container.querySelectorAll(".tile__set--set")).toHaveLength(3);
+    expect(container.querySelectorAll(".tile__set--score")).toHaveLength(6);
+    expect(container.querySelectorAll(".tile__set--double")).toHaveLength(windFaan === 2 ? 3 : 0);
+    // Each scoring set says its worth once.
+    expect([...container.querySelectorAll(".tile__set-faan")].map((b) => b.textContent).sort()).toEqual(
+      ["+1", `+${windFaan}`].sort(),
+    );
+    // The pair is not a set.
+    const nine = screen.getAllByRole("button", { name: /^Discard 9 Bamboo/ });
+    expect(nine.every((b) => b.querySelector(".tile__set") === null)).toBe(true);
+    expect(screen.getAllByRole("button", { name: "Discard 1 Characters, part of a run" })).toHaveLength(1);
+    unmount();
+
+    window.localStorage.setItem("hk-mahjong.set-hints", "off");
+    try {
+      const off = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+      handButtons(off.container);
+      expect(off.container.querySelectorAll(".tile__set, .tile__set-faan")).toHaveLength(0);
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.set-hints");
+    }
   });
 
   it("discards on a double-click with a mouse, never a single one", () => {
