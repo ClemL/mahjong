@@ -97,6 +97,8 @@ export function useDealIn(view: RoomView, seat: Seat, root: RefObject<HTMLElemen
 
   const running = useRef<Animation[]>([]);
   const finish = useCallback(() => {
+    // Over for good: the tiles turned up or redrawn later must not drop in again.
+    seen.current.started = null;
     for (const a of running.current) {
       try {
         a.finish();

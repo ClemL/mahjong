@@ -73,6 +73,20 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   const live = phone.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");
   await expect(live.first()).toBeVisible({ timeout: 4_000 });
   await expect(phoneTiles(phone.page)).toHaveCount(14);
+  // Let the row finish tipping up and the drawn tile land before reading
+  // where anything is.
+  await phone.page.evaluate(() =>
+    Promise.all(
+      document
+        .querySelector(".phone__hand")!
+        .getAnimations({ subtree: true })
+        .filter((a) => a instanceof CSSAnimation)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+  // The deal is over, so a hand turned up now is simply there: nothing drops
+  // in again under a finger reaching for it.
+  expect(await held()).toBe(0);
   // A tile dragged along the hand parts the rest to show where it would
   // land, and lands there.
   const order = () => phoneTiles(phone.page).evaluateAll((els) => els.map((el) => el.getAttribute("data-tile-id")));
