@@ -15,7 +15,7 @@ export interface Preferences {
   rounds: number;
   speed: Speed;
   showHints: boolean;
-  /** The ♿ button listing what finishes each set the hand has started. */
+  /** The wheelchair button listing what finishes each set the hand has started. Off unless chosen. */
   helper: boolean;
   muted: boolean;
   opponents: StrategyName;
@@ -27,7 +27,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rounds: DEFAULT_RULES.rounds,
   speed: "normal",
   showHints: true,
-  helper: true,
+  helper: false,
   muted: false,
   opponents: "greedy",
   claimPrompt: "useful",

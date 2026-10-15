@@ -121,13 +121,13 @@ describe("normalizePreferences", () => {
       rounds: 4,
       speed: "normal",
       showHints: false,
-      helper: true,
+      helper: false,
       muted: false,
       opponents: "random",
       claimPrompt: "useful",
     });
-    expect(normalizePreferences({ helper: false }).helper).toBe(false);
-    expect(normalizePreferences({ helper: "yes" }).helper).toBe(true);
+    expect(normalizePreferences({ helper: true }).helper).toBe(true);
+    expect(normalizePreferences({ helper: "yes" }).helper).toBe(false);
     expect(normalizePreferences(null).minFaan).toBe(3);
     // An older build saved its 0 default with every change; that is not a choice to keep.
     expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(3);

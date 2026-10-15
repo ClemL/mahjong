@@ -187,7 +187,7 @@ export function PhoneView({
   const appearance = useAppearance();
   const fullscreen = useFullscreen("landscape");
   const layout = useCompactLayout();
-  const display = usePhoneDisplay();
+  const display = usePhoneDisplay(me.occupant.name);
   useHaptics(view, display.vibrate === "on");
   const hurriedBy = useHurryFlash(view, display.hurry === "on", display.vibrate === "on");
   const [helperOpen, setHelperOpen] = useState(false);

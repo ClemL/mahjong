@@ -28,7 +28,7 @@ const HELPER = ON_OFF.map((o) => ({
   ...o,
   hint:
     o.value === "on"
-      ? "A ♿ button by your hand that lists the tiles that finish each pair and part-run"
+      ? "A wheelchair button by your hand that lists the tiles that finish each pair and part-run"
       : "No helper button",
 }));
 
