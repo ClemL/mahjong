@@ -6,6 +6,7 @@ import {
   type RoomView,
   drain,
   grantMoreTime,
+  hurryUp,
   hasAnyPlayer,
   identify,
   isOpeningTurn,
@@ -174,6 +175,7 @@ export type PlayerAction =
   | { type: "win" }
   | { type: "claim"; optionId: string | null }
   | { type: "moreTime" }
+  | { type: "hurry" }
   | { type: "leave" };
 
 export async function act(id: string, token: string, action: PlayerAction): Promise<RoomView> {
@@ -213,6 +215,12 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     // the turn already running, not a fresh one.
     if (action.type === "moreTime") {
       const refused = grantMoreTime(r, seat);
+      if (refused) throw new RoomError(refused, 409);
+      return;
+    }
+
+    if (action.type === "hurry") {
+      const refused = hurryUp(r, seat, now);
       if (refused) throw new RoomError(refused, 409);
       return;
     }

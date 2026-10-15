@@ -15,6 +15,8 @@ export interface Preferences {
   rounds: number;
   speed: Speed;
   showHints: boolean;
+  /** The ♿ button listing what finishes each set the hand has started. */
+  helper: boolean;
   muted: boolean;
   opponents: StrategyName;
   claimPrompt: ClaimPrompt;
@@ -25,6 +27,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   rounds: DEFAULT_RULES.rounds,
   speed: "normal",
   showHints: true,
+  helper: true,
   muted: false,
   opponents: "greedy",
   claimPrompt: "useful",
@@ -59,6 +62,7 @@ export function normalizePreferences(raw: unknown): Preferences {
         : d.rounds,
     speed: pick<Speed>(r.speed as Speed, ["slow", "normal", "fast"], d.speed),
     showHints: typeof r.showHints === "boolean" ? r.showHints : d.showHints,
+    helper: typeof r.helper === "boolean" ? r.helper : d.helper,
     muted: typeof r.muted === "boolean" ? r.muted : d.muted,
     opponents: pick<StrategyName>(r.opponents as StrategyName, ["greedy", "random"], d.opponents),
     claimPrompt: pick<ClaimPrompt>(
@@ -99,6 +103,8 @@ export interface GameSettings {
   setSpeed: (value: Speed) => void;
   showHints: boolean;
   setShowHints: (value: boolean) => void;
+  helper: boolean;
+  setHelper: (value: boolean) => void;
   muted: boolean;
   setMuted: (value: boolean) => void;
   opponents: StrategyName;
@@ -139,6 +145,7 @@ export function usePreferences(): PreferencesApi {
     setRounds: useCallback((value: number) => set("rounds", value), [set]),
     setSpeed: useCallback((value: Speed) => set("speed", value), [set]),
     setShowHints: useCallback((value: boolean) => set("showHints", value), [set]),
+    setHelper: useCallback((value: boolean) => set("helper", value), [set]),
     setMuted: useCallback(
       (value: boolean) => {
         set("muted", value);

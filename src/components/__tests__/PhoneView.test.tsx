@@ -3,8 +3,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
+import { hurryUp } from "@/game/room";
 import { PhoneView } from "../PhoneView";
-import { claimable, dealt, fakeApi, playerView, sound } from "./fixtures";
+import { NAMES, claimable, dealt, fakeApi, playerView, sound } from "./fixtures";
 
 /** Phones in these tests are touch screens unless they say otherwise. */
 function touchScreen() {
@@ -361,5 +362,72 @@ describe("PhoneView — whose move it is", () => {
     const name = theirs.players[claimer].occupant.name;
     const tile = tileName(room.state.lastDiscard!.tile.code);
     expect(within(elsewhere).getByText(`Waiting for ${name} to decide on ${tile}…`)).toBeTruthy();
+  });
+
+  it("hurries whoever is holding up the table, and flashes only their screen", () => {
+    const { room, seat } = onTurn();
+    const other = ((seat + 1) % 4) as Seat;
+    const theirs = playerView(room, other);
+    const api = fakeApi(theirs);
+    const { container: elsewhere } = render(<PhoneView api={api} view={theirs} sound={sound} />);
+    const name = theirs.players[seat].occupant.name;
+    fireEvent.click(within(elsewhere).getByRole("button", { name: `Hurry up ${name}: flash their screen` }));
+    expect(api.act).toHaveBeenCalledWith({ type: "hurry" });
+    // Resting until the table would take another.
+    expect(within(elsewhere).getByRole("button", { name: `${name} has been hurried` })).toHaveProperty("disabled", true);
+
+    expect(hurryUp(room, other)).toBeNull();
+    const mine = playerView(room, seat);
+    const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    expect(container.querySelector(".phone--hurried")).not.toBeNull();
+    expect(within(container).getByRole("alert").textContent).toBe(`${NAMES[other]} says hurry up!`);
+    // Nobody is offered a button to hurry themselves.
+    expect(within(container).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
+  });
+
+  it("drops the hurry-up button and the flash when the phone turns them off", () => {
+    const { room, seat } = onTurn();
+    const other = ((seat + 1) % 4) as Seat;
+    hurryUp(room, other);
+    window.localStorage.setItem("hk-mahjong.hurry", "off");
+    try {
+      const mine = playerView(room, seat);
+      const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+      expect(container.querySelector(".phone--hurried, .phone__hurry")).toBeNull();
+      const theirs = playerView(room, other);
+      const { container: elsewhere } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+      expect(within(elsewhere).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.hurry");
+    }
+  });
+
+  it("lists what finishes each set the hand has started, behind the helper button", () => {
+    const { seat, view } = onTurn();
+    const codes = ["m1", "m2", "m3", "p4", "p5", "s7", "s9", "dr", "dr", "we", "wn", "ws", "m9", "p1"];
+    const hand = codes.map((code, i) => ({ id: `${code}#t${i}`, code }));
+    const seated = {
+      ...view,
+      drawnTileId: null,
+      players: view.players.map((p, i) => (i === seat ? { ...p, hand, handCount: hand.length } : p)),
+    } as typeof view;
+    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+    handButtons(container);
+    expect(container.querySelector(".helper")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Helper/ }));
+    const rows = [...container.querySelectorAll(".helper__row")].map((r) => r.textContent ?? "");
+    expect(rows).toHaveLength(3);
+    expect(rows.some((r) => r.includes("run with") && r.includes("3 Dots") && r.includes("6 Dots"))).toBe(true);
+    expect(rows.some((r) => r.includes("run with") && r.includes("8 Bamboo"))).toBe(true);
+    expect(rows.some((r) => r.includes("pung with") && r.includes(tileName("dr")))).toBe(true);
+    unmount();
+
+    window.localStorage.setItem("hk-mahjong.helper", "off");
+    try {
+      render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+      expect(screen.queryByRole("button", { name: /^Helper/ })).toBeNull();
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.helper");
+    }
   });
 });

@@ -6,12 +6,15 @@ import {
   DEFAULT_ROOM_SETTINGS,
   FLOWER_STEP_MS,
   HEARTBEAT_WRITE_MS,
+  HURRY_COOLDOWN_MS,
+  HURRY_FLASH_MS,
   MORE_TIME_MS,
   OPENING_TURN_BONUS_MS,
   SEAT_IDLE_MS,
   type Room,
   drain,
   grantMoreTime,
+  hurryUp,
   identify,
   isHumanSeat,
   mayDeal,
@@ -593,6 +596,48 @@ describe("turn limit", () => {
   it("never shows a deadline on a computer's turn", () => {
     const room = dealt("TEST", 5, [2]);
     expect(viewFor(room, "tok-2").turnDeadlineIn).toBeNull();
+  });
+});
+
+describe("hurry up", () => {
+  it("flashes only the person the table is waiting on, once, and briefly", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    expect(room.state.turn).toBe(0);
+    const t0 = Date.now();
+    expect(hurryUp(room, 2, t0)).toBeNull();
+    const view = viewFor(room, "tok-0", t0 + 100);
+    expect(view.hurry).toEqual({ seat: 0, by: "Someone", id: t0 });
+    // Everyone may see the nudge was sent; only seat 0 is asked to act on it.
+    expect(viewFor(room, "tok-2", t0 + 100).hurry?.seat).toBe(0);
+    expect(viewFor(room, "tok-0", t0 + HURRY_FLASH_MS).hurry).toBeNull();
+  });
+
+  it("refuses hurrying yourself, the computer, or twice in a row", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    const t0 = Date.now();
+    expect(hurryUp(room, 0, t0)).toMatch(/your move/);
+    expect(hurryUp(room, 2, t0)).toBeNull();
+    expect(hurryUp(room, 2, t0 + 1000)).toMatch(/just been hurried/);
+    expect(hurryUp(room, 2, t0 + HURRY_COOLDOWN_MS)).toBeNull();
+
+    const robots = dealt("TEST", 5, [2]);
+    // Seat 0 is the computer's, so nobody is holding anything up.
+    expect(hurryUp(robots, 2)).toMatch(/Nobody/);
+  });
+
+  it("stops flashing once its target has moved", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    const t0 = Date.now();
+    hurryUp(room, 2, t0);
+    const tile = room.state.players[0].hand[0];
+    room.state = discard(room.state, 0, tile.id);
+    expect(viewFor(room, "tok-0", t0 + 100).hurry).toBeNull();
+  });
+
+  it("is filled in on a room stored before it existed", () => {
+    const room = newRoom("TEST", undefined, 1) as Partial<Room>;
+    delete room.hurry;
+    expect(normalizeRoom(room as Room).hurry).toBeNull();
   });
 });
 

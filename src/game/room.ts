@@ -87,6 +87,14 @@ export const TURN_LIMITS = [0, 15, 30, 60, 120] as const;
 /** What one "more time" request adds to a person's turn. One per turn. */
 export const MORE_TIME_MS = 30_000;
 
+/** How long a hurry-up flashes the screen of the person it is aimed at. */
+export const HURRY_FLASH_MS = 2_400;
+/**
+ * How long after one hurry-up the next is refused. A nudge, not a siren: the
+ * table can ask once and then has to let them think.
+ */
+export const HURRY_COOLDOWN_MS = 10_000;
+
 export interface RoomSettings {
   speed: SpeedLevel;
   /** Seconds; one of TURN_LIMITS. */
@@ -165,6 +173,8 @@ export interface Room {
    * dropping back to the seat picker.
    */
   displaced: { token: string; seat: Seat }[];
+  /** The last hurry-up: who it was aimed at, who sent it, and when. */
+  hurry: { seat: Seat; by: Seat; at: number } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -231,6 +241,12 @@ export interface RoomView {
    * deal their own hands in time with it.
    */
   openingLeft: number;
+  /**
+   * A hurry-up still flashing: aimed at `seat`, sent by `by`, `id` naming this
+   * one so a screen flashes once per nudge however often it polls. Null once
+   * it has played out or its target has moved.
+   */
+  hurry: { seat: Seat; by: string; id: number } | null;
 }
 
 const HIDDEN: TileCode = "back";
@@ -262,6 +278,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     lastPlayed: null,
     moreTime: null,
     displaced: [],
+    hurry: null,
   };
 }
 
@@ -272,6 +289,7 @@ export function normalizeRoom(room: Room): Room {
   room.lastPlayed ??= null;
   room.moreTime ??= null;
   room.displaced ??= [];
+  room.hurry ??= null;
   return room;
 }
 
@@ -378,6 +396,34 @@ export function grantMoreTime(room: Room, seat: Seat): string | null {
   if (room.settings.turnLimit <= 0) return "This table has no turn limit";
   if (turnExtended(room)) return "You already have extra time this turn";
   room.moreTime = { seat, from: room.lastStepAt };
+  return null;
+}
+
+/**
+ * The person the table is waiting on right now, if it is waiting on one: the
+ * seat being asked about a discard, or else the seat on turn.
+ */
+export function actingHumanSeat(room: Room, now = Date.now()): Seat | null {
+  if (!room.started) return null;
+  const state = room.state;
+  if (state.phase === "claiming") return pendingHumanClaimants(room, now)[0] ?? null;
+  // A discard waiting to be passed on is not the next person's move yet.
+  if (state.phase === "action" && state.lastDiscard === null && isHumanSeat(room, state.turn, now)) {
+    return state.turn;
+  }
+  return null;
+}
+
+/**
+ * Nudge whoever the table is waiting on, or say why not. Nobody hurries
+ * themselves or the computer, and one nudge has to settle before the next.
+ */
+export function hurryUp(room: Room, by: Seat, now = Date.now()): string | null {
+  const seat = actingHumanSeat(room, now);
+  if (seat === null) return "Nobody is holding up the table";
+  if (seat === by) return "It is your move";
+  if (room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS) return "They have just been hurried";
+  room.hurry = { seat, by, at: now };
   return null;
 }
 
@@ -801,6 +847,16 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       room.started && room.table !== null && isOpeningTurn(state)
         ? Math.max(0, room.lastStepAt - now)
         : 0,
+    hurry:
+      room.hurry &&
+      now - room.hurry.at < HURRY_FLASH_MS &&
+      actingHumanSeat(room, now) === room.hurry.seat
+        ? {
+            seat: room.hurry.seat,
+            by: occupantSummary(room.seats[room.hurry.by], room.hurry.by, playing, now).name ?? SEAT_NAMES[room.hurry.by],
+            id: room.hurry.at,
+          }
+        : null,
   };
 }
 
@@ -866,6 +922,7 @@ export function soloTableView(
     turnExtended: false,
     turnAllowance: 0,
     openingLeft: 0,
+    hurry: null,
   };
 }
 
