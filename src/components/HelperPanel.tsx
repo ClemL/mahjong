@@ -31,7 +31,7 @@ export function WaitList({ waits }: { waits: Wait[] }) {
   );
 }
 
-/** The ♿ toggle that opens the helper. */
+/** The wheelchair toggle that opens the helper. */
 export function HelperButton({
   open,
   onToggle,
@@ -51,7 +51,7 @@ export function HelperButton({
       title="What finishes the sets you have started"
       onClick={onToggle}
     >
-      <span aria-hidden>♿</span>
+      <img className="helper__icon" src="/helper-wheelchair.png" alt="" width={93} height={144} />
     </button>
   );
 }

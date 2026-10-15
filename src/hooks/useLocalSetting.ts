@@ -39,6 +39,35 @@ export function useLocalSetting<T extends string>(
   return [value, set];
 }
 
+/**
+ * Like `useLocalSetting`, but null until the player has chosen, so the default
+ * can follow something only known later — who is sitting in the seat.
+ */
+export function useStoredChoice<T extends string>(key: string, allowed: readonly T[]): [T | null, (value: T) => void] {
+  const [value, setValue] = useState<T | null>(() => {
+    try {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+      return allowed.includes(stored as T) ? (stored as T) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const set = useCallback(
+    (next: T) => {
+      setValue(next);
+      try {
+        window.localStorage.setItem(key, next);
+      } catch {
+        // A choice that cannot be saved still applies for this session.
+      }
+    },
+    [key],
+  );
+
+  return [value, set];
+}
+
 export type OnOff = "on" | "off";
 const ON_OFF: readonly OnOff[] = ["on", "off"];
 
@@ -80,7 +109,16 @@ export interface PhoneDisplay {
   setHelper: (value: OnOff) => void;
 }
 
-export function usePhoneDisplay(): PhoneDisplay {
+/**
+ * Hurry up and the helper start off for everyone but Zaid, whose seat has them
+ * on until they say otherwise. A choice made in settings always wins.
+ */
+export function assistsDefault(name: string | null | undefined): OnOff {
+  return name?.trim().toLowerCase() === "zaid" ? "on" : "off";
+}
+
+/** `name` is whoever holds this phone's seat, which sets the assists' default. */
+export function usePhoneDisplay(name?: string | null): PhoneDisplay {
   const [playLog, setPlayLog] = useLocalSetting<OnOff>("hk-mahjong.play-log", "on", ON_OFF);
   const [size, setSize] = useLocalSetting<PhoneSize>("hk-mahjong.ui-size", "standard", [
     "compact",
@@ -89,8 +127,10 @@ export function usePhoneDisplay(): PhoneDisplay {
   ]);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
   const [setHints, setSetHints] = useLocalSetting<OnOff>("hk-mahjong.set-hints", "on", ON_OFF);
-  const [hurry, setHurry] = useLocalSetting<OnOff>("hk-mahjong.hurry", "on", ON_OFF);
-  const [helper, setHelper] = useLocalSetting<OnOff>("hk-mahjong.helper", "on", ON_OFF);
+  const [hurryChoice, setHurry] = useStoredChoice<OnOff>("hk-mahjong.hurry", ON_OFF);
+  const [helperChoice, setHelper] = useStoredChoice<OnOff>("hk-mahjong.helper", ON_OFF);
+  const hurry = hurryChoice ?? assistsDefault(name);
+  const helper = helperChoice ?? assistsDefault(name);
   return {
     playLog,
     setPlayLog,

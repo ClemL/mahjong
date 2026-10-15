@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
 import { hurryUp } from "@/game/room";
@@ -365,6 +365,8 @@ describe("PhoneView — whose move it is", () => {
   });
 
   it("hurries whoever is holding up the table, and flashes only their screen", () => {
+    window.localStorage.setItem("hk-mahjong.hurry", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));
     const { room, seat } = onTurn();
     const other = ((seat + 1) % 4) as Seat;
     const theirs = playerView(room, other);
@@ -385,24 +387,42 @@ describe("PhoneView — whose move it is", () => {
     expect(within(container).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
   });
 
-  it("drops the hurry-up button and the flash when the phone turns them off", () => {
+  it("leaves the hurry-up button and the flash off unless the phone turns them on", () => {
     const { room, seat } = onTurn();
     const other = ((seat + 1) % 4) as Seat;
     hurryUp(room, other);
-    window.localStorage.setItem("hk-mahjong.hurry", "off");
-    try {
+    {
       const mine = playerView(room, seat);
       const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
       expect(container.querySelector(".phone--hurried, .phone__hurry")).toBeNull();
       const theirs = playerView(room, other);
       const { container: elsewhere } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
       expect(within(elsewhere).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
-    } finally {
-      window.localStorage.removeItem("hk-mahjong.hurry");
     }
   });
 
-  it("lists what finishes each set the hand has started, behind the helper button", () => {
+  it("turns the assists on by default for Zaid, however it is typed, but never over a choice", () => {
+    const { room, seat } = onTurn();
+    const other = ((seat + 1) % 4) as Seat;
+    const occupant = room.seats[other];
+    if (occupant.kind === "human") occupant.name = " zAiD ";
+    const theirs = playerView(room, other);
+    const first = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+    expect(within(first.container).getByRole("button", { name: /^Hurry up/ })).toBeTruthy();
+    expect(within(first.container).getByRole("button", { name: /^Helper/ })).toBeTruthy();
+    first.unmount();
+
+    window.localStorage.setItem("hk-mahjong.helper", "off");
+    try {
+      const chosen = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+      expect(within(chosen.container).queryByRole("button", { name: /^Helper/ })).toBeNull();
+      expect(within(chosen.container).getByRole("button", { name: /^Hurry up/ })).toBeTruthy();
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.helper");
+    }
+  });
+
+  it("lists what finishes each set the hand has started, behind the helper button once turned on", () => {
     const { seat, view } = onTurn();
     const codes = ["m1", "m2", "m3", "p4", "p5", "s7", "s9", "dr", "dr", "we", "wn", "ws", "m9", "p1"];
     const hand = codes.map((code, i) => ({ id: `${code}#t${i}`, code }));
@@ -411,7 +431,13 @@ describe("PhoneView — whose move it is", () => {
       drawnTileId: null,
       players: view.players.map((p, i) => (i === seat ? { ...p, hand, handCount: hand.length } : p)),
     } as typeof view;
-    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+    const off = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+    expect(within(off.container).queryByRole("button", { name: /^Helper/ })).toBeNull();
+    off.unmount();
+
+    window.localStorage.setItem("hk-mahjong.helper", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.helper"));
+    const { container } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
     handButtons(container);
     expect(container.querySelector(".helper")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /^Helper/ }));
@@ -420,14 +446,5 @@ describe("PhoneView — whose move it is", () => {
     expect(rows.some((r) => r.includes("run with") && r.includes("3 Dots") && r.includes("6 Dots"))).toBe(true);
     expect(rows.some((r) => r.includes("run with") && r.includes("8 Bamboo"))).toBe(true);
     expect(rows.some((r) => r.includes("pung with") && r.includes(tileName("dr")))).toBe(true);
-    unmount();
-
-    window.localStorage.setItem("hk-mahjong.helper", "off");
-    try {
-      render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
-      expect(screen.queryByRole("button", { name: /^Helper/ })).toBeNull();
-    } finally {
-      window.localStorage.removeItem("hk-mahjong.helper");
-    }
   });
 });

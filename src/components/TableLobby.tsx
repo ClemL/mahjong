@@ -40,7 +40,9 @@ export function TableLobby({
   const appearance = useAppearance();
   const layout = useCompactLayout();
   const tabletDisplay = useTabletDisplay();
-  const phoneDisplay = usePhoneDisplay();
+  const phoneDisplay = usePhoneDisplay(
+    view.you.seat !== null ? view.players[view.you.seat].occupant.name : null,
+  );
 
   // The join link has to be built in the browser — a statically exported page
   // has no idea what host it will be served from.

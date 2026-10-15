@@ -60,7 +60,7 @@ const HURRY: ChoiceOption<OnOff>[] = [
 ];
 
 const HELPER: ChoiceOption<OnOff>[] = [
-  { value: "on", label: "On", hint: "A ♿ button that lists the tiles that finish each pair and part-run in your hand" },
+  { value: "on", label: "On", hint: "A wheelchair button that lists the tiles that finish each pair and part-run in your hand" },
   { value: "off", label: "Off", hint: "No helper button" },
 ];
 

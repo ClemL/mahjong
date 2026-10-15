@@ -722,8 +722,15 @@ button {
 
 .helper__toggle {
   flex: none;
-  font-size: 16px;
   line-height: 1;
+  padding-block: 2px;
+}
+
+/* The sticker stands a little taller than the text beside it, so it reads at a glance. */
+.helper__icon {
+  display: block;
+  height: 30px;
+  width: auto;
 }
 
 .helper__toggle[aria-pressed="true"] {
