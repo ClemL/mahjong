@@ -2599,6 +2599,11 @@ a.btn {
   gap: 8px 20px;
 }
 
+.gather__home {
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
 .gather__lead {
   margin: 0;
   flex: 1 1 240px;

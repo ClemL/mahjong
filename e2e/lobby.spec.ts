@@ -54,3 +54,35 @@ test("players swap chairs in the lobby, and a taken chair's code takes it over",
     await side.context.close();
   }
 });
+
+test("the table can step back to the start page and pick its lobby up again", async ({
+  browser,
+  request,
+}) => {
+  expect((await request.post(`/api/rooms/${ROOM}/reset`)).ok()).toBe(true);
+
+  const table = await open(browser, TABLET, false);
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  const kris = await open(browser, PHONE_PORTRAIT, true);
+  await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
+  await expect(table.page.getByText("1 of 4 seated")).toBeVisible();
+  if (SHOTS) await table.page.screenshot({ path: `${SHOTS}/table-lobby-home.png` });
+
+  // A phone in a chair has its own way out, and no start-page link.
+  await expect(kris.page.getByRole("link", { name: /Start page/ })).toHaveCount(0);
+
+  await table.page.getByRole("link", { name: /Start page/ }).click();
+  await expect(table.page).toHaveURL(/\/$/);
+
+  // Opening the same table again resumes it: the claim is kept and Kris is
+  // still sitting down, rather than the table being "open on another device".
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  await expect(table.page.getByText("1 of 4 seated")).toBeVisible();
+  await expect(table.page.getByText("Kris").first()).toBeVisible();
+  await expect(table.page.getByText(/already open on another device/)).toHaveCount(0);
+
+  for (const side of [table, kris]) {
+    expect(side.errors).toEqual([]);
+    await side.context.close();
+  }
+});
