@@ -72,6 +72,12 @@ export interface PhoneDisplay {
   /** A line under three tiles in the hand that already make a set. */
   setHints: OnOff;
   setSetHints: (value: OnOff) => void;
+  /** The hurry-up button, and this screen flashing when someone presses theirs. */
+  hurry: OnOff;
+  setHurry: (value: OnOff) => void;
+  /** The ♿ button that lists what finishes each set the hand has started. */
+  helper: OnOff;
+  setHelper: (value: OnOff) => void;
 }
 
 export function usePhoneDisplay(): PhoneDisplay {
@@ -83,5 +89,20 @@ export function usePhoneDisplay(): PhoneDisplay {
   ]);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
   const [setHints, setSetHints] = useLocalSetting<OnOff>("hk-mahjong.set-hints", "on", ON_OFF);
-  return { playLog, setPlayLog, size, setSize, vibrate, setVibrate, setHints, setSetHints };
+  const [hurry, setHurry] = useLocalSetting<OnOff>("hk-mahjong.hurry", "on", ON_OFF);
+  const [helper, setHelper] = useLocalSetting<OnOff>("hk-mahjong.helper", "on", ON_OFF);
+  return {
+    playLog,
+    setPlayLog,
+    size,
+    setSize,
+    vibrate,
+    setVibrate,
+    setHints,
+    setSetHints,
+    hurry,
+    setHurry,
+    helper,
+    setHelper,
+  };
 }

@@ -50,6 +50,20 @@ const SET_HINTS: ChoiceOption<OnOff>[] = [
   { value: "off", label: "Off", hint: "No marks under your tiles" },
 ];
 
+const HURRY: ChoiceOption<OnOff>[] = [
+  {
+    value: "on",
+    label: "On",
+    hint: "A Hurry up button while someone else is holding up the table, and this screen flashes when someone presses theirs",
+  },
+  { value: "off", label: "Off", hint: "No button, and this screen never flashes" },
+];
+
+const HELPER: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "On", hint: "A ♿ button that lists the tiles that finish each pair and part-run in your hand" },
+  { value: "off", label: "Off", hint: "No helper button" },
+];
+
 const SORT: ChoiceOption<SortMode>[] = [
   { value: "suits", label: "Suits", hint: "Characters, dots, bamboo, then winds and dragons" },
   { value: "honors", label: "Honors first", hint: "Winds and dragons on the left, then the suits" },
@@ -141,6 +155,8 @@ export function PhoneSettings({
                 value={display.setHints}
                 onChange={display.setSetHints}
               />
+              <Choice label="Helper" options={HELPER} value={display.helper} onChange={display.setHelper} />
+              <Choice label="Hurry up" options={HURRY} value={display.hurry} onChange={display.setHurry} />
               <Choice
                 label="Vibrate"
                 options={VIBRATE}

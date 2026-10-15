@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ClaimOption } from "@/game/engine";
-import { MORE_TIME_MS, type RoomView } from "@/game/room";
+import { HURRY_COOLDOWN_MS, MORE_TIME_MS, type RoomView } from "@/game/room";
 import { findSets } from "@/game/sets";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
@@ -25,6 +25,8 @@ import { useFlip } from "@/hooks/useFlip";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useDealIn } from "@/hooks/useDealIn";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import { useHurryFlash } from "@/hooks/useHurry";
+import { HelperButton, HelperPanel } from "./HelperPanel";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow, bonusClass } from "./SeatPanel";
 import { ChipStack, Confetti, chipsOf, confettiCount } from "./TableEffects";
@@ -187,6 +189,16 @@ export function PhoneView({
   const layout = useCompactLayout();
   const display = usePhoneDisplay();
   useHaptics(view, display.vibrate === "on");
+  const hurriedBy = useHurryFlash(view, display.hurry === "on", display.vibrate === "on");
+  const [helperOpen, setHelperOpen] = useState(false);
+  // A hurry-up just sent from here: the button rests until the table would
+  // take another, rather than inviting presses the server will refuse.
+  const [hurrySent, setHurrySent] = useState(false);
+  useEffect(() => {
+    if (!hurrySent) return;
+    const timer = window.setTimeout(() => setHurrySent(false), HURRY_COOLDOWN_MS);
+    return () => window.clearTimeout(timer);
+  }, [hurrySent]);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
@@ -546,6 +558,36 @@ export function PhoneView({
     </span>
   ) : null;
 
+  // The person the table is waiting on, when it is someone else at the table:
+  // the one deciding on a discard, or else whoever is on turn and has not thrown.
+  const onTurn = view.players[view.turn].occupant;
+  const waitingOn =
+    view.phase === "claiming"
+      ? (deciding ?? null)
+      : view.phase === "action" && view.lastDiscard === null && onTurn.kind === "human" && !onTurn.away
+        ? view.turn
+        : null;
+  const hurryButton =
+    display.hurry === "on" && waitingOn !== null && waitingOn !== seat ? (
+      <button
+        type="button"
+        className="btn btn--sm btn--ghost phone__hurry-btn"
+        disabled={api.busy || hurrySent}
+        aria-label={hurrySent ? `${nameOf(waitingOn)} has been hurried` : `Hurry up ${nameOf(waitingOn)}: flash their screen`}
+        onClick={() => {
+          setHurrySent(true);
+          void api.act({ type: "hurry" });
+        }}
+      >
+        {hurrySent ? "Hurried" : compact ? "Hurry" : "Hurry up"}
+      </button>
+    ) : null;
+
+  // Only while a hand is live and turned up: the helper reads the tiles in it.
+  const helperAvailable =
+    display.helper === "on" && (view.phase === "action" || view.phase === "claiming");
+  const showHelper = helperAvailable && helperOpen && !hidden;
+
   const allowance =
     view.turnAllowance || view.settings.turnLimit * 1000 + (view.turnExtended ? MORE_TIME_MS : 0);
   const timerStyle: CSSProperties & { "--left": number } = {
@@ -672,6 +714,7 @@ export function PhoneView({
         // Your move — your turn or your call on a discard — lit in the same
         // colour the table lights your rack with.
         yourTurn || view.claim ? "phone--acting" : "",
+        hurriedBy !== null ? "phone--hurried" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -710,6 +753,7 @@ export function PhoneView({
         {compact ? lastPlayed : null}
         {compact ? promptLine : null}
         {compact ? turnTimer : null}
+        {compact ? hurryButton : null}
         {exposedInHeader ? exposed : null}
         {landscape && fullscreen.supported && !fullscreen.active ? (
           <button
@@ -720,6 +764,13 @@ export function PhoneView({
           >
             {compact ? "⛶" : "Full screen"}
           </button>
+        ) : null}
+        {helperAvailable ? (
+          <HelperButton
+            open={helperOpen}
+            onToggle={() => setHelperOpen((o) => !o)}
+            className="btn btn--sm btn--ghost phone__toggle"
+          />
         ) : null}
         <button
           type="button"
@@ -777,8 +828,20 @@ export function PhoneView({
           {lastPlayed}
           {promptLine}
           {turnTimer}
+          {hurryButton}
         </div>
       )}
+
+      {showHelper ? (
+        <HelperPanel
+          hand={me.hand}
+          melds={me.melds}
+          seats={view.players}
+          seatWind={seatWind(seat)}
+          roundWind={view.roundWind}
+          config={view.config}
+        />
+      ) : null}
 
       {exposedInHeader ? null : exposed}
 
@@ -885,6 +948,11 @@ export function PhoneView({
           )}
         </div>
       </div>
+      {hurriedBy !== null ? (
+        <div className="phone__hurry" role="alert">
+          <span className="phone__hurry-text">{hurriedBy} says hurry up!</span>
+        </div>
+      ) : null}
       {zoomed && hasSets ? (
         <button
           type="button"

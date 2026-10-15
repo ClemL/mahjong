@@ -24,6 +24,14 @@ const HINTS = ON_OFF.map((o) => ({
       : "No help with your hand",
 }));
 
+const HELPER = ON_OFF.map((o) => ({
+  ...o,
+  hint:
+    o.value === "on"
+      ? "A ♿ button by your hand that lists the tiles that finish each pair and part-run"
+      : "No helper button",
+}));
+
 const SOUND = ON_OFF.map((o) => ({
   ...o,
   hint: o.value === "on" ? "Clacks on discards, claims and wins" : "Silent",
@@ -69,6 +77,12 @@ export function GamePanel({ api, note }: { api: GameSettings; note?: string }) {
             options={HINTS}
             value={api.showHints ? "on" : "off"}
             onChange={(value) => api.setShowHints(value === "on")}
+          />
+          <Choice
+            label="Helper"
+            options={HELPER}
+            value={api.helper ? "on" : "off"}
+            onChange={(value) => api.setHelper(value === "on")}
           />
           <Choice
             label="Sound"

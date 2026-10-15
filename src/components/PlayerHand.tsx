@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { MahjongApi } from "@/hooks/useMahjong";
 import { useFlip } from "@/hooks/useFlip";
 import type { GameState } from "@/game/engine";
-import { type Wait, bestReadyDiscard, liveTiles, standingWaits } from "@/game/waits";
-import { SEAT_NAMES, type Seat, tileName } from "@/game/tiles";
+import { bestReadyDiscard, liveTiles, standingWaits } from "@/game/waits";
+import { SEAT_NAMES, type Seat, seatWind, tileName } from "@/game/tiles";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow, bonusClass } from "./SeatPanel";
+import { HelperButton, HelperPanel, WaitList } from "./HelperPanel";
 
 function claimLabel(type: string): string {
   switch (type) {
@@ -40,29 +41,6 @@ function tilesCount(n: number): string {
   return n === 1 ? "1 tile" : `${n} tiles`;
 }
 
-/** The winning tiles, each with how many are still out there to be drawn or thrown. */
-function WaitList({ waits }: { waits: Wait[] }) {
-  return (
-    <span className="waits">
-      {waits.map((w) => (
-        <span
-          key={w.code}
-          className={w.left === 0 ? "waits__tile waits__tile--dead" : "waits__tile"}
-          title={`${tileName(w.code)}: ${w.left} left`}
-        >
-          <TileFace code={w.code} size="sm" />
-          <span className="waits__left" aria-hidden>
-            ×{w.left}
-          </span>
-          <span className="sr-only">
-            {tileName(w.code)}, {w.left} left
-          </span>
-        </span>
-      ))}
-    </span>
-  );
-}
-
 export function PlayerHand({
   api,
   showSets = false,
@@ -75,7 +53,10 @@ export function PlayerHand({
   const row = useRef<HTMLDivElement>(null);
   useFlip(row);
   const hint = useWaitsHint(state, humanSeat, actions.canDiscard, api.showHints && !dealing);
+  const [helperOpen, setHelperOpen] = useState(false);
   if (!state) return null;
+  const helperAvailable =
+    api.helper && !dealing && (state.phase === "action" || state.phase === "claiming");
   const me = state.players[humanSeat];
   const drawn = me.hand.find((t) => t.id === state.drawnTileId);
   const rest = me.hand.filter((t) => t.id !== state.drawnTileId);
@@ -105,7 +86,22 @@ export function PlayerHand({
 
   return (
     <section className="hand" aria-label="Your hand">
-      <div className={`hand__prompt${muted ? " hand__prompt--muted" : ""}`}>{prompt}</div>
+      <div className="hand__head">
+        <div className={`hand__prompt${muted ? " hand__prompt--muted" : ""}`}>{prompt}</div>
+        {helperAvailable ? (
+          <HelperButton open={helperOpen} onToggle={() => setHelperOpen((o) => !o)} />
+        ) : null}
+      </div>
+      {helperAvailable && helperOpen ? (
+        <HelperPanel
+          hand={me.hand}
+          melds={me.melds}
+          seats={state.players}
+          seatWind={seatWind(humanSeat)}
+          roundWind={state.roundWind}
+          config={state.config}
+        />
+      ) : null}
 
       {showSets && (me.melds.length > 0 || me.flowers.length > 0) && (
         <div className="seat__row">
