@@ -100,6 +100,14 @@ export function TableLobby({
   return (
     <div className="gather">
       <header className="gather__head">
+        {/* A plain link rather than a leave: the table keeps its claim and the
+            phones keep their chairs, so opening this table again from the start
+            page picks the lobby up where it was. Nothing to confirm. */}
+        {isTable ? (
+          <a href="/" className="btn btn--ghost btn--sm gather__home">
+            ‹ Start page
+          </a>
+        ) : null}
         {isTable && joinUrl ? (
           <span className="gather__url">{joinUrl.replace(/^https?:\/\//, "")}</span>
         ) : null}
