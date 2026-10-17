@@ -33,6 +33,7 @@ import type { Seat } from "@/game/tiles";
 import { isFlower } from "@/game/tiles";
 import { DEFAULT_RULES, roundsInGame } from "@/game/rules";
 import { signatureMoment } from "@/components/moments";
+import { readSavedGame, writeSavedGame } from "@/hooks/soloSave";
 
 export type { Speed };
 
@@ -82,6 +83,25 @@ function seedFromAddress(): number | undefined {
   return Number.isInteger(asked) && asked > 0 ? asked >>> 0 : undefined;
 }
 
+/**
+ * `?new` asks for a fresh game over a saved one. It is taken off the address
+ * once read, so reloading the page after that resumes the new game instead of
+ * throwing it away too.
+ */
+function freshGameAsked(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("new")) return false;
+  params.delete("new");
+  const rest = params.toString();
+  window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  return true;
+}
+
+/** Nothing has been thrown or claimed yet: the hand is still at its deal. */
+function atDeal(state: GameState): boolean {
+  return state.players.every((p) => p.discards.length === 0 && p.melds.length === 0);
+}
+
 export interface MahjongOptions {
   /**
    * How long a fresh hand is shown being dealt before anyone plays, decided as
@@ -114,13 +134,23 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
 
   const newGame = useCallback(() => start(), [start]);
 
+  // Carry on from a saved game. The computer's dice are rolled afresh: its
+  // choices were never meant to repeat, only the deal is.
+  const resume = useCallback((saved: GameState) => {
+    rngRef.current = createRng((saved.rngSeed ^ Date.now()) >>> 0);
+    setState(saved);
+    setGame((n) => n + 1);
+  }, []);
+
   // A table that shows the deal holds play until it has, rather than playing
   // on top of it. The hold is decided the moment a hand is first seen, so no
-  // render ever offers a move early.
+  // render ever offers a move early — and a hand first seen part-way through,
+  // as a resumed one is, has no deal left to show.
   const dealKey = state ? `${state.rngSeed}:${state.handNumber}` : null;
   const hold = useRef<{ key: string | null; until: number }>({ key: null, until: 0 });
   if (state && hold.current.key !== dealKey) {
-    hold.current = { key: dealKey, until: Date.now() + (dealHoldRef.current?.(state) ?? 0) };
+    const ms = atDeal(state) ? (dealHoldRef.current?.(state) ?? 0) : 0;
+    hold.current = { key: dealKey, until: Date.now() + ms };
   }
   const [, wake] = useState(0);
   const dealing = hold.current.until > Date.now();
@@ -135,10 +165,25 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     return () => clearTimeout(timer);
   }, [dealKey]);
 
-  // Deal on the client so the server render stays deterministic.
+  // Deal on the client so the server render stays deterministic. A game left
+  // unfinished on this device is picked up where it was, unless the address
+  // asks for a particular deal or a fresh one.
+  // Only once: a second pass (React's development double-run) would find
+  // `?new` already gone and resume the very save it was asked to replace.
+  const booted = useRef(false);
   useEffect(() => {
-    start(seedFromAddress());
-  }, [start]);
+    if (booted.current) return;
+    booted.current = true;
+    const seed = seedFromAddress();
+    const saved = seed === undefined && !freshGameAsked() ? readSavedGame() : null;
+    if (saved) resume(saved);
+    else start(seed);
+  }, [start, resume]);
+
+  // Every move is saved as it lands; a finished game clears the save.
+  useEffect(() => {
+    if (state) writeSavedGame(state);
+  }, [state]);
 
   // Cues are derived by comparing each state to the one before it, so the
   // engine stays free of presentation concerns.

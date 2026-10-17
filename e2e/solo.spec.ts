@@ -98,6 +98,46 @@ test.describe("solo table", () => {
     expect(errors).toEqual([]);
   });
 
+  test("picks the game up again after a reload, and the start page offers it", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(`/solo?seed=${SEED}`);
+    await page.getByRole("button", { name: "Skip the deal" }).click();
+
+    // Throw once, then wait for the next turn: a hand already under way, so
+    // there is no deal left to show when it comes back.
+    let thrown = 0;
+    while (thrown < 2) {
+      const decision = await nextDecision(page);
+      expect(decision, "the seeded hand lasts two of your turns").not.toBe("over");
+      if (decision === "claim") {
+        await yourHand(page).getByRole("button", { name: "Pass" }).click();
+        continue;
+      }
+      if (++thrown === 2) break;
+      await yourHand(page).locator("button.tile--button:not([disabled])").first().click();
+    }
+    const labels = () => handTiles(page).evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
+    const wall = page.locator(".stat", { hasText: "Wall" }).locator(".stat__value");
+    const before = { hand: await labels(), wall: await wall.textContent() };
+
+    await page.goto("/solo");
+    await expect(yourHand(page)).toBeVisible();
+    // Straight back to your turn: same tiles, same wall, nothing dealt again.
+    await expect(yourHand(page).locator("button.tile--button:not([disabled])").first()).toBeVisible({ timeout: 2_000 });
+    await expect(yourHand(page)).not.toContainText("Dealing");
+    expect(await labels()).toEqual(before.hand);
+    await expect(wall).toHaveText(before.wall!);
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /Resume solo game/ })).toContainText("hand 1");
+    await page.getByRole("link", { name: "New solo game" }).click();
+    await expect(yourHand(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/solo$/);
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /Resume solo game/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("finishes a hand on a phone and reads out what everyone paid", async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize(PHONE_PORTRAIT);

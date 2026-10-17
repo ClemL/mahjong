@@ -11,6 +11,7 @@ import { Choice, type ChoiceOption } from "./Choice";
 import { FilmDialog } from "./FilmPlayer";
 import { BuildFooter } from "./BuildFooter";
 import { TABLES, type TableInfo, findTable } from "@/game/tables";
+import { describeSavedGame, readSavedGame } from "@/hooks/soloSave";
 
 /** Which table this device last chose, so a returning player lands on it again. */
 const TABLE_KEY = "hk-mahjong.table";
@@ -31,14 +32,16 @@ interface Mode {
   detail: string;
 }
 
-function modes(table: TableInfo): Mode[] {
+function modes(table: TableInfo, savedSolo: string | null): Mode[] {
   return [
-    {
-      href: "/solo",
-      glyph: "獨",
-      name: "Play solo",
-      detail: "You against three computer opponents, on this device",
-    },
+    savedSolo
+      ? { href: "/solo", glyph: "獨", name: "Resume solo game", detail: savedSolo }
+      : {
+          href: "/solo",
+          glyph: "獨",
+          name: "Play solo",
+          detail: "You against three computer opponents, on this device",
+        },
     {
       href: `/room/${table.id}`,
       glyph: "眾",
@@ -94,8 +97,12 @@ export function StartPage() {
   // The phone layout is read from storage during the first render, which the
   // server cannot do; hold that one control back until hydration is over.
   const [mounted, setMounted] = useState(false);
+  // An unfinished solo game on this device, described for the Resume button.
+  const [savedSolo, setSavedSolo] = useState<string | null>(null);
   useEffect(() => {
     setMounted(true);
+    const saved = readSavedGame();
+    setSavedSolo(saved ? describeSavedGame(saved) : null);
     try {
       const stored = findTable(window.localStorage.getItem(TABLE_KEY) ?? "");
       if (stored) setTable(stored);
@@ -207,7 +214,7 @@ export function StartPage() {
       </div>
 
       <nav className="start__modes" aria-label="How to play">
-        {modes(table).map((mode) => (
+        {modes(table, savedSolo).map((mode) => (
           <a key={mode.name} className="start__mode" href={mode.href}>
             <span className="start__mode-glyph" aria-hidden="true">
               {mode.glyph}
@@ -222,6 +229,11 @@ export function StartPage() {
         <button type="button" className="btn btn--sm btn--primary topbar__film" onClick={() => setFilm(true)}>
           How to play
         </button>
+        {savedSolo ? (
+          <a className="btn btn--sm btn--ghost" href="/solo?new">
+            New solo game
+          </a>
+        ) : null}
         <span className="start__spacer" />
         <button
           type="button"
