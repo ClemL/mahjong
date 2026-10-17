@@ -98,6 +98,8 @@ const FAAN_ROWS: [string, string, number][] = [
   ["大四喜", "Big Four Winds", DEFAULT_RULES.faan.bigFourWinds],
   ["十三么", "Thirteen Orphans", DEFAULT_RULES.faan.thirteenOrphans],
   ["十八羅漢", "Four Kongs", DEFAULT_RULES.faan.fourKongs],
+  ["天糊", "Heavenly Hand", DEFAULT_RULES.faan.heavenlyHand],
+  ["地糊", "Earthly Hand", DEFAULT_RULES.faan.earthlyHand],
   ["八仙過海", "All Eight Bonus Tiles", DEFAULT_RULES.faan.allEightBonus],
 ];
 

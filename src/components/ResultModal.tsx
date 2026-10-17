@@ -122,6 +122,7 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
               {result.from === null
                 ? "Self-drawn 自摸"
                 : `On ${SEAT_NAMES[result.from]}'s discard`}
+              {result.liable != null ? ` · ${SEAT_NAMES[result.liable]} pays it all 包` : ""}
               {" · "}
               {result.score!.faan} faan
               {result.score!.faan > result.score!.scoredFaan

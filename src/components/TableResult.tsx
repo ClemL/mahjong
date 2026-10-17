@@ -130,6 +130,7 @@ export function TableResult({
               {won
                 ? [
                     won.from === null ? "Self-drawn 自摸" : `Off ${name(won.from)}'s discard`,
+                    won.liable != null ? `${name(won.liable)} pays it all 包` : null,
                     score ? `${score.scoredFaan} faan` : null,
                     `+${won.payments[won.winner!]} chips`,
                   ]

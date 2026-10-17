@@ -29,6 +29,8 @@ export interface FaanTable {
   bonusSet: number;
   allEightBonus: number;
   noBonus: number;
+  heavenlyHand: number;
+  earthlyHand: number;
 }
 
 /** Faan minimums a table can be set to. 3 is the Hong Kong standard. */
@@ -62,6 +64,11 @@ export interface RuleConfig {
    * 2 adds the South round, 4 plays every wind.
    */
   rounds: number;
+  /**
+   * 包: whoever feeds a player the set that makes a third dragon set or a
+   * fourth set of any kind pays the whole of that player's self-drawn win.
+   */
+  liability: boolean;
   faan: FaanTable;
 }
 
@@ -90,6 +97,8 @@ export const DEFAULT_FAAN: FaanTable = {
   bonusSet: 3,
   allEightBonus: 13,
   noBonus: 1,
+  heavenlyHand: 13,
+  earthlyHand: 13,
 };
 
 /**
@@ -109,6 +118,7 @@ export const DEFAULT_RULES: RuleConfig = {
   dealerKeepsOnWashout: false,
   flowers: true,
   rounds: 4,
+  liability: true,
   faan: DEFAULT_FAAN,
 };
 
@@ -127,6 +137,16 @@ export function describeRounds(rounds: number): string {
 /** Whether this table plays with the bonus tiles. A table saved before the option existed did. */
 export function flowersInPlay(config: Pick<RuleConfig, "flowers">): boolean {
   return config.flowers !== false;
+}
+
+/** Whether this table plays 包. A table saved before the option existed gets the default. */
+export function liabilityInPlay(config: Pick<RuleConfig, "liability">): boolean {
+  return config.liability !== false;
+}
+
+/** A faan value, falling back to the default for a table saved before the pattern existed. */
+export function faanFor(config: RuleConfig, key: keyof FaanTable): number {
+  return config.faan[key] ?? DEFAULT_FAAN[key];
 }
 
 export interface RuleNote {
@@ -185,10 +205,28 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
         describeMinimum(config.minFaan),
     },
     {
+      title: "Limit hands at the deal",
+      body:
+        "天糊 Heavenly Hand: the dealer wins on the tiles dealt, before anyone has discarded. " +
+        "地糊 Earthly Hand: another player wins on the dealer's first discard, or self-draws on their own " +
+        "first draw, before anyone has claimed a set or declared a kong. Both score the limit.",
+    },
+    {
       title: "Payment",
       body:
         "Self-draw (自摸): all three opponents pay the hand's value. " +
         "Win on a discard: the discarder alone pays. A washed-out wall (流局) pays nothing.",
+    },
+    {
+      title: "Liability (包)",
+      body: liabilityInPlay(config)
+        ? "Whoever discards the tile that gives a player their third dragon set, or their fourth set of any " +
+          "kind (twelve tiles face up, 十二張落地), pays that player's whole self-drawn win alone — all three " +
+          "shares. If it happens more than once, the latest feed is the one that pays. A concealed kong is " +
+          "nobody's feed. A win off a discard is paid by the discarder as usual. House rules vary; the table " +
+          "can switch this off."
+        : "This table does not play liability (包): a self-drawn win is paid by all three opponents, " +
+          "whoever fed the sets.",
     },
     {
       title: "Dealership",
