@@ -98,6 +98,46 @@ test.describe("solo table", () => {
     expect(errors).toEqual([]);
   });
 
+  test("picks the game up again after a reload, and the start page offers it", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(`/solo?seed=${SEED}`);
+    await page.getByRole("button", { name: "Skip the deal" }).click();
+
+    // Throw once, then wait for the next turn: a hand already under way, so
+    // there is no deal left to show when it comes back.
+    let thrown = 0;
+    while (thrown < 2) {
+      const decision = await nextDecision(page);
+      expect(decision, "the seeded hand lasts two of your turns").not.toBe("over");
+      if (decision === "claim") {
+        await yourHand(page).getByRole("button", { name: "Pass" }).click();
+        continue;
+      }
+      if (++thrown === 2) break;
+      await yourHand(page).locator("button.tile--button:not([disabled])").first().click();
+    }
+    const labels = () => handTiles(page).evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")));
+    const wall = page.locator(".stat", { hasText: "Wall" }).locator(".stat__value");
+    const before = { hand: await labels(), wall: await wall.textContent() };
+
+    await page.goto("/solo");
+    await expect(yourHand(page)).toBeVisible();
+    // Straight back to your turn: same tiles, same wall, nothing dealt again.
+    await expect(yourHand(page).locator("button.tile--button:not([disabled])").first()).toBeVisible({ timeout: 2_000 });
+    await expect(yourHand(page)).not.toContainText("Dealing");
+    expect(await labels()).toEqual(before.hand);
+    await expect(wall).toHaveText(before.wall!);
+
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /Resume solo game/ })).toContainText("hand 1");
+    await page.getByRole("link", { name: "New solo game" }).click();
+    await expect(yourHand(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/solo$/);
+    await page.goto("/");
+    await expect(page.getByRole("link", { name: /Resume solo game/ })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("finishes a hand on a phone and reads out what everyone paid", async ({ page }) => {
     const errors = watchErrors(page);
     await page.setViewportSize(PHONE_PORTRAIT);
@@ -118,6 +158,46 @@ test.describe("solo table", () => {
       const fits = await pill.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.clientWidth > 40);
       expect(fits, "payment pill holds its text").toBe(true);
     }
+
+    await checkReplay(page);
+    await expectNoSidewaysScroll(page);
+    expect(errors).toEqual([]);
+  });
+
+  test("replays a finished hand from the felt's result sheet", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(`/solo?seed=${SEED}`);
+    await page.getByRole("button", { name: "Skip the deal" }).click();
+    for (;;) {
+      const decision = await nextDecision(page);
+      if (decision === "over") break;
+      const hand = yourHand(page);
+      if (decision === "claim") await hand.getByRole("button", { name: "Pass" }).click();
+      else await hand.locator("button.tile--button:not([disabled])").first().click();
+    }
+    await checkReplay(page);
     expect(errors).toEqual([]);
   });
 });
+
+/** Opens the replay from the result, steps back a move, and closes it again. */
+async function checkReplay(page: Page): Promise<void> {
+  await handResult(page).getByRole("button", { name: "Replay hand" }).click();
+  const replay = page.getByRole("dialog", { name: /Replay of hand \d+/ });
+  await expect(replay).toBeVisible();
+  const count = replay.locator(".replay__count");
+  const end = await count.textContent();
+  const [, last] = /Move (\d+) of (\d+)/.exec(end ?? "") ?? [];
+  expect(Number(last), "moves in the hand").toBeGreaterThan(4);
+  await expect(replay.getByRole("region")).toHaveCount(4);
+  await replay.getByRole("button", { name: "Back" }).click();
+  await expect(count).toHaveText(`Move ${Number(last) - 1} of ${last}`);
+  await replay.getByRole("button", { name: "Deal" }).click();
+  await expect(count).toHaveText("The deal");
+  // Thirteen tiles each and the dealer's fourteenth, all face up.
+  const tiles = await replay.locator(".replay__row .tile").count();
+  expect(tiles).toBeGreaterThanOrEqual(53);
+  await page.keyboard.press("Escape");
+  await expect(replay).toHaveCount(0);
+  await expect(handResult(page)).toBeVisible();
+}

@@ -1,0 +1,115 @@
+/* ========================================================== phone view == */
+
+.phone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phone__bar {
+  display: flex;
+  /* A narrow phone with every button switched on wraps rather than scrolling sideways. */
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.phone__seat {
+  font-weight: 700;
+}
+
+.phone__score {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.phone__wall {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone__prompt {
+  margin: 0;
+  font-size: 15px;
+  color: var(--ink-dim);
+}
+
+.phone__prompt--live {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+
+.phone__hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: flex-end;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--shade-3);
+  border: 1px solid var(--panel-border);
+  min-height: 78px;
+}
+
+.phone__actions {
+  position: sticky;
+  bottom: 0;
+  padding: 8px 0;
+  background: linear-gradient(180deg, transparent, var(--felt) 40%);
+}
+
+.fullroom {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .tableview__grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "top"
+      "left"
+      "right"
+      "pond"
+      "bottom";
+  }
+}
+
+a.btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tseat__away {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--chip-neg);
+  color: var(--ink);
+}
+
+.lobby__diag {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.lobby__diaglist {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.lobby__diaglist code {
+  font-size: 11px;
+}
+

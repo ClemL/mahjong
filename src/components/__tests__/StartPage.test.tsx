@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StartPage } from "../StartPage";
 import { normalizePreferences, readPreferences } from "@/hooks/usePreferences";
+import { writeSavedGame } from "@/hooks/soloSave";
+import { createGame } from "@/game/engine";
 
 // The film pulls in a canvas renderer jsdom cannot run; only the button matters here.
 vi.mock("../FilmPlayer", () => ({ FilmDialog: () => null }));
@@ -38,6 +40,17 @@ describe("StartPage", () => {
     expect(href(/Play solo/)).toBe("/solo");
     expect(href(/Multiplayer/)).toBe("/room/TABLE");
     expect(href(/Tablet mode/)).toBe("/room/TABLE?seat=table");
+  });
+
+  it("offers to resume a solo game left unfinished, or start a new one", async () => {
+    const state = createGame({ seed: 3 });
+    state.scores = [12, -4, -4, -4];
+    writeSavedGame(state);
+    render(<StartPage />);
+    const resume = await screen.findByRole("link", { name: /Resume solo game/ });
+    expect(resume.getAttribute("href")).toBe("/solo");
+    expect(resume.textContent).toMatch(/East round, hand 1 · you are \+12/);
+    expect(screen.getByRole("link", { name: "New solo game" }).getAttribute("href")).toBe("/solo?new");
   });
 
   it("remembers the house minimum for the next game", () => {

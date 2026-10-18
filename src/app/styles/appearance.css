@@ -1,0 +1,66 @@
+/* ------------------------------------------------------ appearance panel */
+
+.appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.appearance__preview {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--shade-1);
+  justify-content: center;
+}
+
+.choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.choice__label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+  font-weight: 700;
+}
+
+.choice__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.choice__btn {
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  color: var(--ink-dim);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.choice__btn:hover {
+  background: var(--raise-2);
+  color: var(--ink);
+}
+
+.choice__btn--on {
+  background: var(--accent-wash-2);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.choice__hint {
+  font-size: 11px;
+  color: var(--ink-dim);
+  line-height: 1.35;
+}
+

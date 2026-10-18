@@ -11,6 +11,7 @@ interface Props {
   state: GameState;
   onNextHand: () => void;
   onNewGame: () => void;
+  onReplay?: () => void;
 }
 
 function Standings({ scores }: { scores: number[] }) {
@@ -31,7 +32,7 @@ function Standings({ scores }: { scores: number[] }) {
   );
 }
 
-export function ResultModal({ state, onNextHand, onNewGame }: Props) {
+export function ResultModal({ state, onNextHand, onNewGame, onReplay }: Props) {
   if (state.phase === "gameOver") {
     const wins = state.history.filter((h) => h.type === "win").length;
     return (
@@ -122,6 +123,7 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
               {result.from === null
                 ? "Self-drawn 自摸"
                 : `On ${SEAT_NAMES[result.from]}'s discard`}
+              {result.liable != null ? ` · ${SEAT_NAMES[result.liable]} pays it all 包` : ""}
               {" · "}
               {result.score!.faan} faan
               {result.score!.faan > result.score!.scoredFaan
@@ -196,6 +198,11 @@ export function ResultModal({ state, onNextHand, onNewGame }: Props) {
           <button type="button" className="btn btn--primary" onClick={onNextHand}>
             {result.dealerKeeps ? "Next hand (dealer keeps)" : "Next hand"}
           </button>
+          {onReplay ? (
+            <button type="button" className="btn" onClick={onReplay}>
+              Replay hand
+            </button>
+          ) : null}
           <button type="button" className="btn btn--ghost" onClick={onNewGame}>
             New game
           </button>

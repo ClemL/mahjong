@@ -40,6 +40,7 @@ import {
   discard,
   nextHand,
   setFlowers,
+  setLiability,
   setMinFaan,
   setRounds,
   startHand,
@@ -274,6 +275,7 @@ export type TableCommand =
   | { type: "rounds"; value: number }
   | { type: "skipOpening" }
   | { type: "flowers"; value: boolean }
+  | { type: "liability"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
@@ -365,6 +367,10 @@ export async function control(
           throw new RoomError("Flowers can be changed between hands", 409);
         }
         r.state = setFlowers(r.state, command.value === true);
+        break;
+      // Read when a hand is settled, so it can change at any point.
+      case "liability":
+        r.state = setLiability(r.state, command.value === true);
         break;
       case "speed":
         if (!SPEED_LEVELS.some((s) => s.level === command.value)) {

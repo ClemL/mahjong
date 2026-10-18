@@ -1,11 +1,12 @@
 # Hong Kong Mahjong
 
-A playable Hong Kong old-style mahjong table for the browser. You sit East; the
-other three seats are played by the computer. Built as a Next.js app that
-deploys to Vercel as a fully static site — the whole game runs client-side, with
-no backend, database or API keys.
+A playable Hong Kong old-style mahjong table for the browser. Play solo against
+three computer opponents, or around a shared tablet with friends on their
+phones. Built with Next.js and deployed to Vercel: the solo game runs entirely
+client-side and is served as static pages; multiplayer adds a few API routes
+backed by Upstash Redis.
 
-![Status](https://img.shields.io/badge/tests-120%20passing-brightgreen)
+![CI](https://github.com/ClemL/mahjong/actions/workflows/ci.yml/badge.svg)
 
 ## What is implemented
 
@@ -32,6 +33,9 @@ no backend, database or API keys.
 **Scoring**
 
 - Four sets and a pair, plus Thirteen Orphans (十三么) and Nine Gates (九蓮寶燈).
+- Heavenly Hand (天糊: the dealer wins on the tiles dealt) and Earthly Hand
+  (地糊: a win on the dealer's first discard, or a self-draw on your first draw,
+  before anyone has claimed) score the limit.
 - Every valid reading of a hand is enumerated and the highest-scoring one is
   used, so 111 222 333 is read as triplets or sequences — whichever pays more.
 - Faan patterns with correct exclusions (Big Three Dragons suppresses the
@@ -39,10 +43,14 @@ no backend, database or API keys.
 - Classic Hong Kong payout table: 10 faan limit (滿糊 = 128 points), doubling
   1 · 2 · 4 · 8 · 16 · 24 · 32 · 48 · 64 · 96 · 128.
 - **The faan minimum is a table setting** — 0, 1, 3 (the Hong Kong standard) or
-  5 — changeable mid-hand from the top bar. It defaults to **0**, so a chicken
-  hand (雞糊) can be declared for a single point.
+  5 — changeable mid-hand. It defaults to **3**; at 0 a chicken hand (雞糊) can
+  be declared for a single point.
 - Self-draw: all three opponents pay. Win on a discard: the discarder alone
   pays (出銃全包).
+- Liability (包): whoever discards the tile that gives a player their third
+  dragon set, or their fourth set of any kind (十二張落地), pays that player's
+  whole self-drawn win alone. House rules vary, so a multiplayer table can
+  switch it off.
 
 The exact ruleset is listed in the app under **House rules** and **Faan table**,
 and lives in [`src/game/rules.ts`](src/game/rules.ts). Hong Kong scoring is a
@@ -55,29 +63,32 @@ Two strategies, switchable from the **Play** panel.
 **Skilled (default).** Counts *shanten* — how many tile changes a hand is from
 completion — and discards whatever leaves the hand closest to ready, breaking
 ties on how many useful tiles are still unseen, then on letting go of terminals
-and honors first. It claims a discard only when the meld genuinely brings the
-hand closer, takes a concealed kong only when it costs the hand nothing, and
-always declares a win it is entitled to. It does **not** read the discards for
-danger or steer toward scoring patterns — a competent beginner, not a strong
-player.
+and honors first. It plays for the faan minimum: each candidate discard or claim
+is judged against routes to a hand worth enough to win (a flush, all triplets,
+staying concealed, honor sets already held — see
+[`src/game/plan.ts`](src/game/plan.ts)), so it keeps a hand concealed or chases
+a flush rather than finishing a hand it could not declare. It always declares a
+win it is entitled to. It does **not** read the discards for danger — a
+competent beginner, not a strong player.
 
 **Random.** Draws and discards uniformly at random, claiming at random too.
 Kept because it is the honest baseline, and because it makes the difference
 visible.
 
-Over 120 simulated all-AI hands per cell:
+Over 300 simulated all-AI hands per row (October 2026):
 
 | Opponents | Table minimum | Hands won | Washed out | Avg. faan |
 | --- | --- | --- | --- | --- |
-| Random | 0 faan | 2.5% | 97.5% | 1.67 |
-| Random | 3 faan | 0.8% | 99.2% | 3.00 |
-| **Skilled** | **0 faan** | **100%** | **0%** | 1.48 |
-| **Skilled** | **3 faan** | **65%** | **35%** | 3.17 |
+| Random | 0 faan | 3.0% | 97.0% | 2.33 |
+| Random | 3 faan | 1.0% | 99.0% | 4.33 |
+| Random | 5 faan | 0.3% | 99.7% | 6.00 |
+| **Skilled** | **0 faan** | **100%** | **0%** | 1.58 |
+| **Skilled** | **3 faan** | **82.7%** | **17.3%** | 3.40 |
+| **Skilled** | **5 faan** | **22.0%** | **78.0%** | 5.59 |
 
-At the default 0-faan minimum every hand now finishes. At the Hong Kong
-standard of 3 faan a third still wash out, which is roughly what a table of
-beginners produces. Average faan falls with skilled play because the opponents
-go out quickly with cheap hands rather than sitting on the wall.
+At the default 3-faan minimum about one hand in six washes out. At 5 faan most
+do: the route planner does not yet aim high enough, so 5 is better played
+against people than against the computer.
 
 The shanten calculator decomposes each suit independently and caches per suit,
 since a candidate discard changes only one of the four groups. That took a
@@ -109,12 +120,13 @@ A win is always offered, whatever the setting.
 
 ## Playing together
 
-Single player needs nothing. Multiplayer adds a small server: **one shared
-table**, a tablet acting as the table, and everyone else on their phone.
+Single player needs nothing. Multiplayer adds a small server: **three fixed
+tables** (Table 1, 2 and 3), a tablet acting as the table, and everyone else on
+their phone.
 
-1. Everyone opens the same link — there is one table, opened the first time
-   somebody arrives, so there are no room codes to pass around. The tablet puts
-   that address on screen as a QR code for anyone who would rather scan it.
+1. Everyone opens the same table — chosen on the start page, opened the first
+   time somebody arrives, so there are no room codes to pass around. The tablet
+   puts that address on screen as a QR code for anyone who would rather scan it.
 2. The tablet takes the **Table** seat.
 3. Everyone else taps the seat they want and sits down. A name is already in the
    box, so sitting down is one tap.
@@ -176,12 +188,20 @@ view so the pond is visible somewhere.
   which runs and tests the whole flow locally but is not safe in production —
   the lobby says so.
 - **Seat tokens.** Claiming a seat returns an opaque
-  token, kept in `localStorage`. Every action carries it, and the server maps
-  token → seat. Nobody can play a seat that is not theirs.
+  token, kept in `localStorage`. Every action carries it in the request body and
+  every poll in an `Authorization` header — never the URL, which ends up in
+  logs — and the server maps token → seat. Nobody can play a seat that is not
+  theirs.
 - **Version polling.** Clients poll the room version about once a second; when
   nothing has changed the server replies with a bare marker instead of the
-  table, so the idle cost is a few dozen bytes a second. No sockets, which keeps
-  the whole thing on Vercel's serverless runtime.
+  table, so the idle cost to the client is a few dozen bytes a second. No
+  sockets, which keeps the whole thing on Vercel's serverless runtime.
+- **Rooms are stored deflated.** Each poll still reads the room from Redis, and
+  a room reaches 28 KB of JSON late in a game. Stored deflated (with the version
+  kept readable in front for the compare-and-set script) it is about 5 KB: over
+  a simulated four-player game with a tablet, Redis bandwidth fell from 335 MB
+  to 61 MB an hour. Commands stay at one per poll, about 14,400 an hour per busy
+  table, which is now the first free-tier limit a table meets.
 - **Redaction happens on the server.** A player's view carries their own tiles
   and opaque stand-ins for everyone else's; the table's view carries no
   concealed tiles at all; the wall is never serialized to anyone. This is
@@ -220,23 +240,28 @@ UPSTASH_REDIS_REST_TOKEN=...
 
 Multiplayer needs no password variable while `REQUIRE_PASSWORD` is false.
 
-See [`.env.example`](.env.example). The single-player table at `/` stays fully
-static and needs none of this.
+See [`.env.example`](.env.example). The start page at `/` and the solo game at
+`/solo` stay fully static and need none of this.
 
 ## Running it
 
 ```bash
 npm install
 npm run dev        # http://localhost:3000
-npm test           # 120 unit tests
+npm test           # engine, room, server and component tests, plus the fuzz run
 npm run typecheck  # tsc --noEmit
 npm run build      # production build
+npm run test:e2e   # Playwright smoke tests against that build
 ```
+
+CI (`.github/workflows/ci.yml`) runs all four on every pull request.
 
 ## Deploying to Vercel
 
 The project is a stock Next.js app — Vercel detects it with no configuration.
-There are no environment variables and no server-side state.
+Solo play needs no environment variables; multiplayer needs the two Upstash
+variables above, or rooms live in one serverless instance's memory and appear
+to reset at random.
 
 **From the dashboard:** import the Git repository at
 [vercel.com/new](https://vercel.com/new). Framework preset *Next.js*, build
@@ -250,8 +275,9 @@ vercel          # preview deployment
 vercel --prod   # production
 ```
 
-Both routes produce a fully static export (`○ (Static) prerendered as static
-content`), so the game is served from the CDN edge.
+`/` and `/solo` are prerendered as static content (`○ (Static)`), so the solo
+game is served from the CDN edge; the room pages and `/api/rooms/*` are
+server-rendered on demand.
 
 ### Appearance
 
@@ -259,7 +285,8 @@ A **Table & tiles** panel in the sidebar carries three independent settings,
 remembered in `localStorage` between visits:
 
 - **Table** — Jade, Slate, Mahogany, Midnight, or Parchment (a light table).
-- **Tile faces** — drawn pips, or the Chinese numeral over the suit mark.
+- **Tile faces** — Hong Kong (the default: painted dots and bamboo as on a
+  Hong Kong set), Pips, Indexed, Numerals or Western.
 - **Suit colors** — Vivid (furthest apart), Classic (traditional ink, blue and
   green), or Monochrome (one ink; the pips carry the suit).
 
@@ -290,16 +317,23 @@ src/game/          Rules engine — no React, no DOM
   rules.ts         House ruleset — every tunable number
   engine.ts        The state machine: deal, draw, discard, claims, settlement
   shanten.ts       Distance-to-ready, hand acceptance, visible-tile counting
+  plan.ts          Routes to a hand worth the faan minimum, for the opponents
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
+  sets.ts, waits.ts, helper.ts   Hints: finished sets, waits, sets started
+  replay.ts        A finished hand as compact frames, for the replay
+  room.ts          Multiplayer room model: seating, draining, redaction
+  presence.ts      Away and heartbeat timings
+  tables.ts        The three fixed tables
+  sound.ts         Web Audio cues, synthesised at runtime
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
-src/game/room.ts   Multiplayer room model: seating, draining, redaction
-src/server/        Room store (Upstash + memory) and the room service
-src/app/api/       Room, claim, action and control endpoints
-src/hooks/         React bindings for the engine and for a room
-src/game/sound.ts  Web Audio cues, synthesised at runtime
-src/components/    Tiles, pip artwork, seats, pond, hand, result modal, chart
+src/server/        Room store (Upstash + memory, deflated) and the room service
+src/app/api/       Room, claim, action, control and reset endpoints
+src/hooks/         React bindings for the engine and for a room; the solo save
+src/film/          The explainer film — hand-drawn canvas animation
+src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, replay
 src/app/           Next.js App Router entry and styles
+e2e/               Playwright smoke tests against the production build
 public/updates.txt Changelog, oldest first
 ```
 
@@ -321,8 +355,15 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 - **Min faan** sets the table minimum and applies immediately, mid-hand.
 - **Sound** mutes or unmutes the table cues.
 - **Speed** cycles the pace of the computer players; **Pause** stops the table.
-- A game runs one East round — four dealerships. The dealer keeps the deal
-  after winning (連莊); a loss or a washout passes it on.
+- **Game length** runs the East round alone, East and South, or all four winds
+  (the default) — four dealerships each. The dealer keeps the deal after
+  winning (連莊); a loss or a washout passes it on.
+- **The game is saved on this device** after every move. Reloading `/solo`, or
+  coming back after the browser discarded the tab, picks it up where it was;
+  the start page offers **Resume solo game** or **New solo game**.
+- **Replay hand**, on the result of a finished hand, steps through it one
+  logged move at a time with every hand face up, and says what you were
+  waiting on whenever your hand was ready.
 
 ### Table and tiles
 
@@ -392,7 +433,10 @@ in the table.
 
 ## Known limitations
 
-- One East round only; no South/West/North rounds.
+- A hand resumed after a reload can only be replayed from where it was picked
+  up; the moves before the reload are not saved.
+- Replay is solo only. A multiplayer server would have to keep each hand's
+  moves and release them after the hand, which it does not yet.
 - No sacred-discard (furiten) rule — Hong Kong does not use one, but some houses
   do bar winning on a tile you have discarded.
 - Seven Pairs (七對子) is deliberately not scored: it is not part of the Hong

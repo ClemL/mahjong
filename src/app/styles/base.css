@@ -1,0 +1,130 @@
+:root {
+  --felt: #0d3b2e;
+  --felt-light: #14503d;
+  --felt-edge: #072a20;
+  --ink: #f4f1e8;
+  --ink-dim: #a9bdb4;
+  /* Tile sizes are custom properties so a media query can restate them
+     without fighting source order — the class rules below are the only place
+     that sets --tile-w, and they read these. */
+  --tile-sm: 26px;
+  --tile-md: 34px;
+  --tile-lg: 48px;
+
+  /* Animation timings, so a shared screen can slow them in one place. */
+  --anim-toss: 340ms;
+  --anim-claim: 380ms;
+  --anim-draw: 260ms;
+  --anim-gather: 420ms;
+  /* A claimed discard crossing the felt to its new set; the table only. */
+  --anim-flight: 700ms;
+
+  --tile-face: #fbf8ef;
+  --tile-face-2: #ece5d2;
+  --tile-edge: #c2b795;
+  --tile-shadow: #a0946f;
+  --tile-back: #1f7a5c;
+  --tile-back-2: #14503d;
+  --gold: #e8c46a;
+  --danger: #d9534f;
+  --panel: rgba(0, 0, 0, 0.28);
+  --panel-border: rgba(255, 255, 255, 0.12);
+
+  /* Surfaces and rules, so a theme can invert the whole UI from one block. */
+  --raise-0: rgba(255, 255, 255, 0.06);
+  --raise-1: rgba(255, 255, 255, 0.08);
+  --raise-2: rgba(255, 255, 255, 0.16);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --shade-1: rgba(0, 0, 0, 0.16);
+  --shade-2: rgba(0, 0, 0, 0.2);
+  --shade-3: rgba(0, 0, 0, 0.25);
+  --accent-wash: rgba(232, 196, 106, 0.1);
+  --accent-wash-2: rgba(232, 196, 106, 0.22);
+  --table-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.06), rgba(0, 0, 0, 0.16));
+  --backdrop: rgba(0, 0, 0, 0.62);
+  --modal-bg: linear-gradient(180deg, #123f31, #0b2c22);
+  --tooltip-bg: rgba(4, 24, 18, 0.96);
+  --claim-outline: #7dd3fc;
+  --score-pos: #9ae6b4;
+  --score-neg: #f4a3a0;
+  --chip-pos: rgba(46, 163, 107, 0.28);
+  --chip-neg: rgba(217, 83, 79, 0.26);
+  --option-bg: #f4f1e8;
+  --option-fg: #12241d;
+  /* The table screen's wooden rim, and the racks that sit on it. */
+  --rim: #3d2716;
+  --rack: #2b1b10;
+
+  /* Chart tokens — series colors are the reference categorical slots 1–4,
+     validated against this theme's chart surface. */
+  --chart-surface: #0e3428;
+  --chart-grid: rgba(255, 255, 255, 0.09);
+  --chart-zero: rgba(255, 255, 255, 0.26);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  /* Set hints under the phone hand: a run, three of a kind, and three of a
+     kind that scores. Three reference slots, validated against every pair on
+     each theme's hand surface — four could not clear the pairs, so +1 and +2
+     share the scoring colour and differ by a doubled line and the badge. */
+  --set-run: #3987e5;
+  --set-pung: #199e70;
+  --set-score: #d95926;
+
+  /* Suits are set far apart in hue AND lightness so they read at any size,
+     and stay separable for red-green color vision deficiency. */
+  --suit-m: #1f45c4;        /* Characters 萬 — blue */
+  --suit-m-tint: #1f45c40f;
+  --suit-p: #b3540a;        /* Dots 筒 — burnt orange */
+  --suit-p-tint: #b3540a12;
+  --suit-s: #127a3c;        /* Bamboo 索 — green */
+  --suit-s-tint: #127a3c12;
+  --honor: #1e2732;         /* Winds — near black */
+  --honor-tint: #1e273209;
+  --dragon-r: #c01f16;
+  --dragon-g: #0b6b38;
+  --dragon-w: #2b4ea8;
+  --flower: #7c2ba8;        /* Bonus tiles — purple */
+  --flower-tint: #7c2ba812;
+  /* The Hong Kong face's fixed inks, as a parlour set paints them. */
+  --trad-red: #c4231c;
+  --trad-green: #137a3e;
+  --trad-blue: #1d4f9c;
+  --trad-ink: #17233d;
+  --trad-pink: #e0699a;
+  --trad-purple: #7a3fa8;
+  --trad-yellow: #e9b018;
+  --trad-orange: #e0701c;
+  --trad-brown: #6b4423;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% 0%, var(--felt-light), var(--felt) 55%, var(--felt-edge) 100%);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Noto Sans", sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+

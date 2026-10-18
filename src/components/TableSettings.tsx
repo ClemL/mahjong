@@ -5,7 +5,7 @@ import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay, roundsInGame } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, roundsInGame } from "@/game/rules";
 import { GAME_LENGTHS } from "./gameLength";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
@@ -47,6 +47,11 @@ const WALL: ChoiceOption<OnOff>[] = [
 const FLOWERS: ChoiceOption<OnOff>[] = [
   { value: "on", label: "In play", hint: "144 tiles; Flowers and Seasons score as bonus tiles" },
   { value: "off", label: "Left out", hint: "136 tiles; nothing is scored for bonus tiles" },
+];
+
+const LIABILITY: ChoiceOption<OnOff>[] = [
+  { value: "on", label: "In play", hint: "Feeding a third dragon set or a fourth set pays that player's self-draw alone" },
+  { value: "off", label: "Off", hint: "A self-drawn win is always paid by all three" },
 ];
 
 const SOUND: ChoiceOption<"on" | "off">[] = [
@@ -108,6 +113,14 @@ export function TableSettings({
               disabled={api.busy || handLive}
               note={handLive ? "Can be changed once this hand is over" : undefined}
               onChange={(value) => void api.control({ type: "flowers", value: value === "on" })}
+            />
+
+            <Choice
+              label="Liability (包)"
+              options={LIABILITY}
+              value={liabilityInPlay(view.config) ? "on" : "off"}
+              disabled={api.busy}
+              onChange={(value) => void api.control({ type: "liability", value: value === "on" })}
             />
 
             <Choice

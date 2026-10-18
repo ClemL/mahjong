@@ -6,6 +6,7 @@
  * drive full hands without a UI.
  */
 import {
+  DRAGONS,
   SEAT_NAMES,
   type Seat,
   type Tile,
@@ -22,7 +23,14 @@ import {
 import { type Meld, chowPartners, removeTiles, takeTiles } from "./melds";
 import { analyzeShape, waitingTiles } from "./winning";
 import { type ScoreResult, scoreHand } from "./scoring";
-import { DEFAULT_RULES, type RuleConfig, describeRounds, flowersInPlay, roundsInGame } from "./rules";
+import {
+  DEFAULT_RULES,
+  type RuleConfig,
+  describeRounds,
+  flowersInPlay,
+  liabilityInPlay,
+  roundsInGame,
+} from "./rules";
 import { createRng, shuffle } from "./rng";
 
 export type Phase = "action" | "claiming" | "handOver" | "gameOver";
@@ -59,6 +67,8 @@ export interface HandResult {
   /** Point delta applied to each seat. */
   payments: number[];
   dealerKeeps: boolean;
+  /** Who paid a self-drawn win alone under 包, if anyone. */
+  liable?: Seat | null;
 }
 
 /** One completed hand, kept for the score history and end-of-round summary. */
@@ -389,8 +399,27 @@ function buildWinContext(
     robbingKong,
     onKongReplacement: selfDrawn && state.drawWasReplacement,
     onLastTile: state.lastTileInPlay,
+    ...(selfDrawn ? openingWin(state, seat, null) : {}),
     config: state.config,
   };
+}
+
+/**
+ * 天糊 and 地糊 belong to the hand's first go-round, before anyone has claimed
+ * a set or declared a kong. A claim always leaves a meld behind, and nobody
+ * gets a second discard down before the go-round ends, so the table itself
+ * says whether it is still untouched.
+ */
+function openingWin(state: GameState, seat: Seat, from: Seat | null): { heavenly: boolean; earthly: boolean } {
+  const untouched = state.players.every((p) => p.melds.length === 0 && p.discards.length <= 1);
+  if (!untouched) return { heavenly: false, earthly: false };
+  const discarded = state.players.reduce((n, p) => n + p.discards.length, 0);
+  if (from === null) {
+    if (seat === state.dealer) return { heavenly: discarded === 0, earthly: false };
+    return { heavenly: false, earthly: player(state, seat).discards.length === 0 };
+  }
+  // Off a discard, only the dealer's very first one — still in the pond here.
+  return { heavenly: false, earthly: from === state.dealer && seat !== from && discarded === 1 };
 }
 
 /** Score a self-drawn win for `seat` as the hand currently stands, or null. */
@@ -553,13 +582,19 @@ function collectRobbingClaims(state: GameState, tile: Tile, from: Seat): Pending
   const claims: PendingClaim[] = [];
   for (let step = 1; step <= 3; step++) {
     const seat = nextSeat(from, step);
-    const win = winOptionFor(state, seat, tile, true);
+    const win = winOptionFor(state, seat, tile, from, true);
     if (win) claims.push({ seat, options: [win] });
   }
   return claims;
 }
 
-function winOptionFor(state: GameState, seat: Seat, tile: Tile, robbingKong: boolean): ClaimOption | null {
+function winOptionFor(
+  state: GameState,
+  seat: Seat,
+  tile: Tile,
+  from: Seat,
+  robbingKong: boolean,
+): ClaimOption | null {
   const p = player(state, seat);
   const concealed = p.hand.filter((t) => !isFlower(t.code));
   const codes = [...concealed.map((t) => t.code), tile.code];
@@ -575,6 +610,7 @@ function winOptionFor(state: GameState, seat: Seat, tile: Tile, robbingKong: boo
     robbingKong,
     onKongReplacement: false,
     onLastTile: state.lastTileInPlay,
+    ...openingWin(state, seat, from),
     config: state.config,
   };
   const score = scoreHand(ctx);
@@ -587,13 +623,13 @@ export function claimOptionsFor(
   state: GameState,
   seat: Seat,
   tile: Tile,
-  _from: Seat,
+  from: Seat,
   isNext: boolean,
 ): ClaimOption[] {
   const p = player(state, seat);
   const options: ClaimOption[] = [];
 
-  const win = winOptionFor(state, seat, tile, false);
+  const win = winOptionFor(state, seat, tile, from, false);
   if (win) options.push(win);
 
   const matching = p.hand.filter((t) => t.code === tile.code);
@@ -741,6 +777,8 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
 
   if (winner.option.type === "win") {
     const p = player(state, winner.seat);
+    // Read before the tile leaves the pond, which is what makes it the first discard.
+    const opening = openingWin(state, winner.seat, discarder);
     // Move the winning tile out of wherever it currently sits: the discarder's
     // pond, or the declarer's hand when an added kong is being robbed.
     const source = player(state, discarder);
@@ -763,6 +801,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
       robbingKong: robbing,
       onKongReplacement: false,
       onLastTile: state.lastTileInPlay,
+      ...opening,
       config: state.config,
     });
     if (!score) {
@@ -816,6 +855,24 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
 // Settlement
 // ---------------------------------------------------------------------------
 
+/**
+ * Who pays a self-drawn win alone under 包: whoever fed the set that made a
+ * third dragon set, or a fourth set of any kind — twelve tiles face up, a
+ * fourth wind set included. The latest such feed is the one that counts, and
+ * a concealed kong is nobody's feed.
+ */
+export function liableSeat(melds: Meld[]): Seat | null {
+  let liable: Seat | null = null;
+  let dragonSets = 0;
+  for (const [index, meld] of melds.entries()) {
+    const dragonSet = meld.type !== "chow" && DRAGONS.includes(meld.tiles[0].code);
+    if (dragonSet) dragonSets += 1;
+    if (meld.concealed || meld.claimedFrom === undefined) continue;
+    if (index === 3 || (dragonSet && dragonSets === 3)) liable = meld.claimedFrom;
+  }
+  return liable;
+}
+
 function settleWin(
   state: GameState,
   winner: Seat,
@@ -825,7 +882,11 @@ function settleWin(
 ): void {
   const payments = [0, 0, 0, 0];
   const value = score.value;
-  if (selfDrawn || from === null) {
+  const liable = selfDrawn && liabilityInPlay(state.config) ? liableSeat(player(state, winner).melds) : null;
+  if (liable !== null && liable !== winner) {
+    payments[liable] -= value * 3;
+    payments[winner] += value * 3;
+  } else if (selfDrawn || from === null) {
     for (const p of state.players) {
       if (p.seat !== winner) {
         payments[p.seat] -= value;
@@ -855,6 +916,7 @@ function settleWin(
     score,
     payments,
     dealerKeeps: winner === state.dealer,
+    liable,
   };
   recordHand(state, score.faan, score.value);
   state.phase = "handOver";
@@ -935,6 +997,15 @@ export function setFlowers(previous: GameState, flowers: boolean): GameState {
     null,
     flowers ? "Flowers and Seasons are back in the set" : "Flowers and Seasons are taken out of the set",
   );
+  return state;
+}
+
+/** Play with or without 包. Like the minimum, it is read when a hand is settled. */
+export function setLiability(previous: GameState, liability: boolean): GameState {
+  if (liabilityInPlay(previous.config) === liability) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, liability };
+  log(state, null, liability ? "Liability (包) is in play" : "Liability (包) is switched off");
   return state;
 }
 

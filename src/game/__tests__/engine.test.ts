@@ -184,6 +184,8 @@ describe("turn actions", () => {
     state.players[seat].flowers = [{ id: "f", code: "f2" }];
     state.drawnTileId = "h13";
     state.players[seat].melds = [];
+    // A discard already down: a hand under way, not the dealer's 天糊 on the deal.
+    state.players[(seat + 1) % 4].discards = [{ id: "d", code: "s1" }];
     const actions = turnActions(state, seat);
     // All sequences (1) + self draw (1) = 2 faan, below the 3 faan minimum.
     expect(actions.canWin).toBe(false);
@@ -198,6 +200,7 @@ describe("turn actions", () => {
     state.players[seat].flowers = [{ id: "f", code: "f2" }];
     state.players[seat].melds = [];
     state.drawnTileId = "h13";
+    state.players[(seat + 1) % 4].discards = [{ id: "d", code: "s1" }];
     const actions = turnActions(state, seat);
     expect(actions.canWin).toBe(true);
     expect(actions.winScore!.faan).toBe(2);

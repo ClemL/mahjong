@@ -102,6 +102,7 @@ export function TableResult({
   tile,
   onHide,
   onNextHand,
+  onReplay,
   busy,
 }: {
   view: RoomView;
@@ -110,6 +111,8 @@ export function TableResult({
   tile: number;
   onHide: () => void;
   onNextHand: () => void;
+  /** Step back through the hand; solo only, where every move was seen. */
+  onReplay?: () => void;
   busy: boolean;
 }) {
   const result = view.result;
@@ -130,6 +133,7 @@ export function TableResult({
               {won
                 ? [
                     won.from === null ? "Self-drawn 自摸" : `Off ${name(won.from)}'s discard`,
+                    won.liable != null ? `${name(won.liable)} pays it all 包` : null,
                     score ? `${score.scoredFaan} faan` : null,
                     `+${won.payments[won.winner!]} chips`,
                   ]
@@ -182,6 +186,11 @@ export function TableResult({
               <span className="seat__meta">
                 {result.dealerKeeps ? `${name(view.dealer)} deals again` : "The deal moves on"}
               </span>
+              {onReplay ? (
+                <button type="button" className="btn" onClick={onReplay}>
+                  Replay hand
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="btn btn--primary"

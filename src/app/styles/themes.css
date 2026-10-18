@@ -1,0 +1,399 @@
+/* ============================================================== themes ==
+   Each theme overrides only the surface tokens; the suit palette is a
+   separate axis so any tile coloring works on any table.
+   ====================================================================== */
+
+[data-theme="slate"] {
+  --rim: #0e1013;
+  --rack: #1a1d22;
+  --felt: #23272e;
+  --felt-light: #2f353e;
+  --felt-edge: #15181d;
+  --ink: #eceef1;
+  --ink-dim: #a4abb6;
+  --gold: #e2bb63;
+  --tile-back: #4b5564;
+  --tile-back-2: #333b46;
+  --modal-bg: linear-gradient(180deg, #2b313a, #1c2027);
+  --tooltip-bg: rgba(12, 14, 18, 0.96);
+  --chart-surface: #1f232a;
+}
+
+[data-theme="mahogany"] {
+  --rim: #170907;
+  --rack: #1f0e0b;
+  --felt: #3b201a;
+  --felt-light: #4f2c23;
+  --felt-edge: #221110;
+  --ink: #f6ece5;
+  --ink-dim: #c2a396;
+  --gold: #edb96f;
+  --tile-back: #7d4030;
+  --tile-back-2: #55271b;
+  --accent-wash: rgba(237, 185, 111, 0.12);
+  --accent-wash-2: rgba(237, 185, 111, 0.24);
+  --modal-bg: linear-gradient(180deg, #4a2921, #2c1512);
+  --tooltip-bg: rgba(28, 12, 9, 0.96);
+  --chart-surface: #331c17;
+}
+
+[data-theme="midnight"] {
+  --rim: #060b1c;
+  --rack: #0d1530;
+  --felt: #131e3f;
+  --felt-light: #1d2d5c;
+  --felt-edge: #0a1128;
+  --ink: #eef1fa;
+  --ink-dim: #a2acc9;
+  --gold: #e6c672;
+  --tile-back: #2e4177;
+  --tile-back-2: #1d2d5c;
+  --modal-bg: linear-gradient(180deg, #1c2b57, #101a36);
+  --tooltip-bg: rgba(6, 11, 26, 0.96);
+  --chart-surface: #15203f;
+}
+
+/* A light table. Every surface token flips; the chart takes the light steps
+   of the same categorical palette, which are selected for a light surface
+   rather than flipped from the dark ones. */
+[data-theme="parchment"] {
+  --rim: #b39a6c;
+  --rack: #ece2c9;
+  --felt: #d8ded3;
+  --felt-light: #e9ede4;
+  --felt-edge: #c3ccbc;
+  --ink: #1f231c;
+  --ink-dim: #5b6157;
+  --gold: #8a6a12;
+  --danger: #b03a36;
+  /* Ivory tiles on a light table need a firmer edge to stay defined. */
+  --tile-edge: #a2977a;
+  --tile-shadow: #8d8265;
+  --tile-back: #3f7a63;
+  --tile-back-2: #2c5a48;
+  --panel: rgba(255, 255, 255, 0.6);
+  --panel-border: rgba(0, 0, 0, 0.14);
+  --raise-0: rgba(0, 0, 0, 0.04);
+  --raise-1: rgba(0, 0, 0, 0.06);
+  --raise-2: rgba(0, 0, 0, 0.12);
+  --line-soft: rgba(0, 0, 0, 0.08);
+  --line: rgba(0, 0, 0, 0.14);
+  --line-strong: rgba(0, 0, 0, 0.2);
+  --shade-1: rgba(0, 0, 0, 0.05);
+  --shade-2: rgba(0, 0, 0, 0.06);
+  --shade-3: rgba(0, 0, 0, 0.07);
+  --accent-wash: rgba(138, 106, 18, 0.12);
+  --accent-wash-2: rgba(138, 106, 18, 0.18);
+  --table-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.05));
+  --backdrop: rgba(30, 35, 28, 0.42);
+  --modal-bg: linear-gradient(180deg, #f6f3e8, #e9e5d6);
+  --tooltip-bg: rgba(255, 255, 255, 0.97);
+  --claim-outline: #1668a8;
+  --score-pos: #14663c;
+  --score-neg: #a3302b;
+  --chip-pos: rgba(20, 102, 60, 0.18);
+  --chip-neg: rgba(163, 48, 43, 0.16);
+  --option-bg: #ffffff;
+  --option-fg: #1f231c;
+  --chart-surface: #efe9d8;
+  --chart-grid: rgba(0, 0, 0, 0.1);
+  --chart-zero: rgba(0, 0, 0, 0.3);
+  --set-run: #2a78d6;
+  --set-pung: #1baf7a;
+  --set-score: #eb6834;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+}
+
+/* ======================================================== suit palettes ==
+   The tile face keeps a faint wash of its suit color, which is a second cue
+   that does not depend on reading the glyph.
+   ====================================================================== */
+
+/* Traditional ink: near-black Characters, blue Dots, green Bamboo, red bonus. */
+[data-suits="classic"] {
+  --suit-m: #23303a;
+  --suit-m-tint: #23303a0d;
+  --suit-p: #1d4e89;
+  --suit-p-tint: #1d4e8912;
+  --suit-s: #146c43;
+  --suit-s-tint: #146c4312;
+  --flower: #b3261e;
+  --flower-tint: #b3261e12;
+}
+
+/* One ink for every suit — the pips and numerals carry all the meaning. */
+[data-suits="mono"] {
+  --suit-m: #23303a;
+  --suit-m-tint: transparent;
+  --suit-p: #23303a;
+  --suit-p-tint: transparent;
+  --suit-s: #23303a;
+  --suit-s-tint: transparent;
+  --honor: #23303a;
+  --dragon-r: #23303a;
+  --dragon-g: #23303a;
+  --dragon-w: #23303a;
+  --flower: #23303a;
+  --flower-tint: transparent;
+}
+
+/* ==================================================== tile face styles ==
+   Both faces are rendered and one is hidden, so switching is instant and no
+   component needs to know the setting.
+   ====================================================================== */
+
+.tile__glyph--alt,
+.tile__suit--alt {
+  display: none;
+}
+
+[data-tiles="numerals"] .tile__pips {
+  display: none;
+}
+
+[data-tiles="numerals"] .tile__glyph--alt {
+  display: block;
+}
+
+[data-tiles="numerals"] .tile__suit--alt {
+  display: block;
+}
+
+.tile__glyph--arabic,
+.tile__index {
+  display: none;
+}
+
+/* Arabic numeral in place of the Chinese one, for every suit. */
+[data-tiles="western"] .tile__pips,
+[data-tiles="western"] .tile__glyph--cn {
+  display: none;
+}
+
+[data-tiles="western"] .tile__glyph--arabic,
+[data-tiles="western"] .tile__suit--alt {
+  display: block;
+}
+
+[data-tiles="western"] .tile__glyph--arabic {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  font-variant-numeric: lining-nums;
+}
+
+/* Hong Kong: painted pips, the set's own inks on an untinted face, and an
+   empty frame for the White Dragon. The inks are fixed rather than taken from
+   the suit palette because the colors are part of how the tiles look; the
+   pip counts and layouts still name every tile without them. */
+.tile__pips--trad,
+.tile__frame {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__pips--plain {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__pips--trad {
+  display: block;
+}
+
+[data-tiles="traditional"] {
+  --suit-m-tint: transparent;
+  --suit-p-tint: transparent;
+  --suit-s-tint: transparent;
+}
+
+/* Characters: the numeral in dark ink over a red 萬. */
+[data-tiles="traditional"] .tile--m .tile__glyph {
+  color: var(--trad-ink);
+}
+
+[data-tiles="traditional"] .tile--m .tile__suit {
+  color: var(--trad-red);
+}
+
+[data-tiles="traditional"] .tile--w {
+  color: var(--trad-ink);
+}
+
+[data-tiles="traditional"] .tile--dr {
+  color: var(--trad-red);
+}
+
+[data-tiles="traditional"] .tile--dg {
+  color: var(--trad-green);
+}
+
+[data-tiles="traditional"] .tile--dw .tile__glyph {
+  display: none;
+}
+
+/* Bonus tiles: a painted motif under a large corner number, which replaces
+   the faint Latin name. */
+.tile__flower,
+.tile__flower-num {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile--f {
+  --flower-tint: transparent;
+}
+
+[data-tiles="traditional"] .tile--f .tile__glyph,
+[data-tiles="traditional"] .tile--f .tile__label {
+  display: none;
+}
+
+[data-tiles="traditional"] .tile__flower {
+  display: block;
+  width: 90%;
+  aspect-ratio: 1;
+  margin-top: calc(var(--tile-w) * 0.22);
+}
+
+[data-tiles="traditional"] .tile__flower-num {
+  display: block;
+  position: absolute;
+  top: calc(var(--tile-w) * 0.03);
+  left: calc(var(--tile-w) * 0.1);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: calc(var(--tile-w) * 0.34);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tile__flower-num--flower {
+  color: var(--trad-red);
+}
+
+.tile__flower-num--season {
+  color: var(--trad-blue);
+}
+
+/* A heavy outer rule and a fine inner one, as the tile is engraved. */
+[data-tiles="traditional"] .tile__frame {
+  display: block;
+  width: 62%;
+  height: 64%;
+  margin-top: calc(var(--tile-w) * 0.06);
+  border: max(calc(var(--tile-w) * 0.06), 1.5px) solid var(--trad-blue);
+  border-radius: calc(var(--tile-w) * 0.04);
+  box-shadow:
+    inset 0 0 0 max(calc(var(--tile-w) * 0.04), 1px) var(--tile-face),
+    inset 0 0 0 max(calc(var(--tile-w) * 0.07), 1.5px) var(--trad-blue);
+}
+
+/* The corner index replaces the faint Latin label wherever a tile has one;
+   it takes the suit ink so it reads at pond size, and a halo of the face
+   color keeps it clear of the artwork it overlaps. */
+[data-tiles="indexed"] .tile__index {
+  display: block;
+  position: absolute;
+  top: calc(var(--tile-w) * 0.02);
+  left: calc(var(--tile-w) * 0.08);
+  z-index: 1;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: calc(var(--tile-w) * 0.3);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow:
+    1px 0 0 var(--tile-face),
+    -1px 0 0 var(--tile-face),
+    0 1px 0 var(--tile-face),
+    0 -1px 0 var(--tile-face);
+}
+
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__label {
+  display: none;
+}
+
+/* Nudge the artwork off the index so the two do not collide. */
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__pips,
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__glyph,
+[data-tiles="indexed"] .tile:has(.tile__index) .tile__suit {
+  transform: translate(calc(var(--tile-w) * 0.06), calc(var(--tile-w) * 0.07)) scale(0.9);
+}
+
+/* =========================================================== tile body ==
+   Each body restates the face and edge tokens. These come after the themes
+   so a body choice wins over the parchment table's firmer default edge.
+   ====================================================================== */
+
+[data-body="bone"] {
+  --tile-face: #ffffff;
+  --tile-face-2: #e8e9e6;
+  --tile-edge: #b4b6b0;
+  --tile-shadow: #8f928a;
+}
+
+/* A real set's construction: the face is laminated onto a colored layer, so
+   the tile's visible thickness takes the back color. */
+[data-body="twotone"] {
+  --tile-face: #fdfcf8;
+  --tile-face-2: #eeece4;
+  --tile-edge: var(--tile-back-2);
+  --tile-shadow: var(--tile-back);
+}
+
+[data-body="amber"] {
+  --tile-face: #fcf1d6;
+  --tile-face-2: #f0dcaa;
+  --tile-edge: #b8975a;
+  --tile-shadow: #8e6c33;
+}
+
+[data-body="flat"] {
+  --tile-face: #fffdf6;
+  --tile-face-2: #fffdf6;
+  --tile-edge: #9c9583;
+  --tile-shadow: #9c9583;
+}
+
+[data-body="flat"] .tile:not(.tile--back) {
+  border-radius: calc(var(--tile-w) * 0.1);
+  box-shadow: 0 1px 0 var(--tile-shadow), 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+[data-body="flat"] .tile:not(.tile--back):not(.tile--m):not(.tile--p):not(.tile--s):not(.tile--f) {
+  background: var(--tile-face);
+}
+
+[data-body="flat"] .tile__glyph {
+  text-shadow: none;
+}
+
+[data-body="flat"] .tile__pips {
+  filter: none;
+}
+
+/* ========================================================== tile backs == */
+
+[data-backs="emerald"] {
+  --tile-back: #1f7a5c;
+  --tile-back-2: #14503d;
+}
+
+[data-backs="crimson"] {
+  --tile-back: #a3302b;
+  --tile-back-2: #6b1a17;
+}
+
+[data-backs="sapphire"] {
+  --tile-back: #2c56a8;
+  --tile-back-2: #1a3672;
+}
+
+[data-backs="gold"] {
+  --tile-back: #b88a2c;
+  --tile-back-2: #7c5a16;
+}
+
+[data-backs="ebony"] {
+  --tile-back: #34343a;
+  --tile-back-2: #17171a;
+}
+

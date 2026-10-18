@@ -103,9 +103,11 @@ export function useRoom(roomId: string): RoomApi {
       let reached = false;
       try {
         const params = new URLSearchParams();
-        if (tokenRef.current) params.set("token", tokenRef.current);
         if (versionRef.current) params.set("since", String(versionRef.current));
-        const response = await fetch(`/api/rooms/${roomId}?${params}`, { cache: "no-store" });
+        const response = await fetch(`/api/rooms/${roomId}?${params}`, {
+          cache: "no-store",
+          headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : undefined,
+        });
         reached = true;
         if (!response.ok) {
           const body = (await response.json().catch(() => ({}))) as { error?: string };

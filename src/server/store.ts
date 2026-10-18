@@ -1,5 +1,6 @@
 import "server-only";
 
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { Redis } from "@upstash/redis";
 import type { Room } from "@/game/room";
 
@@ -16,6 +17,29 @@ import type { Room } from "@/game/room";
  * would appear to reset at random. The lobby says so, and `isPersistent()`
  * lets the UI warn.
  */
+
+/**
+ * Rooms are stored deflated. Every poll reads the whole room, which reaches
+ * 28 KB of JSON late in a game, and at five devices polling about once a second
+ * that bandwidth was the first of Upstash's free-tier limits a table ran into.
+ * Deflated it is about 5 KB. The version is kept readable in front, so the
+ * compare-and-set script can check it without inflating anything.
+ */
+export function encodeRoom(room: Room): string {
+  return `v${room.version}:${deflateRawSync(JSON.stringify(room)).toString("base64")}`;
+}
+
+/**
+ * Reads either form: a room written before compression is plain JSON, which
+ * the Upstash client may already have parsed into an object.
+ */
+export function decodeRoom(raw: string | Room): Room {
+  if (typeof raw !== "string") return raw;
+  const prefix = /^v\d+:/.exec(raw);
+  if (!prefix) return JSON.parse(raw) as Room;
+  const packed = Buffer.from(raw.slice(prefix[0].length), "base64");
+  return JSON.parse(inflateRawSync(packed).toString("utf8")) as Room;
+}
 
 export interface RoomStore {
   get(id: string): Promise<Room | null>;
@@ -35,20 +59,20 @@ class MemoryStore implements RoomStore {
 
   async get(id: string): Promise<Room | null> {
     const raw = this.rooms.get(key(id));
-    return raw ? (JSON.parse(raw) as Room) : null;
+    return raw ? decodeRoom(raw) : null;
   }
 
   async create(room: Room): Promise<boolean> {
     if (this.rooms.has(key(room.id))) return false;
-    this.rooms.set(key(room.id), JSON.stringify(room));
+    this.rooms.set(key(room.id), encodeRoom(room));
     return true;
   }
 
   async compareAndSet(room: Room, expectedVersion: number): Promise<boolean> {
     const raw = this.rooms.get(key(room.id));
     if (!raw) return false;
-    if ((JSON.parse(raw) as Room).version !== expectedVersion) return false;
-    this.rooms.set(key(room.id), JSON.stringify(room));
+    if (decodeRoom(raw).version !== expectedVersion) return false;
+    this.rooms.set(key(room.id), encodeRoom(room));
     return true;
   }
 
@@ -61,11 +85,15 @@ class MemoryStore implements RoomStore {
   }
 }
 
-/** Swap the stored value only when its version field is the one we read. */
-const CAS_SCRIPT = `
+/**
+ * Swap the stored value only when its version is the one we read — from the
+ * prefix of a deflated room, or the field of one written as plain JSON.
+ */
+export const CAS_SCRIPT = `
 local current = redis.call('GET', KEYS[1])
 if current == false then return 0 end
-if tonumber(string.match(current, '"version":(%d+)')) ~= tonumber(ARGV[1]) then return 0 end
+local version = string.match(current, '^v(%d+):') or string.match(current, '"version":(%d+)')
+if tonumber(version) ~= tonumber(ARGV[1]) then return 0 end
 redis.call('SET', KEYS[1], ARGV[2], 'EX', tonumber(ARGV[3]))
 return 1
 `;
@@ -75,12 +103,11 @@ class UpstashStore implements RoomStore {
 
   async get(id: string): Promise<Room | null> {
     const raw = await this.redis.get<string | Room>(key(id));
-    if (!raw) return null;
-    return typeof raw === "string" ? (JSON.parse(raw) as Room) : raw;
+    return raw ? decodeRoom(raw) : null;
   }
 
   async create(room: Room): Promise<boolean> {
-    const result = await this.redis.set(key(room.id), JSON.stringify(room), {
+    const result = await this.redis.set(key(room.id), encodeRoom(room), {
       nx: true,
       ex: ROOM_TTL_SECONDS,
     });
@@ -91,7 +118,7 @@ class UpstashStore implements RoomStore {
     const result = await this.redis.eval(
       CAS_SCRIPT,
       [key(room.id)],
-      [String(expectedVersion), JSON.stringify(room), String(ROOM_TTL_SECONDS)],
+      [String(expectedVersion), encodeRoom(room), String(ROOM_TTL_SECONDS)],
     );
     return result === 1;
   }

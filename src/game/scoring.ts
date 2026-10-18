@@ -19,7 +19,7 @@ import {
 } from "./tiles";
 import type { Meld } from "./melds";
 import { type Decomposition, analyzeShape } from "./winning";
-import { type RuleConfig, flowersInPlay } from "./rules";
+import { type RuleConfig, faanFor, flowersInPlay } from "./rules";
 
 export interface PatternHit {
   key: string;
@@ -54,6 +54,10 @@ export interface WinContext {
   onKongReplacement: boolean;
   /** 海底撈月 / 河底撈魚 — won on the very last tile of the wall. */
   onLastTile: boolean;
+  /** 天糊 — the dealer won on the tiles dealt. */
+  heavenly?: boolean;
+  /** 地糊 — won in the first go-round, before anyone claimed a set. */
+  earthly?: boolean;
   config: RuleConfig;
 }
 
@@ -153,6 +157,12 @@ function scoreSituational(ctx: WinContext, hits: PatternHit[], melds: Meld[]): v
       name: "Win on the Last Tile",
       faan: f.lastTile,
     });
+  }
+  if (ctx.heavenly) {
+    hits.push({ key: "heavenlyHand", chinese: "天糊", name: "Heavenly Hand", faan: faanFor(ctx.config, "heavenlyHand") });
+  }
+  if (ctx.earthly) {
+    hits.push({ key: "earthlyHand", chinese: "地糊", name: "Earthly Hand", faan: faanFor(ctx.config, "earthlyHand") });
   }
 }
 

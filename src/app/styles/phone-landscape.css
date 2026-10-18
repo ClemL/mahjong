@@ -1,0 +1,662 @@
+/* ================================================ the phone, held sideways == */
+
+/* With a tablet acting as the table, a phone is only a controller: the hand
+   along the bottom, the choices above it, nothing to scroll. */
+.app--handset {
+  max-width: none;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: max(6px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right))
+    max(6px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+  gap: 6px;
+}
+
+html:has(.app--handset),
+body:has(.app--handset) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* Held upright — or with rotation locked, which a page cannot override
+   outside full screen — the controller turns itself on its side instead.
+   Turned clockwise, it reads correctly with the phone rotated to the left,
+   which is the way Android calls landscape. The safe-area insets turn with it. */
+@media (orientation: portrait) {
+  .app--handset {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    width: 100dvh;
+    height: 100vw;
+    height: 100dvw;
+    transform-origin: top left;
+    transform: translateX(100vw) rotate(90deg);
+    transform: translateX(100dvw) rotate(90deg);
+    padding: max(6px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+      max(6px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-top));
+  }
+}
+
+.phone__wind {
+  margin-right: 6px;
+  color: var(--gold);
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* Outside the controller the confirm bar and the actions keep their own
+   places in the column, the action row sticky at the bottom. */
+.phone__controls {
+  display: contents;
+}
+
+.phone--landscape {
+  flex: 1;
+  min-height: 0;
+  /* Sized by the box it is given, not the viewport — which, when the layout
+     is turned on its side, is the wrong way round. */
+  container-type: size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar bar"
+    "prompt melds"
+    "controls controls"
+    "hand hand";
+  gap: 6px 10px;
+}
+
+/* The ghost of a discard is placed in the controller's own frame. */
+.phone--landscape {
+  position: relative;
+}
+
+/* A discard leaves the phone the way it would leave a hand: lifted, then
+   thrown up and away over the top edge, towards the table. */
+@keyframes send-to-table {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  22%  { transform: translateY(-14px) scale(1.18) rotate(-3deg); opacity: 1; }
+  100% { transform: translateY(calc(var(--send-rise) * -1)) scale(0.55) rotate(4deg); opacity: 0.2; }
+}
+
+@keyframes sent-label {
+  0%, 15% { opacity: 0; transform: translate(-50%, 4px); }
+  35%, 70% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+
+.phone__sent {
+  position: absolute;
+  z-index: 50;
+  pointer-events: none;
+  animation: send-to-table var(--anim-toss) cubic-bezier(0.5, 0, 0.75, 0.4) both;
+}
+
+.phone__sent .tile {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--gold) 70%, transparent),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.phone__sent-label {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+  animation: sent-label var(--anim-toss) ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__sent {
+    display: none;
+  }
+}
+
+.phone--landscape .phone__bar {
+  grid-area: bar;
+  padding: 3px 8px;
+  gap: 10px;
+}
+
+.phone--landscape .phone__status {
+  grid-area: prompt;
+  align-self: center;
+  min-width: 0;
+}
+
+.phone--landscape .phone__prompt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone--landscape .phone__melds {
+  grid-area: melds;
+  justify-content: flex-end;
+  max-width: 66cqw;
+  /* Clear of the gold frame drawn inside the edge on your move. */
+  padding-right: 6px;
+  /* Large enough to read your own sets at arm's length; the hand below has
+     room to give. */
+  --tile-sm: clamp(20px, 9.5cqh, 36px);
+}
+
+.phone--landscape .phone__controls {
+  grid-area: controls;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+}
+
+.phone--landscape .phone__actions {
+  position: static;
+  padding: 0;
+  background: none;
+  justify-content: center;
+}
+
+.phone--landscape .phone__hand {
+  grid-area: hand;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+  min-height: 0;
+  padding: 12px 8px 8px;
+  /* Fourteen tiles and the gap before the drawn one, across the full width. */
+  --tile-lg: clamp(24px, min(calc((100cqw - 110px) / 14.4), 20cqh), 76px);
+}
+
+/* ------------------------------------------------------------ claim choices */
+
+.claims {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* Each claim shows the meld it would make, so two ways to chow the same tile
+   are told apart by their tiles, not by guessing. */
+.claim {
+  --tile-sm: 30px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 44px;
+  padding: 5px 10px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--gold);
+  background: var(--accent-wash-2);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 120ms ease, transform 80ms ease;
+}
+
+.claim:hover:not(:disabled),
+.claim:focus-visible {
+  background: color-mix(in srgb, var(--gold) 34%, transparent);
+}
+
+.claim:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.claim:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.claim--win {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 26%, transparent);
+}
+
+.claim--win:hover:not(:disabled),
+.claim--win:focus-visible {
+  background: color-mix(in srgb, var(--danger) 42%, transparent);
+}
+
+.claim__meld {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+/* The tile won from the discard lies on its side, as it does on a real table. */
+.claim__taken {
+  position: relative;
+  display: inline-block;
+  width: calc(var(--tile-sm) * 1.38);
+  height: var(--tile-sm);
+}
+
+.claim__taken > .tile {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+/* The button is the target; a tile zooming under the finger would not help. */
+.claim .tile {
+  pointer-events: none;
+}
+
+.claims__pass {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.claims__timer {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Time left on the claim, as a draining bar under the count. */
+.claims__timer::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) calc(var(--left, 1) * 100%), var(--line) 0);
+}
+
+/* The hand tiles the pressed or hovered claim would take. Lifted as well as
+   ringed, so it does not rest on the ring's color. */
+.tile--uses {
+  transform: translateY(-10px);
+  outline: 3px solid var(--claim-outline);
+  outline-offset: 2px;
+  z-index: 20;
+}
+
+/* ------------------------------------------------ compact phone controller */
+
+/* The same controller with the air let out: one header line carrying the
+   prompt and the open melds, claims laid out sideways, and the hand without
+   its tray — so the tiles take the width the chrome gave back. */
+.app--handset:has(.phone--compact) {
+  padding-left: max(4px, env(safe-area-inset-left));
+  padding-right: max(4px, env(safe-area-inset-right));
+}
+
+@media (orientation: portrait) {
+  .app--handset:has(.phone--compact) {
+    padding-left: max(4px, env(safe-area-inset-top));
+    padding-right: max(4px, env(safe-area-inset-bottom));
+  }
+}
+
+.phone--landscape.phone--compact {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar"
+    "melds"
+    "controls"
+    "hand";
+  gap: 4px;
+}
+
+.phone--compact .phone__bar {
+  gap: 8px;
+  padding: 0 4px;
+  border: none;
+  background: none;
+}
+
+.phone--compact .phone__score {
+  margin-left: 0;
+}
+
+.phone--compact .phone__prompt {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone--compact .phone__melds {
+  flex: 0 1 auto;
+  flex-wrap: nowrap;
+  gap: 2px;
+  --tile-sm: clamp(18px, 8.5cqh, 30px);
+}
+
+.phone--compact .phone__bar .phone__sets {
+  flex-wrap: nowrap;
+}
+
+/* On its own row compact has the width, so the sets match the roomy layout. */
+.phone--compact > .phone__melds {
+  justify-content: center;
+  max-width: none;
+  --tile-sm: clamp(20px, 9.5cqh, 36px);
+}
+
+.phone--compact .phone__melds .meld {
+  padding: 1px;
+}
+
+/* The menu is a glyph here; its label stays for screen readers. */
+.phone--compact .hamburger__text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.phone--compact .confirm-bar {
+  padding: 2px 8px;
+  gap: 8px;
+}
+
+.phone--compact .claims {
+  gap: 6px;
+}
+
+.phone--compact .claim {
+  --tile-sm: 24px;
+  flex-direction: row;
+  gap: 6px;
+  padding: 3px 8px;
+}
+
+.phone--compact .claims__pass {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phone--compact .claims__timer {
+  min-width: 34px;
+}
+
+.phone--compact .phone__hand {
+  gap: 3px;
+  padding: 10px 0 2px;
+  border: none;
+  background: none;
+  /* Fourteen tiles, the gap before the drawn one, and nothing else. */
+  --tile-lg: clamp(24px, min(calc((100cqw - 50px) / 14.2), 30cqh), 88px);
+}
+
+.phone--compact .hand__gap {
+  width: 8px;
+}
+
+/* ------------------------------------------- phone: status, ghosts, sorting */
+
+/* The last tile, the prompt and the turn clock share one line. */
+.phone__status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.phone__status .phone__prompt {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The newest discard at the table, with the wind of whoever threw it. */
+.phone__last {
+  --tile-sm: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 2px 6px 2px 4px;
+  border-radius: 8px;
+  background: var(--raise-1);
+}
+
+.phone__last-from {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  line-height: 1;
+}
+
+.phone--compact .phone__last {
+  --tile-sm: clamp(16px, 7cqh, 24px);
+  padding: 1px 4px 1px 3px;
+}
+
+/* Time left to discard: the count, and a bar draining under it. */
+.phone__timer {
+  flex: none;
+  min-width: 38px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.phone__timer::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) calc(var(--left, 1) * 100%), var(--line) 0);
+}
+
+/* Claims on offer, drawn faintly where your claimed sets go. Identity is the
+   dashed outline and the label, not the fading alone. */
+.meld--ghost {
+  position: relative;
+  align-items: flex-end;
+  opacity: 0.55;
+  background: transparent;
+  outline: 1.5px dashed var(--gold);
+  outline-offset: 1px;
+  transition: opacity 120ms ease;
+}
+
+.meld--ghost-lit {
+  opacity: 1;
+  outline-style: solid;
+}
+
+.meld__ghost-label {
+  align-self: center;
+  margin: 0 3px 0 1px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--gold);
+}
+
+.phone--compact .phone__melds {
+  grid-area: melds;
+}
+
+/* Sets already in the hand (Settings → Set hints): a line under their three
+   tiles. Each kind has its own line as well as its own colour — dashed for a
+   run, solid for three of a kind, doubled where it scores two — and a scoring
+   set says +1 or +2 in words, so none of it rests on colour alone. */
+.tile__set {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: calc(var(--tile-w) * -0.06 - 7px);
+  height: 3px;
+  border-radius: 2px;
+  background: var(--set-color);
+  pointer-events: none;
+}
+
+.tile__set--run {
+  --set-color: var(--set-run);
+  background: repeating-linear-gradient(90deg, var(--set-color) 0 7px, transparent 7px 11px);
+}
+
+.tile__set--set { --set-color: var(--set-pung); }
+.tile__set--score { --set-color: var(--set-score); }
+
+.tile__set--double {
+  height: 7px;
+  bottom: calc(var(--tile-w) * -0.06 - 11px);
+  background: linear-gradient(
+    var(--set-color) 0 2.5px,
+    transparent 2.5px 4.5px,
+    var(--set-color) 4.5px 7px
+  );
+}
+
+/* What a scoring set is worth, in ink on a dark chip ringed in the set's colour. */
+.tile__set-faan {
+  position: absolute;
+  top: calc(var(--tile-w) * -0.14);
+  right: calc(var(--tile-w) * -0.14);
+  min-width: 1.7em;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 2px solid var(--set-score);
+  background: #111a16;
+  color: #fff;
+  font-size: max(10px, calc(var(--tile-w) * 0.2));
+  font-weight: 800;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Room under the hand for the lines. */
+.phone__hand,
+.phone--landscape .phone__hand {
+  padding-bottom: 16px;
+}
+
+/* A tile under a finger grows and rises out from under it, so it can be read
+   while it is touched. Touch only needs no hover gate: it lasts the press. */
+.phone__hand .tile--peek {
+  transform: translateY(-30%) scale(1.45);
+  z-index: 40;
+  box-shadow: 0 10px 2px var(--tile-shadow), 0 18px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* A tile picked up to move: enlarged, riding the finger (translate, so the
+   lift and the scale stay in transform). */
+.phone__hand .tile--dragging {
+  translate: var(--drag-x, 0) var(--drag-y, 0);
+  transform: translateY(-14%) scale(1.3);
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  z-index: 40;
+  box-shadow: 0 12px 2px var(--tile-shadow), 0 20px 32px rgba(0, 0, 0, 0.55);
+}
+
+/* The rest part to open the gap where it would land. Only while dragging, so
+   the drop — which moves them into those places for real — does not slide. */
+.phone__hand--dragging .tile[data-tile-id]:not(.tile--dragging) {
+  translate: var(--part-x, 0) var(--part-y, 0);
+  transition:
+    translate 170ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    transform 140ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__hand--dragging .tile[data-tile-id]:not(.tile--dragging),
+  .phone__hand .tile--peek {
+    transition: none;
+  }
+}
+
+/* The page still scrolls under a finger moving up and down the column; only
+   sideways movement belongs to the hand. The controller does not scroll, so
+   there the hand takes every direction — it may be turned on its side. */
+.phone__hand {
+  touch-action: pan-y;
+}
+
+.phone--landscape .phone__hand {
+  touch-action: none;
+}
+
+.phone__hand--dragging {
+  cursor: grabbing;
+}
+
+/* Turned up by its owner: the face-down row tips over to show the tiles. */
+@keyframes hand-turn-up {
+  from { transform: perspective(700px) rotateX(75deg); opacity: 0.4; }
+  to   { transform: none; opacity: 1; }
+}
+
+.phone__hand:not(.phone__hand--hidden) {
+  animation: hand-turn-up 320ms cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__hand:not(.phone__hand--hidden) {
+    animation: none;
+  }
+}
+
+/* On your turn a tile can be flicked up off the hand, so the hand keeps every
+   direction of a touch that starts on it, upright as well as on its side. */
+.phone__hand--throw {
+  touch-action: none;
+}
+
+/* A tile being pulled up to throw. The individual translate property moves it
+   on top of whatever transform the tile already has — lifted, armed, hovered. */
+.tile--flicking {
+  translate: var(--flick-x, 0) var(--flick-y, 0);
+  z-index: 30;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  box-shadow: 0 10px 2px var(--tile-shadow), 0 16px 26px rgba(0, 0, 0, 0.5);
+}
+
+.tile--flung {
+  visibility: hidden;
+}
+
+/* The seat picker's way out of a table stuck on a device that has gone. */
+.lobby__reset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+

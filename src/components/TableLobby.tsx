@@ -6,7 +6,7 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { QrCode } from "./QrCode";
@@ -289,6 +289,18 @@ export function TableLobby({
               >
                 <option value="on">In play</option>
                 <option value="off">Left out</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field__label">Liability (包)</span>
+              <select
+                className="field__select"
+                value={liabilityInPlay(view.config) ? "on" : "off"}
+                disabled={api.busy}
+                onChange={(e) => void api.control({ type: "liability", value: e.target.value === "on" })}
+              >
+                <option value="on">In play</option>
+                <option value="off">Off</option>
               </select>
             </label>
           </>

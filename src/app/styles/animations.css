@@ -1,0 +1,157 @@
+/* ------------------------------------------------------------- animations */
+
+/* A discard flies in from the direction of the player who threw it. */
+@keyframes toss-from-bottom {
+  0%   { transform: translateY(120px) scale(1.5) rotate(-8deg); opacity: 0; }
+  60%  { transform: translateY(-6px) scale(1.08) rotate(2deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-top {
+  0%   { transform: translateY(-120px) scale(1.5) rotate(8deg); opacity: 0; }
+  60%  { transform: translateY(6px) scale(1.08) rotate(-2deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-left {
+  0%   { transform: translateX(-160px) scale(1.5) rotate(-10deg); opacity: 0; }
+  60%  { transform: translateX(8px) scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: translateX(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes toss-from-right {
+  0%   { transform: translateX(160px) scale(1.5) rotate(10deg); opacity: 0; }
+  60%  { transform: translateX(-8px) scale(1.08) rotate(-3deg); opacity: 1; }
+  100% { transform: translateX(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+/* A tile retrieved from the pond into a meld. */
+@keyframes claim-pop {
+  0%   { transform: scale(2.1) translateY(-26px); opacity: 0; }
+  55%  { transform: scale(1.15) translateY(3px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* The tile just drawn from the wall. */
+@keyframes draw-in {
+  0%   { transform: translateY(-22px) scale(0.85); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.tile--toss-bottom { animation: toss-from-bottom var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-top    { animation: toss-from-top var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-left   { animation: toss-from-left var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--toss-right  { animation: toss-from-right var(--anim-toss) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--claimed     { animation: claim-pop var(--anim-claim) cubic-bezier(0.2, 0.85, 0.3, 1) both; }
+.tile--drew        { animation: draw-in var(--anim-draw) ease-out both; }
+
+/* A claim. The tiles from the hand slide out to meet the claimed one, which
+   lands last; the set then carries its name until the next discard, so it is
+   still findable by whoever looked up late. */
+@keyframes meld-gather {
+  0%   { transform: translateY(calc(var(--tile-w) * 1.6)); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes meld-glow {
+  0%, 100% { box-shadow: 0 0 0 2px var(--gold); }
+  50%      { box-shadow: 0 0 0 2px var(--gold), 0 0 18px 4px color-mix(in srgb, var(--gold) 55%, transparent); }
+}
+
+@keyframes tag-in {
+  0%   { transform: translate(-50%, 8px) scale(0.6); opacity: 0; }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+}
+
+.meld--fresh {
+  position: relative;
+  background: var(--accent-wash);
+  box-shadow: 0 0 0 2px var(--gold);
+  animation: meld-glow calc(var(--anim-claim) * 2.4) ease-in-out var(--anim-claim) 2;
+}
+
+.meld--fresh .meld__gathered {
+  animation: meld-gather var(--anim-gather) cubic-bezier(0.2, 0.85, 0.3, 1) both;
+}
+
+.meld--fresh .meld__gathered + .meld__gathered {
+  animation-delay: calc(var(--anim-gather) * 0.25);
+}
+
+.meld__tag {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: #1b1405;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: tag-in var(--anim-gather) cubic-bezier(0.2, 0.85, 0.3, 1) calc(var(--anim-claim) * 0.5) both;
+  z-index: 2;
+}
+
+/* On the table the claimed tile arrives by air (TableTop's flight) once the
+   throw has landed. The name goes up at once, so the set is announced while
+   the tile is still on its way. */
+.felt .meld__tag {
+  /* Clear of the rack's own status pill, out on the felt where it is read. */
+  margin-bottom: 20px;
+  padding: 2px 10px;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  animation-delay: 0ms;
+}
+
+.tile--flying {
+  position: absolute;
+  margin: 0;
+  z-index: 20;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 3px var(--gold),
+    0 calc(var(--tile-w) * 0.25) calc(var(--tile-w) * 0.45) rgba(0, 0, 0, 0.5);
+}
+
+/* Hovering must win over an in-flight animation. */
+@media (hover: hover) and (pointer: fine) {
+  .tile:not(.tile--back):hover {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile,
+  .tile--toss-bottom,
+  .tile--toss-top,
+  .tile--toss-left,
+  .tile--toss-right,
+  .tile--claimed,
+  .tile--drew,
+  .meld--fresh,
+  .meld--fresh .tile,
+  .meld__tag {
+    animation: none;
+    transition: none;
+  }
+
+  .tile:not(.tile--back):hover,
+  .tile--button:hover:not(:disabled) {
+    transform: scale(1.25);
+  }
+}
+
+/* Rows hold zoomed and animated tiles without clipping them. */
+.seat__row,
+.pond__row,
+.hand__tiles,
+.meld,
+.modal__tiles {
+  overflow: visible;
+}
+

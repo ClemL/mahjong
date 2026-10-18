@@ -1,0 +1,117 @@
+/* ==================================================== multiplayer lobby == */
+
+.lobby {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lobby__title {
+  margin: 0;
+  font-size: 22px;
+}
+
+.lobby__code {
+  color: var(--gold);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+}
+
+.lobby__lead {
+  margin: 0;
+  color: var(--ink-dim);
+  line-height: 1.5;
+}
+
+.lobby__error,
+.lobby__warn {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.lobby__error {
+  background: var(--chip-neg);
+  color: var(--ink);
+}
+
+.lobby__warn {
+  background: var(--accent-wash-2);
+  color: var(--ink);
+}
+
+.lobby__seats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.seat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  color: var(--ink);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.seat-card:hover:not(:disabled) {
+  background: var(--raise-2);
+}
+
+.seat-card--on {
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.seat-card:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.seat-card__wind {
+  font-size: 26px;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.seat-card__name {
+  font-weight: 700;
+}
+
+.seat-card__state {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.lobby__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.field__input {
+  font: inherit;
+  color: var(--ink);
+  background: var(--raise-1);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 7px 10px;
+  min-width: 160px;
+}
+
+.lobby__link {
+  color: var(--ink-dim);
+  font-size: 13px;
+}
+
