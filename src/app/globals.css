@@ -1391,6 +1391,100 @@ details[open] > summary::after {
   width: min(680px, 100%);
 }
 
+/* Replay of a finished hand: every seat face up, one move at a time. It is
+   opened from the felt's result sheet, so it sits above everything the felt
+   draws, as the tile reference does. */
+.modal__backdrop:has(.replay) {
+  z-index: 100;
+}
+
+.replay__step {
+  margin: 0 0 10px;
+  min-height: 2.6em;
+  font-size: 14px;
+}
+
+.replay__count {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.replay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.replay__slider {
+  flex: 1 1 140px;
+  min-width: 0;
+  accent-color: var(--gold);
+}
+
+/* A phone has no room for the slider between the buttons: it takes a row of
+   its own above them, so the four buttons stay on one line. */
+@media (max-width: 480px) {
+  .replay__slider {
+    order: -1;
+    flex-basis: 100%;
+  }
+}
+
+.replay__seats {
+  display: grid;
+  gap: 8px;
+}
+
+.replay__seat {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--raise-0);
+}
+
+/* On turn is said in words too; the gold edge only backs it up. */
+.replay__seat--turn {
+  border-color: var(--gold);
+}
+
+.replay__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.replay__badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.replay__row,
+.replay__pond {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.replay__pond {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line-soft);
+}
+
+.replay__ready {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--score-pos);
+}
+
 .modal__section {
   margin: 18px 0 6px;
   font-size: 12px;

@@ -158,6 +158,46 @@ test.describe("solo table", () => {
       const fits = await pill.evaluate((el) => el.scrollWidth <= el.clientWidth + 1 && el.clientWidth > 40);
       expect(fits, "payment pill holds its text").toBe(true);
     }
+
+    await checkReplay(page);
+    await expectNoSidewaysScroll(page);
+    expect(errors).toEqual([]);
+  });
+
+  test("replays a finished hand from the felt's result sheet", async ({ page }) => {
+    const errors = watchErrors(page);
+    await page.goto(`/solo?seed=${SEED}`);
+    await page.getByRole("button", { name: "Skip the deal" }).click();
+    for (;;) {
+      const decision = await nextDecision(page);
+      if (decision === "over") break;
+      const hand = yourHand(page);
+      if (decision === "claim") await hand.getByRole("button", { name: "Pass" }).click();
+      else await hand.locator("button.tile--button:not([disabled])").first().click();
+    }
+    await checkReplay(page);
     expect(errors).toEqual([]);
   });
 });
+
+/** Opens the replay from the result, steps back a move, and closes it again. */
+async function checkReplay(page: Page): Promise<void> {
+  await handResult(page).getByRole("button", { name: "Replay hand" }).click();
+  const replay = page.getByRole("dialog", { name: /Replay of hand \d+/ });
+  await expect(replay).toBeVisible();
+  const count = replay.locator(".replay__count");
+  const end = await count.textContent();
+  const [, last] = /Move (\d+) of (\d+)/.exec(end ?? "") ?? [];
+  expect(Number(last), "moves in the hand").toBeGreaterThan(4);
+  await expect(replay.getByRole("region")).toHaveCount(4);
+  await replay.getByRole("button", { name: "Back" }).click();
+  await expect(count).toHaveText(`Move ${Number(last) - 1} of ${last}`);
+  await replay.getByRole("button", { name: "Deal" }).click();
+  await expect(count).toHaveText("The deal");
+  // Thirteen tiles each and the dealer's fourteenth, all face up.
+  const tiles = await replay.locator(".replay__row .tile").count();
+  expect(tiles).toBeGreaterThanOrEqual(53);
+  await page.keyboard.press("Escape");
+  await expect(replay).toHaveCount(0);
+  await expect(handResult(page)).toBeVisible();
+}

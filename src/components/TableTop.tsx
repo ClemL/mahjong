@@ -588,12 +588,14 @@ export function Felt({
   sheet,
   onNextHand,
   onSkipDeal,
+  onReplay,
   busy = false,
 }: {
   view: RoomView;
   display: TabletDisplay;
   sheet: ResultSheet;
   onNextHand: () => void;
+  onReplay?: () => void;
   /** The deal has been skipped here; whoever holds play for it should stop. */
   onSkipDeal?: () => void;
   busy?: boolean;
@@ -721,6 +723,7 @@ export function Felt({
               tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
               onHide={sheet.hide}
               onNextHand={onNextHand}
+              onReplay={onReplay}
               busy={busy}
             />
           ) : null}

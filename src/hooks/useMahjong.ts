@@ -34,6 +34,7 @@ import { isFlower } from "@/game/tiles";
 import { DEFAULT_RULES, roundsInGame } from "@/game/rules";
 import { signatureMoment } from "@/components/moments";
 import { readSavedGame, writeSavedGame } from "@/hooks/soloSave";
+import { type ReplayFrame, recordFrame } from "@/game/replay";
 
 export type { Speed };
 
@@ -62,6 +63,8 @@ export interface MahjongApi extends GameSettings {
   dealing: boolean;
   /** Stop holding play for the deal: the player has skipped it. */
   skipDeal: () => void;
+  /** This hand so far, a frame per logged move, for the replay once it is over. */
+  replay: ReplayFrame[];
   paused: boolean;
   setPaused: (value: boolean) => void;
   discard: (tileId: string) => void;
@@ -154,6 +157,16 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
   }
   const [, wake] = useState(0);
   const dealing = hold.current.until > Date.now();
+
+  // The hand's moves as they happen. A resumed hand starts from where it was
+  // picked up; the moves before the reload were never seen here.
+  const frames = useRef<{ key: string | null; list: ReplayFrame[] }>({ key: null, list: [] });
+  if (state) {
+    frames.current =
+      frames.current.key === dealKey
+        ? { key: dealKey, list: recordFrame(frames.current.list, state) }
+        : { key: dealKey, list: recordFrame([], state) };
+  }
   const skipDeal = useCallback(() => {
     hold.current = { ...hold.current, until: 0 };
     wake((n) => n + 1);
@@ -353,6 +366,7 @@ export function useMahjong(humanSeat: Seat = 0, options: MahjongOptions = {}): M
     readyDiscards,
     dealing,
     skipDeal,
+    replay: frames.current.list,
     paused,
     setPaused,
     discard,

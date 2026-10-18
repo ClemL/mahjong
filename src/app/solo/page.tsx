@@ -19,6 +19,7 @@ import { PlayPanel } from "@/components/PlayPanel";
 import { GamePanel } from "@/components/GamePanel";
 import { SettingsMenu } from "@/components/SettingsMenu";
 import { FilmDialog } from "@/components/FilmPlayer";
+import { ReplayDialog } from "@/components/ReplayDialog";
 import { useAppearance } from "@/hooks/useAppearance";
 import {
   FaanPanel,
@@ -49,6 +50,7 @@ export default function Page() {
   const onFelt = useMediaQuery(FELT_QUERY);
   const { state } = api;
   const [film, setFilm] = useState(false);
+  const [replaying, setReplaying] = useState(false);
 
   if (!state || !view) {
     return (
@@ -60,6 +62,9 @@ export default function Page() {
   }
 
   const me = api.humanSeat;
+  // A finished hand can be stepped back through, once there is more than its deal to see.
+  const replay =
+    state.phase === "handOver" && api.replay.length > 1 ? () => setReplaying(true) : undefined;
 
   return (
     <main className="app">
@@ -131,7 +136,11 @@ export default function Page() {
         {/* The same felt as the shared tablet, seen from your chair: you at
             the bottom, play passing to your right, your own tiles in your
             hand below the cloth. */}
-        {onFelt ? <SoloFelt api={api} view={view} display={display} /> : <SoloGrid api={api} />}
+        {onFelt ? (
+          <SoloFelt api={api} view={view} display={display} onReplay={replay} />
+        ) : (
+          <SoloGrid api={api} />
+        )}
 
         <aside className="side">
           <ScorePanel state={state} />
@@ -143,7 +152,16 @@ export default function Page() {
       {/* On the felt each hand's result is laid over the cloth; the end of the
           round has its own summary either way. */}
       {state.phase === "gameOver" || !onFelt ? (
-        <ResultModal state={state} onNextHand={api.nextHand} onNewGame={api.newGame} />
+        <ResultModal state={state} onNextHand={api.nextHand} onNewGame={api.newGame} onReplay={replay} />
+      ) : null}
+
+      {replaying && replay ? (
+        <ReplayDialog
+          frames={api.replay}
+          handNumber={state.handNumber}
+          humanSeat={me}
+          onClose={() => setReplaying(false)}
+        />
       ) : null}
 
       {film ? <FilmDialog onClose={() => setFilm(false)} /> : null}
@@ -153,7 +171,17 @@ export default function Page() {
   );
 }
 
-function SoloFelt({ api, view, display }: { api: MahjongApi; view: RoomView; display: TabletDisplay }) {
+function SoloFelt({
+  api,
+  view,
+  display,
+  onReplay,
+}: {
+  api: MahjongApi;
+  view: RoomView;
+  display: TabletDisplay;
+  onReplay?: () => void;
+}) {
   const sheet = useResultSheet(view);
   return (
     <div className="solo">
@@ -166,12 +194,18 @@ function SoloFelt({ api, view, display }: { api: MahjongApi; view: RoomView; dis
           sheet={sheet}
           onNextHand={api.nextHand}
           onSkipDeal={api.skipDeal}
+          onReplay={onReplay}
         />
         {sheet.aside && api.state?.phase === "handOver" ? (
           <div className="solo__after">
             <button type="button" className="btn btn--sm" onClick={sheet.show}>
               Result
             </button>
+            {onReplay ? (
+              <button type="button" className="btn btn--sm" onClick={onReplay}>
+                Replay
+              </button>
+            ) : null}
             <button type="button" className="btn btn--sm btn--primary" onClick={api.nextHand}>
               Next hand
             </button>
