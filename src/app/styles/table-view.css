@@ -1,0 +1,151 @@
+/* ======================================================== the table view == */
+
+.app--table {
+  max-width: none;
+}
+
+.tableview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tableview__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+}
+
+.tableview__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.14em;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.tableview__grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 260px) minmax(0, 1fr) minmax(150px, 260px);
+  grid-template-areas:
+    ".    top    ."
+    "left pond right"
+    ".    bottom .";
+  gap: 10px;
+}
+
+.tseat--top { grid-area: top; }
+.tseat--left { grid-area: left; }
+.tseat--right { grid-area: right; }
+.tseat--bottom { grid-area: bottom; }
+.tableview__middle { grid-area: pond; }
+
+.tseat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--shade-2);
+  border: 1px solid transparent;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.tseat--active {
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.tseat--deciding {
+  border-color: var(--claim-outline);
+}
+
+.tseat__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tseat__wind {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--gold);
+  line-height: 1;
+}
+
+.tseat__name {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.tseat__seatno {
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.tseat__score {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tseat__hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+}
+
+.tseat__count {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-left: 4px;
+}
+
+.tseat__deciding {
+  font-size: 11px;
+  color: var(--claim-outline);
+}
+
+.tableview__pond {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--shade-1);
+  border: 1px solid var(--panel-border);
+}
+
+.tableview__result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--accent-wash-2);
+}
+
+.tableview__seating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.tableview__seatinfo b {
+  color: var(--ink);
+}
+

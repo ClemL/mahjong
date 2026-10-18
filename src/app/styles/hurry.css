@@ -1,0 +1,45 @@
+/* ------------------------------------------------------------- hurry up */
+
+.phone__hurry-btn {
+  flex: none;
+}
+
+/* Someone at the table has asked this player to hurry: the whole screen
+   flashes, and a banner says who asked, so it never rests on colour alone. */
+.phone__hurry {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--danger) 45%, transparent);
+  box-shadow: inset 0 0 0 6px var(--danger);
+  animation: hurry-flash 0.4s steps(1, end) 6;
+}
+
+.phone__hurry-text {
+  padding: 10px 18px;
+  border-radius: 12px;
+  background: var(--tooltip-bg);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 800;
+  border: 2px solid var(--danger);
+}
+
+@keyframes hurry-flash {
+  0% {
+    background: color-mix(in srgb, var(--danger) 55%, transparent);
+  }
+  50% {
+    background: transparent;
+  }
+}
+
+/* No flicker for anyone who has asked for less motion: a steady tint and the banner say it. */
+@media (prefers-reduced-motion: reduce) {
+  .phone__hurry {
+    animation: none;
+  }
+}

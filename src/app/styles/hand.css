@@ -1,0 +1,128 @@
+/* ------------------------------------------------------------- your hand */
+
+.hand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--shade-3);
+  border: 1px solid var(--panel-border);
+}
+
+/* What a ready hand wins on: each tile with how many are still unseen. A
+   dead wait is struck through and dimmed, and its count says 0 in words. */
+.waits__line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.waits {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.waits__tile {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.waits__left {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.waits__tile--dead {
+  opacity: 0.5;
+}
+
+.waits__tile--dead .waits__left {
+  text-decoration: line-through;
+}
+
+.hand__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: flex-end;
+  min-height: 70px;
+  padding-top: 8px;
+}
+
+.hand__gap {
+  width: 14px;
+}
+
+.hand__prompt {
+  font-size: 13px;
+  color: var(--gold);
+  min-height: 18px;
+  font-weight: 600;
+}
+
+.hand__prompt--muted {
+  color: var(--ink-dim);
+  font-weight: 400;
+}
+
+.hand__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------- helper */
+
+/* What finishes each set the hand has started: the two tiles held, then the
+   tiles that would make them three, each with how many are still unseen. */
+.helper {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--shade-2);
+  border: 1px solid var(--line);
+}
+
+.helper__row {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.helper__held {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.helper__label {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.helper__toggle {
+  flex: none;
+  line-height: 1;
+  padding-block: 2px;
+}
+
+/* The sticker stands a little taller than the text beside it, so it reads at a glance. */
+.helper__icon {
+  display: block;
+  height: 30px;
+  width: auto;
+}
+
+.helper__toggle[aria-pressed="true"] {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+

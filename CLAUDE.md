@@ -53,6 +53,7 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
   sound.ts         Web Audio cues, synthesised at runtime
   room.ts          Multiplayer room: seating, draining, redaction (pure)
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
+  replay.ts        A finished hand as compact frames, for the replay
 src/server/        Room store (Upstash + memory) and room service — server only
 src/app/api/       Room endpoints
 src/hooks/         React bindings for the engine and for a room
@@ -63,8 +64,10 @@ src/film/          The explainer film — hand-drawn canvas animation, no React
   script.ts        Subtitles and chapters
   scenes.ts        The twelve scenes
   film.ts          renderFrame(ctx, t) — the whole film from a timestamp
-src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, footer
-src/app/           Next.js entry and all styles
+src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, replay, footer
+src/app/           Next.js entry
+  globals.css      Imports src/app/styles/*.css in cascade order
+  styles/          One stylesheet per area of the screen
 e2e/               Playwright smoke tests against the production build
 public/updates.txt Changelog, oldest first
 ```

@@ -1,0 +1,282 @@
+/* ------------------------------------------------------- score history */
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+.history__row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 4px 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line-soft);
+  align-items: baseline;
+}
+
+.history__hand {
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.history__what {
+  min-width: 0;
+}
+
+.history__faan,
+.history__from {
+  color: var(--ink-dim);
+}
+
+.history__washout {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+.history__deltas {
+  grid-column: 2;
+  display: flex;
+  gap: 4px;
+}
+
+.history__delta {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  color: var(--ink-dim);
+  min-width: 30px;
+}
+
+.history__delta--pos { color: var(--score-pos); }
+.history__delta--neg { color: var(--score-neg); }
+
+/* --------------------------------------------------------------- chart */
+
+.chart {
+  margin: 16px 0 4px;
+  padding: 10px 12px 6px;
+  background: var(--chart-surface);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+.chart__title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+}
+
+.chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+
+.chart__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  display: inline-block;
+  flex: none;
+}
+
+.chart__plot {
+  position: relative;
+}
+
+.chart__plot svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chart__zero {
+  stroke: var(--chart-zero);
+  stroke-width: 1;
+}
+
+.chart__crosshair {
+  stroke: var(--chart-zero);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.chart__axis {
+  fill: var(--ink-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__tooltip {
+  position: absolute;
+  top: 4px;
+  pointer-events: none;
+  background: var(--tooltip-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  min-width: 128px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  z-index: 5;
+}
+
+.chart__tooltip-title {
+  font-size: 11px;
+  color: var(--ink-dim);
+  margin-bottom: 4px;
+}
+
+.chart__tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.chart__tooltip-name {
+  flex: 1;
+  color: var(--ink);
+}
+
+.chart__tooltip-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.modal--wide {
+  width: min(680px, 100%);
+}
+
+/* Replay of a finished hand: every seat face up, one move at a time. It is
+   opened from the felt's result sheet, so it sits above everything the felt
+   draws, as the tile reference does. */
+.modal__backdrop:has(.replay) {
+  z-index: 100;
+}
+
+.replay__step {
+  margin: 0 0 10px;
+  min-height: 2.6em;
+  font-size: 14px;
+}
+
+.replay__count {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.replay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.replay__slider {
+  flex: 1 1 140px;
+  min-width: 0;
+  accent-color: var(--gold);
+}
+
+/* A phone has no room for the slider between the buttons: it takes a row of
+   its own above them, so the four buttons stay on one line. */
+@media (max-width: 480px) {
+  .replay__slider {
+    order: -1;
+    flex-basis: 100%;
+  }
+}
+
+.replay__seats {
+  display: grid;
+  gap: 8px;
+}
+
+.replay__seat {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--raise-0);
+}
+
+/* On turn is said in words too; the gold edge only backs it up. */
+.replay__seat--turn {
+  border-color: var(--gold);
+}
+
+.replay__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.replay__badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.replay__row,
+.replay__pond {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.replay__pond {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line-soft);
+}
+
+.replay__ready {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--score-pos);
+}
+
+.modal__section {
+  margin: 18px 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--ink-dim);
+}
+
