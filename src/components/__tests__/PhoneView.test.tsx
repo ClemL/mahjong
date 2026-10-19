@@ -68,7 +68,7 @@ describe("PhoneView", () => {
       ...view,
       players: view.players.map((p, i) => (i === seat ? { ...p, flowers } : p)),
     } as typeof view;
-    const { container } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+    const { container } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
 
     expect(container.querySelectorAll(".phone__melds .tile--idle")).toHaveLength(1);
     expect(container.querySelector(".phone__zoom")).toBeNull();
@@ -95,7 +95,7 @@ describe("PhoneView", () => {
     } as typeof view;
     const windFaan = wind === view.roundWind ? 2 : 1;
 
-    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
     handButtons(container);
     expect(container.querySelectorAll(".tile__set--run")).toHaveLength(3);
     expect(container.querySelectorAll(".tile__set--set")).toHaveLength(3);
@@ -113,7 +113,7 @@ describe("PhoneView", () => {
 
     window.localStorage.setItem("hk-mahjong.set-hints", "off");
     try {
-      const off = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} landscape />);
+      const off = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
       handButtons(off.container);
       expect(off.container.querySelectorAll(".tile__set, .tile__set-faan")).toHaveLength(0);
     } finally {
@@ -278,7 +278,7 @@ describe("PhoneView", () => {
   it("shows the newest discard and a play log on the controller", () => {
     const { room, claimer } = claimable();
     const view = playerView(room, claimer);
-    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
     const discard = view.lastDiscard!;
     expect(container.querySelector(".phone__last")).not.toBeNull();
@@ -291,7 +291,7 @@ describe("PhoneView", () => {
   it("hides the play log when the phone's settings say so", () => {
     window.localStorage.setItem("hk-mahjong.play-log", "off");
     const { view } = onTurn();
-    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
     expect(container.querySelector(".playlog")).toBeNull();
     window.localStorage.removeItem("hk-mahjong.play-log");
   });
@@ -303,7 +303,7 @@ describe("PhoneView compact mode", () => {
   it("folds the prompt into the bar on a landscape controller", () => {
     compactStored();
     const { view } = onTurn();
-    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
     const root = container.firstElementChild!;
     expect(root.className).toContain("phone--landscape");
@@ -317,7 +317,7 @@ describe("PhoneView compact mode", () => {
 
   it("leaves the roomy layout in place when compact is off", () => {
     const { view } = onTurn();
-    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} landscape />);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
     expect(container.firstElementChild!.className).not.toContain("phone--compact");
     expect(container.querySelector(".phone__bar .phone__prompt")).toBeNull();
@@ -325,14 +325,6 @@ describe("PhoneView compact mode", () => {
     expect(seatName(container).className).toBe("");
   });
 
-  it("ignores the stored choice on a phone standing in for the table", () => {
-    compactStored();
-    const { view } = onTurn();
-    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
-
-    expect(container.firstElementChild!.className).not.toContain("phone--compact");
-    expect(container.querySelector(".phone__bar .phone__prompt")).toBeNull();
-  });
 });
 
 describe("PhoneView — whose move it is", () => {

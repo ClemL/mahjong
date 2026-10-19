@@ -1,36 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { ClaimPrompt } from "@/game/controller";
-import type { StrategyName } from "@/game/ai";
 import { DEFAULT_RULES, MIN_FAAN_CHOICES, ROUND_CHOICES } from "@/game/rules";
-import { primeAudio } from "@/game/sound";
 
-export type Speed = "slow" | "normal" | "fast";
-
-/** The game options a player sets before sitting down, kept per device. */
+/**
+ * The house rules this device sets on a table it opens in tablet mode, kept
+ * per device. Once tiles are out, the table's own settings are the ones used.
+ */
 export interface Preferences {
   minFaan: number;
   /** Wind rounds in a game: 1, 2 or 4. */
   rounds: number;
-  speed: Speed;
-  showHints: boolean;
-  /** The wheelchair button listing what finishes each set the hand has started. Off unless chosen. */
-  helper: boolean;
-  muted: boolean;
-  opponents: StrategyName;
-  claimPrompt: ClaimPrompt;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   minFaan: DEFAULT_RULES.minFaan,
   rounds: DEFAULT_RULES.rounds,
-  speed: "normal",
-  showHints: true,
-  helper: false,
-  muted: false,
-  opponents: "greedy",
-  claimPrompt: "useful",
 };
 
 const STORAGE_KEY = "hk-mahjong.prefs";
@@ -60,16 +45,6 @@ export function normalizePreferences(raw: unknown): Preferences {
       typeof r.version === "number" && r.version >= 3
         ? pick(r.rounds, ROUND_CHOICES as readonly number[], d.rounds)
         : d.rounds,
-    speed: pick<Speed>(r.speed as Speed, ["slow", "normal", "fast"], d.speed),
-    showHints: typeof r.showHints === "boolean" ? r.showHints : d.showHints,
-    helper: typeof r.helper === "boolean" ? r.helper : d.helper,
-    muted: typeof r.muted === "boolean" ? r.muted : d.muted,
-    opponents: pick<StrategyName>(r.opponents as StrategyName, ["greedy", "random"], d.opponents),
-    claimPrompt: pick<ClaimPrompt>(
-      r.claimPrompt as ClaimPrompt,
-      ["useful", "always", "wins"],
-      d.claimPrompt,
-    ),
   };
 }
 
@@ -90,43 +65,20 @@ function writePreferences(prefs: Preferences): void {
   }
 }
 
-/**
- * The settings surface shared by the start page and the solo game's drawer, so
- * the same panels drive both and a change in either is remembered by the other.
- */
+/** The house-rule defaults the start page sets. */
 export interface GameSettings {
   minFaan: number;
   setMinFaan: (value: number) => void;
   rounds: number;
   setRounds: (value: number) => void;
-  speed: Speed;
-  setSpeed: (value: Speed) => void;
-  showHints: boolean;
-  setShowHints: (value: boolean) => void;
-  helper: boolean;
-  setHelper: (value: boolean) => void;
-  muted: boolean;
-  setMuted: (value: boolean) => void;
-  opponents: StrategyName;
-  setOpponents: (value: StrategyName) => void;
-  claimPrompt: ClaimPrompt;
-  setClaimPrompt: (value: ClaimPrompt) => void;
 }
 
-export interface PreferencesApi extends GameSettings {
-  prefs: Preferences;
-  /** False until the stored choices have been read, so nothing acts on the defaults by mistake. */
-  loaded: boolean;
-}
-
-export function usePreferences(): PreferencesApi {
+export function usePreferences(): GameSettings {
   // Defaults first so the server and first client render agree.
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFERENCES);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setPrefs(readPreferences());
-    setLoaded(true);
   }, []);
 
   const set = useCallback(<K extends keyof Preferences>(key: K, value: Preferences[K]) => {
@@ -138,22 +90,8 @@ export function usePreferences(): PreferencesApi {
   }, []);
 
   return {
-    prefs,
-    loaded,
     ...prefs,
     setMinFaan: useCallback((value: number) => set("minFaan", value), [set]),
     setRounds: useCallback((value: number) => set("rounds", value), [set]),
-    setSpeed: useCallback((value: Speed) => set("speed", value), [set]),
-    setShowHints: useCallback((value: boolean) => set("showHints", value), [set]),
-    setHelper: useCallback((value: boolean) => set("helper", value), [set]),
-    setMuted: useCallback(
-      (value: boolean) => {
-        set("muted", value);
-        if (!value) primeAudio();
-      },
-      [set],
-    ),
-    setOpponents: useCallback((value: StrategyName) => set("opponents", value), [set]),
-    setClaimPrompt: useCallback((value: ClaimPrompt) => set("claimPrompt", value), [set]),
   };
 }

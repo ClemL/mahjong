@@ -113,3 +113,573 @@
   }
 }
 
+/* ============================================ the tablet's settings sheet == */
+
+/* The tablet has room to lay its settings out in sections rather than one long
+   drawer, so they take the whole screen, with a rail of sections down the side. */
+.sheet__backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  background: var(--felt);
+}
+
+.sheet {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  animation: sheet-in 160ms ease-out;
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 12px 18px;
+  flex-wrap: wrap;
+  padding: 18px 28px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.sheet__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.sheet__kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.sheet__title {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+
+.sheet__note {
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.sheet__btn {
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.sheet__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* ------------------------------------------------- sections and the rail */
+
+.tset {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.tset__rail {
+  width: 272px;
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 14px;
+  overflow-y: auto;
+  background: var(--shade-2);
+  border-right: 1px solid var(--line-soft);
+}
+
+.tset__tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tset__tab {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+}
+
+.tset__tab:hover {
+  background: var(--raise-0);
+}
+
+/* The open section: raised, and marked down its edge, not by color alone. */
+.tset__tab--on {
+  background: var(--raise-1);
+  border-color: var(--line);
+  box-shadow: inset 4px 0 0 var(--gold);
+}
+
+.tset__tab:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.tset__icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+.tset__tab-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.tset__tab-name {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.tset__tab-sum {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.tset__board {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--raise-0);
+  border: 1px solid var(--line-soft);
+}
+
+.tset__board-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.tset__board-text {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tset__rotate {
+  min-height: 44px;
+}
+
+.tset__content {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px 30px 28px;
+  overflow-y: auto;
+}
+
+.tset__force {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.tset__force-label {
+  margin-right: 4px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.tset__chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--raise-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tset__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.tset-card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 22px;
+  border-radius: 18px;
+  background: var(--raise-0);
+  border: 1px solid var(--line);
+}
+
+.tset-card--tall {
+  grid-row: span 2;
+}
+
+.tset-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tset-card__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.tset__lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--raise-1);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tset__foot {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+/* A small tablet: the cards stack, then the rail goes above them. */
+@media (max-width: 1000px) {
+  .tset__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tset-card--tall {
+    grid-row: auto;
+  }
+
+  .sheet__note {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .tset {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .tset__rail {
+    width: auto;
+    overflow: visible;
+    border-right: none;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .tset__content {
+    overflow: visible;
+    padding: 18px 16px 24px;
+  }
+}
+
+/* ------------------------------------------------------ setting controls */
+
+.seg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.seg-field__label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.seg-field__hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.seg {
+  display: grid;
+  grid-template-columns: repeat(var(--seg-count), minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--shade-2);
+  border: 1px solid var(--line-soft);
+}
+
+.seg__btn {
+  min-height: 48px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  transition: background 120ms ease;
+}
+
+.seg__btn--tall {
+  min-height: 56px;
+}
+
+.seg__btn:hover:not(:disabled):not(.seg__btn--on) {
+  background: var(--raise-1);
+}
+
+.seg__btn--on {
+  background: var(--gold);
+  color: var(--on-gold);
+  font-weight: 800;
+}
+
+.seg__btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.seg__sub {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.seg__btn--on .seg__sub {
+  color: inherit;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.switch-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.switch-row__label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.switch-row__hint {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+/* On and off are told apart by where the knob sits as well as by the fill. */
+.switch {
+  flex: none;
+  width: 60px;
+  height: 36px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--shade-2);
+}
+
+.switch[aria-checked="true"] {
+  justify-content: flex-end;
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.switch__knob {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ink-dim);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.switch[aria-checked="true"] .switch__knob {
+  background: #fffaf0;
+}
+
+.switch:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.switch:focus-visible,
+.seg__btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* What a win off a discard costs at this table, under the paying rules. */
+.payout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--shade-2);
+  border: 1px dashed var(--line-strong);
+}
+
+.payout__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.payout__rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  margin: 0;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.payout__rows dt,
+.payout__rows dd {
+  margin: 0;
+}
+
+.payout__rows dd {
+  text-align: right;
+  font-weight: 800;
+}
+
+.payout__paid {
+  color: var(--score-neg);
+}
+
+.payout__got {
+  color: var(--score-pos);
+}
+
+.payout__win {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------- a phone's settings */
+
+.sgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sgroup__title {
+  margin: 0 4px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.sgroup__card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--raise-0);
+  border: 1px solid var(--line);
+}
+
+.sgroup__card > * {
+  padding: 12px 14px;
+}
+
+.sgroup__card > * + * {
+  border-top: 1px solid var(--line-soft);
+}
+
+.sgroup__card .seg__btn {
+  min-height: 44px;
+  font-size: 13px;
+}
+
+.sgroup__leave {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sgroup__leave .btn {
+  min-height: 48px;
+  border-radius: 14px;
+  border-color: var(--danger);
+  background: transparent;
+  color: var(--score-neg);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sgroup__note {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}

@@ -36,16 +36,12 @@
 }
 
 /* Everything but the hand: it stays its own colour, so the tiles can still be
-   read and thrown while the screen says to hurry. On the controller the flash
-   covers the rows above the hand; upright, the docked hand rises over it. */
+   read and thrown while the screen says to hurry. The flash covers the rows
+   above the hand and stops at its edge. */
 .phone--landscape .phone__hurry {
   position: absolute;
   grid-column: 1 / -1;
   grid-row: 1 / hand-start;
-}
-
-.phone--hurried:not(.phone--landscape) .phone__dock {
-  z-index: 91;
 }
 
 .phone__hurry-text {

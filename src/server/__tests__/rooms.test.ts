@@ -177,10 +177,10 @@ describe("the lobby", () => {
     await expect(control(id, table, { type: "deal" })).rejects.toMatchObject({ status: 409 });
   });
 
-  it("lets a player deal when there is no tablet, but not when there is", async () => {
+  it("leaves the deal to the table: a phone never deals, with or without a tablet", async () => {
     const alone = await room();
     const { token } = await claimSeat(alone, { seat: 0 });
-    expect((await control(alone, token, { type: "deal" })).started).toBe(true);
+    await expect(control(alone, token, { type: "deal" })).rejects.toMatchObject({ status: 403 });
 
     const withTablet = await room();
     const player = await claimSeat(withTablet, { seat: 0 });
@@ -242,7 +242,11 @@ describe("playing", () => {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const id = await room();
       const { token } = await claimSeat(id, { seat: 0 });
-      let view = await control(id, token, { type: "deal" });
+      const table = (await claimSeat(id, { seat: "table" })).token;
+      await control(id, table, { type: "deal" });
+      // The table cuts its deal short, so play is paced from now.
+      await control(id, table, { type: "skipOpening" });
+      let view = await readRoom(id, token);
       // Seat 0 is the dealer on the opening hand, so the turn is already here.
       expect(view.turn).toBe(0);
       const wallBefore = view.wallCount;
@@ -478,19 +482,22 @@ describe("table control", () => {
 });
 
 describe("playing the computer while you wait", () => {
-  it("marks a solo deal as a warm-up and offers to regroup when someone joins", async () => {
+  it("marks a one-player deal as a warm-up, and lets the table regroup when someone joins", async () => {
     const id = await room();
     const { token } = await claimSeat(id, { seat: 0, name: "Kris" });
-    const solo = await control(id, token, { type: "deal" });
-    expect(solo.warmup).toBe(true);
-    expect(solo.seatedCount).toBe(1);
-    expect(solo.canRegroup).toBe(false);
+    const table = (await claimSeat(id, { seat: "table" })).token;
+    const warmup = await control(id, table, { type: "deal" });
+    expect(warmup.warmup).toBe(true);
+    expect(warmup.seatedCount).toBe(1);
+    expect(warmup.canRegroup).toBe(false);
 
     await claimSeat(id, { seat: 2, name: "Srini" });
-    const joined = await readRoom(id, token);
-    expect(joined.canRegroup).toBe(true);
+    expect((await readRoom(id, table)).canRegroup).toBe(true);
+    // The phones see no offer: the table has the button.
+    expect((await readRoom(id, token)).canRegroup).toBe(false);
+    await expect(control(id, token, { type: "regroup" })).rejects.toMatchObject({ status: 403 });
 
-    const back = await control(id, token, { type: "regroup" });
+    const back = await control(id, table, { type: "regroup" });
     expect(back.started).toBe(false);
     expect(back.warmup).toBe(false);
     // Both chairs survive the regroup; only the practice hand is dropped.

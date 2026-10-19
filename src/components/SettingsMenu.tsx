@@ -13,9 +13,15 @@ import { FilmDialog } from "./FilmPlayer";
  */
 export function SettingsMenu({
   label = "Settings",
+  sheet,
   children,
 }: {
   label?: string;
+  /**
+   * The whole screen rather than a drawer, for the tablet: room for its
+   * settings to be laid out in sections rather than one long list.
+   */
+  sheet?: { title: string; subtitle: string };
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -62,7 +68,35 @@ export function SettingsMenu({
         <span className="hamburger__text">{label}</span>
       </button>
 
-      {open ? (
+      {open && sheet ? (
+        <div className="sheet__backdrop">
+          <section id={panelId} className="sheet" role="dialog" aria-modal="true" aria-labelledby={`${panelId}-title`}>
+            <header className="sheet__head">
+              <div className="sheet__titles">
+                <span className="sheet__kicker">{sheet.subtitle}</span>
+                <h2 className="sheet__title" id={`${panelId}-title`}>
+                  {sheet.title}
+                </h2>
+              </div>
+              <span className="sheet__note">Changes reach every phone at once</span>
+              <button
+                type="button"
+                className="btn btn--ghost sheet__btn"
+                onClick={() => {
+                  setOpen(false);
+                  setFilm(true);
+                }}
+              >
+                How to play
+              </button>
+              <button ref={closeButton} type="button" className="btn btn--ghost sheet__btn" onClick={() => setOpen(false)}>
+                Done
+              </button>
+            </header>
+            <div className="sheet__body">{children}</div>
+          </section>
+        </div>
+      ) : open ? (
         <div
           className="drawer__backdrop"
           // Only a click on the backdrop itself closes the drawer, or dragging

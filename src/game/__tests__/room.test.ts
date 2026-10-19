@@ -26,7 +26,6 @@ import {
   returnToLobby,
   robotName,
   shouldRegroup,
-  soloTableView,
   startPlay,
   syncSeats,
   touch,
@@ -152,6 +151,15 @@ describe("redaction", () => {
     );
     expect(viewFor(room, "tok-table").drawnTileId).toBeNull();
   });
+
+  it("names the drawn tile to everyone once the hand is over, when every hand is face up", () => {
+    const drawn = room.state.drawnTileId;
+    expect(drawn).not.toBeNull();
+    room.state = { ...room.state, phase: "handOver" };
+    for (const token of ["tok-0", "tok-south", "tok-table", null]) {
+      expect(viewFor(room, token).drawnTileId).toBe(drawn);
+    }
+  });
 });
 
 describe("the deal on the table screen", () => {
@@ -176,38 +184,8 @@ describe("the deal on the table screen", () => {
   });
 });
 
-describe("the solo felt", () => {
+describe("the felt's deal", () => {
   const state = createGame({ seed: 11, humanSeat: 0 });
-
-  it("draws no concealed tile on the felt, the player's own included", () => {
-    const view = soloTableView(state, null, []);
-    for (const player of view.players) {
-      expect(player.hand.every((t) => t.code === "back")).toBe(true);
-      expect(player.handCount).toBe(state.players[player.seat].hand.length);
-    }
-    expect(view.you).toEqual({ role: "table", seat: null });
-    expect(view.actions).toBeNull();
-    expect(view.claim).toBeNull();
-  });
-
-  it("never carries the wall, only its count", () => {
-    const view = soloTableView(state, null, []);
-    expect(view.wallCount).toBe(state.wall.length);
-    expect(JSON.stringify(view)).not.toContain('"wall"');
-  });
-
-  it("turns every hand up once the hand is settled", () => {
-    const view = soloTableView({ ...state, phase: "handOver" }, null, []);
-    for (const player of view.players) {
-      expect(player.hand).toEqual(state.players[player.seat].hand);
-    }
-  });
-
-  it("names the player and leaves the computer seats to their winds", () => {
-    const view = soloTableView(state, null, []);
-    expect(view.players[0].occupant).toEqual({ kind: "human", name: "East (you)", away: false });
-    expect(view.players[1].occupant).toEqual({ kind: "ai", name: null, away: false });
-  });
 
   it("holds the deal as long as the felt takes to show it", () => {
     const flowers = state.players.reduce((n, p) => n + p.flowers.length, 0);
@@ -248,15 +226,14 @@ describe("lobby", () => {
     expect(room.state.players.every((p) => p.discards.length === 0)).toBe(true);
   });
 
-  it("lets the table deal, and a player only when there is no table", () => {
+  it("lets only the table deal: phones alone never start a game", () => {
     const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
-    expect(mayDeal(room, "tok-0")).toBe(true);
+    expect(mayDeal(room, "tok-0")).toBe(false);
     expect(mayDeal(room, "nobody")).toBe(false);
 
     room.table = { token: "tok-table", lastSeen: Date.now() };
     expect(mayDeal(room, "tok-table")).toBe(true);
-    // With a tablet on the table the button lives there, not in four pockets.
     expect(mayDeal(room, "tok-0")).toBe(false);
   });
 
@@ -281,18 +258,20 @@ describe("lobby", () => {
     expect(full.warmup).toBe(false);
   });
 
-  it("offers to regroup once somebody joins the warm-up, and not before", () => {
+  it("offers the table a regroup once somebody joins the warm-up, and not before", () => {
     const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
+    room.table = { token: "tok-table", lastSeen: Date.now() };
     startPlay(room);
     expect(shouldRegroup(room)).toBe(false);
-    expect(viewFor(room, "tok-0").canRegroup).toBe(false);
+    expect(viewFor(room, "tok-table").canRegroup).toBe(false);
 
     seat(room, 2, "tok-2");
     expect(shouldRegroup(room)).toBe(true);
-    expect(viewFor(room, "tok-0").canRegroup).toBe(true);
-    // The newcomer sees the offer too — either of them can take it.
-    expect(viewFor(room, "tok-2").canRegroup).toBe(true);
+    expect(viewFor(room, "tok-table").canRegroup).toBe(true);
+    // The phones see no offer; the button is the table's.
+    expect(viewFor(room, "tok-0").canRegroup).toBe(false);
+    expect(viewFor(room, "tok-2").canRegroup).toBe(false);
   });
 
   it("never lets a player regroup a real four-person game", () => {
@@ -302,7 +281,7 @@ describe("lobby", () => {
     expect(shouldRegroup(room)).toBe(false);
   });
 
-  it("gives the regroup to the table when there is one", () => {
+  it("gives the regroup to the table alone", () => {
     const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");
     room.table = { token: "tok-table", lastSeen: Date.now() };
@@ -670,7 +649,7 @@ describe("the deal", () => {
     expect(room.lastStepAt).toBe(now + DEAL_MS + flowers * FLOWER_STEP_MS);
   });
 
-  it("does not hold a game played on phones alone", () => {
+  it("does not hold play for a deal no table screen is showing", () => {
     const room = newRoom("TEST", undefined, 5);
     room.seats[0] = { kind: "human", name: "Someone", token: "tok-0", lastSeen: Date.now() };
     const now = Date.now();

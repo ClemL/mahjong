@@ -212,23 +212,3 @@
   outline-offset: -3px;
   box-shadow: 0 0 22px color-mix(in srgb, var(--gold) 45%, transparent);
 }
-
-/* Upright, the docked hand is positioned and would paint over that outline,
-   so the frame is drawn on a layer above it instead. */
-.phone:not(.phone--landscape) {
-  position: relative;
-}
-
-.phone--acting:not(.phone--landscape) {
-  outline: none;
-}
-
-.phone--acting:not(.phone--landscape)::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 51;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 3px var(--gold);
-  pointer-events: none;
-}

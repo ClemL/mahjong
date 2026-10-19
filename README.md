@@ -1,10 +1,10 @@
 # Hong Kong Mahjong
 
-A playable Hong Kong old-style mahjong table for the browser. Play solo against
-three computer opponents, or around a shared tablet with friends on their
-phones. Built with Next.js and deployed to Vercel: the solo game runs entirely
-client-side and is served as static pages; multiplayer adds a few API routes
-backed by Upstash Redis.
+A playable Hong Kong old-style mahjong table for the browser, played around a
+shared tablet with everyone on their phone, held sideways. A game always takes
+at least two devices — the tablet as the table and one phone — and seats nobody
+takes are played by the computer. Built with Next.js and deployed to Vercel; the
+table runs on a few API routes backed by Upstash Redis.
 
 ![CI](https://github.com/ClemL/mahjong/actions/workflows/ci.yml/badge.svg)
 
@@ -59,7 +59,8 @@ house-rules affair, so every number is in one file and is easy to change.
 
 ## The computer opponents
 
-Two strategies, switchable from the **Play** panel.
+Computer seats play the skilled strategy. A random one is kept as the measured
+baseline.
 
 **Skilled (default).** Counts *shanten* — how many tile changes a hand is from
 completion — and discards whatever leaves the hand closest to ready, breaking
@@ -106,24 +107,12 @@ export interface AiStrategy {
 }
 ```
 
-## Claim prompts
-
-Being asked about every claimable discard is the main source of friction in a
-mahjong UI. **Ask me about claims** has three settings:
-
-- **Useful only** (default) — interrupts when a claim would actually reduce
-  your shanten, using the same judgment the skilled opponent applies to its own
-  hand. About 35% fewer interruptions than asking every time.
-- **Every claim** — the traditional behavior.
-- **Wins only** — never interrupts except to declare a win.
-
-A win is always offered, whatever the setting.
-
 ## Playing together
 
-Single player needs nothing. Multiplayer adds a small server: **three fixed
-tables** (Table 1, 2 and 3), a tablet acting as the table, and everyone else on
-their phone.
+The game runs on a small server: **three fixed tables** (Table 1, 2 and 3), a
+tablet acting as the table, and everyone else on their phone. There is no game
+on one device alone, and no upright layout: phones play sideways, and a phone
+held upright turns its controller on its side.
 
 1. Everyone opens the same table — chosen on the start page, opened the first
    time somebody arrives, so there are no room codes to pass around. The tablet
@@ -131,9 +120,10 @@ their phone.
 2. The tablet takes the **Table** seat.
 3. Everyone else taps the seat they want and sits down. A name is already in the
    box, so sitting down is one tap.
-4. **Nothing is dealt until somebody deals**, so four people arriving one at a
-   time all start the same hand. Waiting alone, you can play the computer in the
-   meantime; the table offers to deal everyone in the moment a friend sits down.
+4. **Nothing is dealt until the table deals**, so four people arriving one at a
+   time all start the same hand. Only the tablet deals; phones on their own are
+   told to open one. Waiting alone, you can play the computer in the meantime;
+   the table offers to deal everyone in the moment a friend sits down.
 5. **Seats nobody takes are played by the computer**, so three friends and one
    empty chair still works.
 
@@ -224,11 +214,11 @@ view so the pond is visible somewhere.
   stands between a passer-by and all four chairs.
 - **Pacing.** Around a shared table nobody is watching the exact instant a tile
   is thrown, and a poll can deliver the move up to a second after it happened,
-  so multiplayer runs its animations about 2.5× slower than single player and
-  keeps a ring on the newest discard. All of it still respects
+  so the table runs its animations about 2.5× slower than a screen you watch up
+  close, and keeps a ring on the newest discard. All of it still respects
   `prefers-reduced-motion`.
 - **Sound.** The tablet and the phones derive cues by diffing consecutive polled
-  views, the same way single player diffs engine states — a clack on a discard,
+  views — a clack on a discard,
   a distinct cue for a claim or kong, a run of notes on a win. Each device has
   its own mute toggle, remembered between visits.
 
@@ -241,8 +231,8 @@ UPSTASH_REDIS_REST_TOKEN=...
 
 Multiplayer needs no password variable while `REQUIRE_PASSWORD` is false.
 
-See [`.env.example`](.env.example). The start page at `/` and the solo game at
-`/solo` stay fully static and need none of this.
+See [`.env.example`](.env.example). The start page at `/` stays fully static and
+needs none of this.
 
 ## Running it
 
@@ -260,9 +250,8 @@ CI (`.github/workflows/ci.yml`) runs all four on every pull request.
 ## Deploying to Vercel
 
 The project is a stock Next.js app — Vercel detects it with no configuration.
-Solo play needs no environment variables; multiplayer needs the two Upstash
-variables above, or rooms live in one serverless instance's memory and appear
-to reset at random.
+The tables need the two Upstash variables above, or rooms live in one serverless
+instance's memory and appear to reset at random.
 
 **From the dashboard:** import the Git repository at
 [vercel.com/new](https://vercel.com/new). Framework preset *Next.js*, build
@@ -276,9 +265,8 @@ vercel          # preview deployment
 vercel --prod   # production
 ```
 
-`/` and `/solo` are prerendered as static content (`○ (Static)`), so the solo
-game is served from the CDN edge; the room pages and `/api/rooms/*` are
-server-rendered on demand.
+`/` is prerendered as static content (`○ (Static)`) and served from the CDN
+edge; the room pages and `/api/rooms/*` are server-rendered on demand.
 
 ### Appearance
 
@@ -322,7 +310,8 @@ src/game/          Rules engine — no React, no DOM
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   sets.ts, waits.ts, helper.ts   Hints: finished sets, waits, sets started
-  replay.ts        A finished hand as compact frames, for the replay
+  patternTiles.ts  The tiles behind each faan pattern, for the result
+  summary.ts       A finished game's standings and facts
   room.ts          Multiplayer room model: seating, draining, redaction
   presence.ts      Away and heartbeat timings
   tables.ts        The three fixed tables
@@ -330,9 +319,9 @@ src/game/          Rules engine — no React, no DOM
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
 src/server/        Room store (Upstash + memory, deflated) and the room service
 src/app/api/       Room, claim, action, control and reset endpoints
-src/hooks/         React bindings for the engine and for a room; the solo save
+src/hooks/         React bindings for a room and the phone's own settings
 src/film/          The explainer film — hand-drawn canvas animation
-src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, replay
+src/components/    Tiles, pip artwork, the felt, the phone controller, settings, results
 src/app/           Next.js App Router entry and styles
 e2e/               Playwright smoke tests against the production build
 public/updates.txt Changelog, oldest first
@@ -346,25 +335,20 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 
 ## Playing
 
-- Click a tile in your hand to discard it.
-- **Hover any tile to zoom it** — in your hand, in the pond, or in an
-  opponent's meld — so a 22px discard is still readable.
-- When an opponent discards something you can use, Chow / Pung / Kong / Win
-  buttons appear with a preview of the meld they would form. **Pass** declines.
-- A green dot on a tile means discarding it leaves you ready (聽牌). Toggle this
-  with **Hints**.
-- **Min faan** sets the table minimum and applies immediately, mid-hand.
-- **Sound** mutes or unmutes the table cues.
-- **Speed** cycles the pace of the computer players; **Pause** stops the table.
-- **Game length** runs the East round alone, East and South, or all four winds
-  (the default) — four dealerships each. The dealer keeps the deal after
-  winning (連莊); a loss or a washout passes it on.
-- **The game is saved on this device** after every move. Reloading `/solo`, or
-  coming back after the browser discarded the tab, picks it up where it was;
-  the start page offers **Resume solo game** or **New solo game**.
-- **Replay hand**, on the result of a finished hand, steps through it one
-  logged move at a time with every hand face up, and says what you were
-  waiting on whenever your hand was ready.
+- On your phone, **tap a tile to arm it and tap again to throw it**, or flick it
+  up off the hand. Drag a tile sideways to put it where you want it.
+- When you can use a discard, Chow / Pung / Kong / Win buttons appear with the
+  meld they would make; **Pass** declines.
+- **Hide hand** turns your tiles face down for when the phone is put down; every
+  hand arrives face down until you turn it up.
+- **Set hints**, the **helper** and **hurry up** are each phone's own choice,
+  under the phone's settings.
+- **Min faan**, **Game length**, **Flowers**, **Liability** and who pays on a
+  discard win are the table's, set from the tablet: in the lobby, or in its
+  settings at any point. Game length runs the East round alone, East and South,
+  or all four winds (the default) — four dealerships each. The dealer keeps the
+  deal after winning (連莊); a loss or a washout passes it on.
+- **Sound** is each device's own.
 
 ### Table and tiles
 
@@ -419,25 +403,40 @@ concerns. Audio is created lazily on your first action, since browsers refuse to
 start it before a gesture, and every call is wrapped so a failed cue can never
 interrupt play. Toggle it with **Sound**.
 
-### Score history
+### Hand results and the end of the game
 
-Every settled hand is recorded — winner, faan, value, per-seat payments and the
-cumulative scores after it. The **Score history** panel lists them as they
-happen, and the end-of-round summary shows final standings, a cumulative-score
-line chart, and the full hand-by-hand table.
+At the end of a hand the tablet lays its result over the felt: who won and what
+it paid them, the winning hand in its sets with the tile it went out on ringed,
+the faan ledger, and who paid. The ledger shows the tiles behind each pattern
+when there are four or fewer of them — a dragon or wind set, a flower, the
+self-drawn tile; a pattern about the whole hand, such as a flush, shows none,
+since the hand is already above it. **Who pays** draws each seat's payment as a
+bar either side of one line, paid to the left and received to the right, with
+the signed amount and each seat's chips after it.
+
+Each phone shows its own result in the space above the hand: what the hand cost
+or paid you and why ("You threw the winning tile, so you pay the full share"),
+the winner's hand and faan, and the table's chips. **Hide** puts it aside;
+**Result** brings it back.
+
+Every settled hand is recorded — winner, faan, value, its biggest pattern,
+per-seat payments and the cumulative scores after it. When the game ends the
+tablet shows the final chips in order, four facts about the game (the biggest
+hand, self-draws, who threw the most winning tiles, washouts) and everyone's
+chips after each hand, as a line chart or, under **Hand by hand**, as a table.
+**New game** goes back to the lobby with everyone still seated; each phone shows
+its place.
 
 The chart's four series use categorical slots 1–4 of a reference palette,
-validated against the panel's dark-green surface: worst adjacent CVD ΔE 8.4,
-normal-vision ΔE 19.8, all four above 3:1 contrast. Identity is never carried by
-color alone — every series is direct-labeled, listed in the legend, and repeated
-in the table.
+validated against each theme's chart surface: on the dark themes, worst adjacent
+CVD ΔE 8.4, normal-vision ΔE 19.8, all four above 3:1 contrast. On Parchment
+three slots fall below 3:1 against the light surface, so the values are always
+readable another way. A colour follows the seat, not the standings. Identity is
+never carried by color alone — every line is named at its end, keyed in the
+final chips, and repeated in the table.
 
 ## Known limitations
 
-- A hand resumed after a reload can only be replayed from where it was picked
-  up; the moves before the reload are not saved.
-- Replay is solo only. A multiplayer server would have to keep each hand's
-  moves and release them after the hand, which it does not yet.
 - No sacred-discard (furiten) rule — Hong Kong does not use one, but some houses
   do bar winning on a tile you have discarded.
 - Seven Pairs (七對子) is deliberately not scored: it is not part of the Hong

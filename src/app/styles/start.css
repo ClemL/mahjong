@@ -158,11 +158,6 @@
   min-width: 0;
 }
 
-.topbar__home {
-  color: inherit;
-  text-decoration: none;
-}
-
 /* The hand turned face down. It is a button, so it drops the button chrome
    and keeps the hand's own frame. */
 .phone__hand--hidden {
@@ -193,4 +188,3 @@
 .phone__more-time {
   flex: none;
 }
-

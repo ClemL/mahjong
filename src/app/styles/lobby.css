@@ -14,12 +14,6 @@
   font-size: 22px;
 }
 
-.lobby__code {
-  color: var(--gold);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  letter-spacing: 0.14em;
-}
-
 .lobby__lead {
   margin: 0;
   color: var(--ink-dim);
@@ -109,9 +103,3 @@
   padding: 7px 10px;
   min-width: 160px;
 }
-
-.lobby__link {
-  color: var(--ink-dim);
-  font-size: 13px;
-}
-

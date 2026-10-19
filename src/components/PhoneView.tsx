@@ -28,12 +28,13 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { useHurryFlash } from "@/hooks/useHurry";
 import { HelperButton, HelperPanel } from "./HelperPanel";
 import { TileBack, TileButton, TileFace } from "./TileView";
-import { MeldRow, bonusClass } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./MeldRow";
 import { ChipStack, Confetti, chipsOf, confettiCount } from "./TableEffects";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
 import { PlayLog } from "./PlayLog";
+import { PhoneResult } from "./PhoneResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 
@@ -163,23 +164,19 @@ function GhostMeld({
 }
 
 /**
- * The player's own view: their hand and the decisions that are theirs.
- *
- * `landscape` is the controller a phone becomes when a tablet is acting as the
- * table. The pond, the scores and everyone's melds are on the shared screen,
- * so the phone gives its whole width to the hand and the choices, held
- * sideways and full screen where the browser allows it.
+ * The player's own view: their hand and the decisions that are theirs, on a
+ * phone held sideways. The pond, the scores and everyone's melds are on the
+ * tablet in the middle, so the phone gives its whole width to the hand and the
+ * choices, full screen where the browser allows it.
  */
 export function PhoneView({
   api,
   view,
   sound,
-  landscape = false,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
-  landscape?: boolean;
 }) {
   const seat = view.you.seat!;
   const me = view.players[seat];
@@ -195,9 +192,7 @@ export function PhoneView({
   // rather than inviting presses the server will refuse.
   const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
-  // Density is a choice for the controller; the phone that stands in for the
-  // whole table keeps its single column.
-  const compact = landscape && layout.compact;
+  const compact = layout.compact;
   // A tile is armed by the first tap or click and thrown by the second, so a
   // double-click or double-tap discards and a single stray touch never does.
   const [armed, setArmed] = useState<string | null>(null);
@@ -224,6 +219,8 @@ export function PhoneView({
   const [preview, setPreview] = useState<ClaimOption | null>(null);
   // Your open sets and flowers drawn large, for reading across a table.
   const [zoomed, setZoomed] = useState(false);
+  // The hand's result, put aside to look at the table, by the hand and phase it was for.
+  const [resultAside, setResultAside] = useState<string | null>(null);
   useEffect(() => {
     // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
@@ -454,7 +451,7 @@ export function PhoneView({
     const tile = me.hand.find((t) => t.id === tileId);
     const at = root && el ? offsetWithin(el, root) : null;
     const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (landscape && tile && el && at && !still) {
+    if (tile && el && at && !still) {
       setSent({
         id: tileId,
         code: tile.code,
@@ -619,9 +616,16 @@ export function PhoneView({
       </>
     ) : null;
 
+  const resultKey = `${view.handNumber}-${view.phase}`;
+  const showResult = over && result !== null && resultAside !== resultKey;
   const promptLine = (
     <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
       {prompt}
+      {over && result && !showResult ? (
+        <button type="button" className="btn btn--sm phone__result-open" onClick={() => setResultAside(null)}>
+          Result
+        </button>
+      ) : null}
     </p>
   );
 
@@ -714,17 +718,18 @@ export function PhoneView({
     <div
       className={[
         "phone",
-        landscape ? "phone--landscape" : "",
+        "phone--landscape",
         compact ? "phone--compact" : "",
-        landscape ? `phone--size-${display.size}` : "",
+        `phone--size-${display.size}`,
         // Your move — your turn or your call on a discard — lit in the same
         // colour the table lights your rack with.
         yourTurn || view.claim ? "phone--acting" : "",
         hurriedBy !== null ? "phone--hurried" : "",
+        showResult ? "phone--result" : "",
       ]
         .filter(Boolean)
         .join(" ")}
-      onPointerDownCapture={landscape ? onFirstTouch : undefined}
+      onPointerDownCapture={onFirstTouch}
       ref={rootRef}
     >
       <header className="phone__bar">
@@ -761,7 +766,7 @@ export function PhoneView({
         {compact ? turnTimer : null}
         {compact ? hurryButton : null}
         {exposedInHeader ? exposed : null}
-        {landscape && fullscreen.supported && !fullscreen.active ? (
+        {fullscreen.supported && !fullscreen.active ? (
           <button
             type="button"
             className="btn btn--sm btn--ghost"
@@ -817,10 +822,9 @@ export function PhoneView({
               sound={sound}
               config={view.config}
               appearance={appearance}
-              fullscreenHint={landscape && !fullscreen.supported}
-              layout={landscape ? layout : undefined}
+              fullscreenHint={!fullscreen.supported}
+              layout={layout}
               display={display}
-              controller={landscape}
               sort={order}
               table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
@@ -844,7 +848,7 @@ export function PhoneView({
           nothing that comes and goes can push it off the bottom or cover it. */}
       <div className="phone__dock">
         <div className="phone__controls">
-          {landscape && display.playLog === "on" ? (
+          {display.playLog === "on" ? (
             <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
           ) : null}
           {armedTile && yourTurn ? (
@@ -958,6 +962,9 @@ export function PhoneView({
           </div>
         )}
       </div>
+      {showResult ? (
+        <PhoneResult view={view} seat={seat} nameOf={nameOf} onHide={() => setResultAside(resultKey)} />
+      ) : null}
       {hurriedBy !== null ? (
         <div className="phone__hurry" role="alert">
           <span className="phone__hurry-text">{hurriedBy} says hurry up!</span>
@@ -976,7 +983,7 @@ export function PhoneView({
           ) : null}
         </button>
       ) : null}
-      {landscape && youWon && result?.score ? (
+      {youWon && result?.score ? (
         <Confetti
           key={`confetti-${view.handNumber}`}
           count={confettiCount(result.score.scoredFaan)}

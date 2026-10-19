@@ -14,7 +14,7 @@ import { positionOf } from "./tableLayout";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
 import { PhoneSettings } from "./PhoneSettings";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 
 /** Screen edges by position; which seat is at which follows the table's rotation. */
 const EDGES = ["bottom", "right", "top", "left"];
@@ -116,13 +116,13 @@ export function TableLobby({
           <strong>{tableName(view.roomId)}.</strong>{" "}
           {isTable
             ? "Scan the code on the chair you are sitting in. Type a name into it first and it arrives with them. Nothing is dealt until the table deals."
-            : view.canDeal
-              ? "Deal once everyone is down. Seats left open are played by the computer."
-              : "You are in. The table deals once everyone is down."}
+            : "You are in. The table deals once everyone is down."}
         </p>
         {/* The same drawer as during play, so the look and the house rules can
             be settled while people are still sitting down. */}
-        <SettingsMenu>
+        <SettingsMenu
+          sheet={isTable ? { title: "Table settings", subtitle: `${tableName(view.roomId)} · Before the deal` } : undefined}
+        >
           {isTable ? (
             <TableSettings
               api={api}
@@ -136,9 +136,8 @@ export function TableLobby({
               sound={sound}
               config={view.config}
               appearance={appearance}
-              // The controller layout only exists once a tablet is the table.
-              layout={view.tablePresent ? layout : undefined}
-              display={view.tablePresent ? phoneDisplay : undefined}
+              layout={layout}
+              display={phoneDisplay}
               table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
             />
@@ -382,9 +381,11 @@ export function TableLobby({
           </button>
         ) : (
           <span className="gather__hint">
+            {/* A game is played with a tablet in the middle: no phone deals, and
+                there is nothing to deal to until one is the table. */}
             {view.tablePresent
               ? "The table deals when everyone is ready."
-              : "Take a seat to start the hand."}
+              : "Open Tablet mode on a tablet to deal. It goes in the middle, as the table."}
           </span>
         )}
       </footer>

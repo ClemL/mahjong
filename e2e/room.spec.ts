@@ -1,7 +1,7 @@
 import { type Browser, type Page, expect, test } from "@playwright/test";
 import { PHONE_LANDSCAPE, TABLET, presetPreferences, watchErrors } from "./helpers";
 
-/** Its own table, so a solo run elsewhere can never be sitting in this one. */
+/** Its own table, so another spec's game can never be sitting in this one. */
 const ROOM = "TABLE2";
 
 async function open(

@@ -13,7 +13,8 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
-import { TableResult } from "./TableResult";
+import { TableResult, isLastHand } from "./TableResult";
+import { GameComplete } from "./GameComplete";
 import {
   ChipStack,
   DealOverlay,
@@ -28,10 +29,10 @@ import { signatureMoment, winningTileOf } from "./moments";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
-import { MeldRow, bonusClass, isFreshClaim } from "./SeatPanel";
+import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 import {
   POSITION_ROTATION,
   type TableLayout,
@@ -563,14 +564,16 @@ function Console({
  * at the table, and the next hand brings it back.
  */
 export function useResultSheet(view: RoomView) {
-  const [asideHand, setAsideHand] = useState<number | null>(null);
+  const [aside, setAside] = useState<string | null>(null);
   const settled = (view.phase === "handOver" || view.phase === "gameOver") && view.result !== null;
+  // The game's end comes up over the last hand's result even if that was put aside.
+  const key = `${view.handNumber}-${view.phase}`;
   return {
-    open: settled && asideHand !== view.handNumber,
+    open: settled && aside !== key,
     /** Settled, with the sheet put aside — the way back to it is the caller's. */
-    aside: settled && asideHand === view.handNumber,
-    hide: () => setAsideHand(view.handNumber),
-    show: () => setAsideHand(null),
+    aside: settled && aside === key,
+    hide: () => setAside(key),
+    show: () => setAside(null),
   };
 }
 
@@ -587,15 +590,16 @@ export function Felt({
   display,
   sheet,
   onNextHand,
+  onNewGame,
   onSkipDeal,
-  onReplay,
   busy = false,
 }: {
   view: RoomView;
   display: TabletDisplay;
   sheet: ResultSheet;
   onNextHand: () => void;
-  onReplay?: () => void;
+  /** Back to the lobby with everyone seated, once the game is over. */
+  onNewGame: () => void;
   /** The deal has been skipped here; whoever holds play for it should stop. */
   onSkipDeal?: () => void;
   busy?: boolean;
@@ -717,15 +721,24 @@ export function Felt({
           />
           {/* A moment has the felt to itself; the sheet follows it, or a skip. */}
           {sheet.open && !momentLive ? (
-            <TableResult
-              view={view}
-              name={(seat) => occupantName(view.players[seat])}
-              tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
-              onHide={sheet.hide}
-              onNextHand={onNextHand}
-              onReplay={onReplay}
-              busy={busy}
-            />
+            view.phase === "gameOver" ? (
+              <GameComplete
+                view={view}
+                name={(seat) => occupantName(view.players[seat])}
+                onHide={sheet.hide}
+                onNewGame={onNewGame}
+                busy={busy}
+              />
+            ) : (
+              <TableResult
+                view={view}
+                name={(seat) => occupantName(view.players[seat])}
+                tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
+                onHide={sheet.hide}
+                onNextHand={onNextHand}
+                busy={busy}
+              />
+            )
           ) : null}
           <WinOverlay
             live={winLive}
@@ -794,7 +807,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         <div className="actions">
           {sheet.aside ? (
             <button type="button" className="btn btn--sm" onClick={sheet.show}>
-              Result
+              {view.phase === "gameOver" ? "Final scores" : "Result"}
             </button>
           ) : null}
           {view.phase === "handOver" ? (
@@ -804,7 +817,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
               disabled={api.busy}
               onClick={() => void api.control({ type: "nextHand" })}
             >
-              Next hand
+              {isLastHand(view) ? "Final scores" : "Next hand"}
             </button>
           ) : null}
           {view.awaitingClaimSeats.length > 0 ? (
@@ -842,7 +855,12 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
               Full screen
             </button>
           ) : null}
-          <SettingsMenu>
+          <SettingsMenu
+            sheet={{
+              title: "Table settings",
+              subtitle: `${tableName(view.roomId)} · Hand ${view.handNumber} · ${roundName(view.roundWind)} round`,
+            }}
+          >
             <TableSettings
               api={api}
               view={view}
@@ -859,6 +877,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         display={display}
         sheet={sheet}
         onNextHand={() => void api.control({ type: "nextHand" })}
+        onNewGame={() => void api.control({ type: "restart" })}
         onSkipDeal={() => void api.control({ type: "skipOpening" })}
         busy={api.busy}
       />

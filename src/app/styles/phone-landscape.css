@@ -1,7 +1,7 @@
 /* ================================================ the phone, held sideways == */
 
-/* With a tablet acting as the table, a phone is only a controller: the hand
-   along the bottom, the choices above it, nothing to scroll. */
+/* The game is only played sideways. A phone is a controller beside the tablet:
+   the hand along the bottom, the choices above it, nothing to scroll. */
 .app--handset {
   max-width: none;
   width: 100%;
@@ -21,7 +21,8 @@ body:has(.app--handset) {
 }
 
 /* Held upright — or with rotation locked, which a page cannot override
-   outside full screen — the controller turns itself on its side instead.
+   outside full screen — the controller turns itself on its side, so it is
+   landscape whichever way the phone is held.
    Turned clockwise, it reads correctly with the phone rotated to the left,
    which is the way Android calls landscape. The safe-area insets turn with it. */
 @media (orientation: portrait) {
@@ -46,12 +47,6 @@ body:has(.app--handset) {
   color: var(--gold);
   font-size: 18px;
   line-height: 1;
-}
-
-/* Outside the controller the confirm bar and the actions keep their own
-   places in the dock's column, above the hand. */
-.phone__controls {
-  display: contents;
 }
 
 .phone--landscape {
@@ -692,4 +687,3 @@ body:has(.app--handset) {
   padding-top: 14px;
   border-top: 1px solid var(--line-soft);
 }
-

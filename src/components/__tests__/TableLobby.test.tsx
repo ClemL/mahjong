@@ -149,14 +149,12 @@ describe("TableLobby on a phone", () => {
     expect(screen.getByText("The table deals when everyone is ready.")).toBeTruthy();
   });
 
-  it("lets a player deal when no tablet is acting as the table", () => {
+  it("never lets a phone deal: with no tablet yet, it asks for one", () => {
     const view = playerView(lobby([0, 1], false), 0);
-    const api = fakeApi(view);
-    render(<TableLobby api={api} view={view} sound={sound} />);
+    render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Deal" }));
-    expect(api.control).toHaveBeenCalledWith({ type: "deal" });
-    expect(screen.queryByRole("button", { name: "Reset table" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^(Deal|Play the computer)$/ })).toBeNull();
+    expect(screen.getByText(/Open Tablet mode on a tablet/)).toBeTruthy();
   });
 });
 

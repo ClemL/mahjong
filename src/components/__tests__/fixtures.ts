@@ -14,7 +14,7 @@ import {
 } from "@/game/room";
 import type { Seat } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
-import type { SoundToggle } from "../TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 
 export const NAMES = ["Kris", "Srini", "Steven", "James"];
 

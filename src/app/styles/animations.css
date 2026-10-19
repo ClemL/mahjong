@@ -148,10 +148,6 @@
 
 /* Rows hold zoomed and animated tiles without clipping them. */
 .seat__row,
-.pond__row,
-.hand__tiles,
-.meld,
-.modal__tiles {
+.meld {
   overflow: visible;
 }
-
