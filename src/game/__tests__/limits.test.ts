@@ -9,9 +9,10 @@ import {
   liableSeat,
   selfDrawScore,
   setLiability,
+  setOthersPayHalf,
 } from "../engine";
 import type { Meld } from "../melds";
-import { DEFAULT_RULES, type RuleConfig, ruleNotes } from "../rules";
+import { DEFAULT_RULES, type RuleConfig, halfShare, othersPayHalfInPlay, ruleNotes } from "../rules";
 import type { Seat, Tile } from "../tiles";
 
 let uid = 0;
@@ -192,7 +193,7 @@ describe("包 liability", () => {
   });
 
   it("leaves a win off a discard to the discarder", () => {
-    const state = onTurn(blank(), 0, "s1 s9 we ws ww wn dg dw m1 m9 p1 p9 s5 p5");
+    const state = onTurn(blank({ othersPayHalf: false }), 0, "s1 s9 we ws ww wn dg dw m1 m9 p1 p9 s5 p5");
     state.players[1].hand = tiles("p5");
     state.players[1].melds = twelveDown().players[1].melds;
     state.players[0].discards = tiles("s2 s3");
@@ -216,5 +217,61 @@ describe("包 liability", () => {
     const state = twelveDown();
     delete (state.config as Partial<RuleConfig>).liability;
     expect(declareSelfDraw(state, 1).result?.liable).toBe(3);
+  });
+});
+
+describe("the others pay half of a discard win", () => {
+  /** East throws South the last tile of a ready hand; it is not East's first discard, so no 地糊. */
+  function winOffEast(config: Partial<RuleConfig> = {}): GameState {
+    const state = onTurn(blank(config), 0, "s1 s9 we ws ww wn dg dw m1 m9 p1 p9 s5 p5");
+    state.players[0].discards = tiles("s2 s3");
+    state.players[1].hand = tiles("m1 m2 m3 m4 m5 m6 m7 m8 m9 dr dr dr p5");
+    const thrown = discard(state, 0, state.players[0].hand.find((t) => t.code === "p5")!.id);
+    return answerClaim(thrown, 1, "win");
+  }
+
+  it("is in play by default: the discarder pays the value, the other two half each", () => {
+    const after = winOffEast();
+    const value = after.result!.score!.value;
+    const half = halfShare(value);
+    expect(after.result?.payments).toEqual([-value, value + 2 * half, -half, -half]);
+    expect(after.scores.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it("rounds a half up to a whole point", () => {
+    expect([1, 2, 3, 8, 24].map(halfShare)).toEqual([1, 1, 2, 4, 12]);
+  });
+
+  it("leaves the discarder paying alone when the table switches it off", () => {
+    const after = winOffEast({ othersPayHalf: false });
+    const value = after.result!.score!.value;
+    expect(after.result?.payments).toEqual([-value, value, 0, 0]);
+  });
+
+  it("leaves a self-drawn win as it was: all three pay the value", () => {
+    const state = onTurn(blank(), 1, COMPLETE);
+    state.players[0].discards = tiles("s2 s3");
+    const after = declareSelfDraw(state, 1);
+    const value = after.result!.score!.value;
+    expect(after.result?.payments).toEqual([-value, 3 * value, -value, -value]);
+  });
+
+  it("can be switched off and on between moves, and the rules say which", () => {
+    const payment = (state: GameState) => ruleNotes(state.config).find((n) => n.title === "Payment")?.body;
+    const off = setOthersPayHalf(blank(), false);
+    expect(off.config.othersPayHalf).toBe(false);
+    expect(payment(off)).toMatch(/discarder alone pays/);
+    const on = setOthersPayHalf(off, true);
+    expect(on.config.othersPayHalf).toBe(true);
+    expect(payment(on)).toMatch(/half of it each/);
+    expect(setOthersPayHalf(on, true)).toBe(on);
+    expect(on.log.at(-1)?.text).toMatch(/half each/);
+  });
+
+  it("counts a table saved before the option existed as playing it", () => {
+    const state = blank();
+    delete (state.config as Partial<RuleConfig>).othersPayHalf;
+    expect(othersPayHalfInPlay(state.config)).toBe(true);
+    expect(DEFAULT_RULES.othersPayHalf).toBe(true);
   });
 });

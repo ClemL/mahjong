@@ -41,6 +41,7 @@ import {
   nextHand,
   setFlowers,
   setLiability,
+  setOthersPayHalf,
   setMinFaan,
   setRounds,
   startHand,
@@ -276,6 +277,7 @@ export type TableCommand =
   | { type: "skipOpening" }
   | { type: "flowers"; value: boolean }
   | { type: "liability"; value: boolean }
+  | { type: "othersPayHalf"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
@@ -371,6 +373,9 @@ export async function control(
       // Read when a hand is settled, so it can change at any point.
       case "liability":
         r.state = setLiability(r.state, command.value === true);
+        break;
+      case "othersPayHalf":
+        r.state = setOthersPayHalf(r.state, command.value === true);
         break;
       case "speed":
         if (!SPEED_LEVELS.some((s) => s.level === command.value)) {

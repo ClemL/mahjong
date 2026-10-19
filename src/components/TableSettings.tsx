@@ -5,7 +5,7 @@ import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, roundsInGame } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, othersPayHalfInPlay, roundsInGame } from "@/game/rules";
 import { GAME_LENGTHS } from "./gameLength";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
@@ -52,6 +52,15 @@ const FLOWERS: ChoiceOption<OnOff>[] = [
 const LIABILITY: ChoiceOption<OnOff>[] = [
   { value: "on", label: "In play", hint: "Feeding a third dragon set or a fourth set pays that player's self-draw alone" },
   { value: "off", label: "Off", hint: "A self-drawn win is always paid by all three" },
+];
+
+const OTHERS_PAY_HALF: ChoiceOption<OnOff>[] = [
+  {
+    value: "on",
+    label: "Half each",
+    hint: "On a win off a discard, the two players who did not throw it pay half the hand's value each",
+  },
+  { value: "off", label: "Discarder only", hint: "On a win off a discard, the discarder alone pays (出銃全包)" },
 ];
 
 const SOUND: ChoiceOption<"on" | "off">[] = [
@@ -121,6 +130,14 @@ export function TableSettings({
               value={liabilityInPlay(view.config) ? "on" : "off"}
               disabled={api.busy}
               onChange={(value) => void api.control({ type: "liability", value: value === "on" })}
+            />
+
+            <Choice
+              label="Others pay on a discard"
+              options={OTHERS_PAY_HALF}
+              value={othersPayHalfInPlay(view.config) ? "on" : "off"}
+              disabled={api.busy}
+              onChange={(value) => void api.control({ type: "othersPayHalf", value: value === "on" })}
             />
 
             <Choice

@@ -328,6 +328,15 @@ describe("table control", () => {
     await expect(control(id, tokens[0], { type: "liability", value: false })).rejects.toMatchObject({ status: 403 });
   });
 
+  it("switches whether the others pay half of a discard win, at any point, from the table only", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    expect((await control(id, table, { type: "othersPayHalf", value: false })).config.othersPayHalf).toBe(false);
+    expect((await control(id, table, { type: "othersPayHalf", value: true })).config.othersPayHalf).toBe(true);
+    await expect(control(id, tokens[0], { type: "othersPayHalf", value: false })).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
   it("takes the flowers out of the set between hands, never during one", async () => {
     const id = await room();
     await claimSeat(id, { seat: 0 });

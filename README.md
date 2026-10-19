@@ -45,8 +45,9 @@ backed by Upstash Redis.
 - **The faan minimum is a table setting** — 0, 1, 3 (the Hong Kong standard) or
   5 — changeable mid-hand. It defaults to **3**; at 0 a chicken hand (雞糊) can
   be declared for a single point.
-- Self-draw: all three opponents pay. Win on a discard: the discarder alone
-  pays (出銃全包).
+- Self-draw: all three opponents pay. Win on a discard: the discarder pays the
+  hand's value and the other two pay half of it each, rounded up. A
+  multiplayer table can switch that off so the discarder alone pays (出銃全包).
 - Liability (包): whoever discards the tile that gives a player their third
   dragon set, or their fourth set of any kind (十二張落地), pays that player's
   whole self-drawn win alone. House rules vary, so a multiplayer table can

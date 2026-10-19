@@ -50,8 +50,12 @@ export interface RuleConfig {
   limitFaan: number;
   /** payoutTable[faan] = points a single payer owes. */
   payoutTable: number[];
-  /** When true the discarder alone pays a discard win (出銃全包). */
-  discarderPaysAll: boolean;
+  /**
+   * A win off a discard is paid in full by the discarder; with this on, the
+   * two players who did not throw it also pay half of it each (rounded up).
+   * Off, the discarder alone pays (出銃全包).
+   */
+  othersPayHalf: boolean;
   /** When true a washed-out hand keeps the dealership in place (流局連莊). */
   dealerKeepsOnWashout: boolean;
   /**
@@ -114,7 +118,7 @@ export const DEFAULT_RULES: RuleConfig = {
   minFaan: 3,
   limitFaan: 10,
   payoutTable: DEFAULT_PAYOUT_TABLE,
-  discarderPaysAll: true,
+  othersPayHalf: true,
   dealerKeepsOnWashout: false,
   flowers: true,
   rounds: 4,
@@ -142,6 +146,19 @@ export function flowersInPlay(config: Pick<RuleConfig, "flowers">): boolean {
 /** Whether this table plays 包. A table saved before the option existed gets the default. */
 export function liabilityInPlay(config: Pick<RuleConfig, "liability">): boolean {
   return config.liability !== false;
+}
+
+/**
+ * Whether the players who did not throw a winning discard pay half of it each.
+ * A table saved before the option existed gets the default.
+ */
+export function othersPayHalfInPlay(config: Pick<RuleConfig, "othersPayHalf">): boolean {
+  return config.othersPayHalf !== false;
+}
+
+/** What each of the others pays on a discard win worth `value`: half, rounded up to a whole point. */
+export function halfShare(value: number): number {
+  return Math.ceil(value / 2);
 }
 
 /** A faan value, falling back to the default for a table saved before the pattern existed. */
@@ -215,7 +232,12 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
       title: "Payment",
       body:
         "Self-draw (自摸): all three opponents pay the hand's value. " +
-        "Win on a discard: the discarder alone pays. A washed-out wall (流局) pays nothing.",
+        (othersPayHalfInPlay(config)
+          ? "Win on a discard: the discarder pays the hand's value, and the two players who did not throw it " +
+            "pay half of it each, rounded up. House rules vary; the table can switch this off so the discarder " +
+            "alone pays (出銃全包). "
+          : "Win on a discard: the discarder alone pays (出銃全包). ") +
+        "A washed-out wall (流局) pays nothing.",
     },
     {
       title: "Liability (包)",
@@ -223,7 +245,7 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
         ? "Whoever discards the tile that gives a player their third dragon set, or their fourth set of any " +
           "kind (twelve tiles face up, 十二張落地), pays that player's whole self-drawn win alone — all three " +
           "shares. If it happens more than once, the latest feed is the one that pays. A concealed kong is " +
-          "nobody's feed. A win off a discard is paid by the discarder as usual. House rules vary; the table " +
+          "nobody's feed. A win off a discard is paid as any other discard win. House rules vary; the table " +
           "can switch this off."
         : "This table does not play liability (包): a self-drawn win is paid by all three opponents, " +
           "whoever fed the sets.",

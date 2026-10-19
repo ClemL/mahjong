@@ -28,7 +28,9 @@ import {
   type RuleConfig,
   describeRounds,
   flowersInPlay,
+  halfShare,
   liabilityInPlay,
+  othersPayHalfInPlay,
   roundsInGame,
 } from "./rules";
 import { createRng, shuffle } from "./rng";
@@ -893,17 +895,15 @@ function settleWin(
         payments[winner] += value;
       }
     }
-  } else if (state.config.discarderPaysAll) {
-    payments[from] -= value;
-    payments[winner] += value;
   } else {
     payments[from] -= value;
     payments[winner] += value;
-    for (const p of state.players) {
-      if (p.seat !== winner && p.seat !== from) {
-        const half = Math.ceil(value / 2);
-        payments[p.seat] -= half;
-        payments[winner] += half;
+    if (othersPayHalfInPlay(state.config)) {
+      for (const p of state.players) {
+        if (p.seat !== winner && p.seat !== from) {
+          payments[p.seat] -= halfShare(value);
+          payments[winner] += halfShare(value);
+        }
       }
     }
   }
@@ -1006,6 +1006,21 @@ export function setLiability(previous: GameState, liability: boolean): GameState
   const state = clone(previous);
   state.config = { ...state.config, liability };
   log(state, null, liability ? "Liability (包) is in play" : "Liability (包) is switched off");
+  return state;
+}
+
+/** Whether the others pay half of a discard win. Read when a hand is settled, like 包. */
+export function setOthersPayHalf(previous: GameState, othersPayHalf: boolean): GameState {
+  if (othersPayHalfInPlay(previous.config) === othersPayHalf) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, othersPayHalf };
+  log(
+    state,
+    null,
+    othersPayHalf
+      ? "On a discard win the other two now pay half each"
+      : "On a discard win the discarder now pays alone (出銃全包)",
+  );
   return state;
 }
 
