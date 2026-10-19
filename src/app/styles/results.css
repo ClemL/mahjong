@@ -1,0 +1,931 @@
+/* ============================================ the end of a hand, and a game == */
+
+/* Over everything on the felt but the chips and confetti, which cross it. The
+   felt and the turned-up racks show through, dimmed. */
+.result-sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 26;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: color-mix(in srgb, var(--backdrop) 55%, transparent);
+  animation: result-in 450ms ease 200ms both;
+}
+
+@keyframes result-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.result-sheet__card {
+  position: relative;
+  isolation: isolate;
+  width: min(1120px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 24px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+}
+
+/* The panel's own colour is see-through too, so it reads as laid on the felt. */
+.result-sheet__card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--modal-bg);
+  opacity: 0.92;
+}
+
+.result-sheet__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.result-sheet__heading-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.result-sheet__kicker {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.result-sheet__title {
+  margin: 0;
+  font-size: clamp(26px, 3.6vw, 44px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+}
+
+.result-sheet__zh {
+  margin-left: 4px;
+  font-size: 0.72em;
+  color: var(--gold);
+}
+
+.result-sheet__subtitle {
+  margin: 2px 0 0;
+  color: var(--ink-dim);
+  font-size: 16px;
+}
+
+.result-sheet__gain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.result-sheet__gain-value {
+  font-size: clamp(34px, 4.6vw, 56px);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+.result-sheet__gain-note {
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.result-sheet__head-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.result-sheet__panel {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: var(--raise-0);
+  border: 1px solid var(--line);
+}
+
+.result-sheet__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.result-sheet__heading {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.result-sheet__note {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.result-sheet__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.result-sheet__columns--one {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(560px, 100%);
+  margin: 0 auto;
+}
+
+.result-sheet__actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.result-sheet__actions .btn {
+  min-height: 46px;
+  padding-inline: 20px;
+}
+
+.result-sheet__next {
+  margin-right: auto;
+  font-size: 15px;
+  color: var(--ink-dim);
+}
+
+/* ---- the winning hand, set by set, each named underneath ---- */
+
+.result-hand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 18px;
+}
+
+.result-hand__group {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.result-hand__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.result-hand__won {
+  color: var(--gold);
+}
+
+/* The tile the hand went out on: a ring, and its set says so in words. */
+.tile--won-on {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.result-hand--bare {
+  gap: 4px 8px;
+}
+
+/* A limit hand's sets turn over one at a time on the result sheet. */
+.result-hand--reveal .result-hand__group {
+  animation: reveal-set 520ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  animation-delay: calc(var(--i) * 260ms + 600ms);
+}
+
+@keyframes reveal-set {
+  0%   { opacity: 0; transform: perspective(600px) rotateY(80deg); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ---- the faan, with the tiles behind each where there are few ---- */
+
+.faan-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.faan-ledger__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.faan-ledger__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 3ch;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.faan-ledger__name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.faan-ledger__zh {
+  margin-left: 4px;
+  color: var(--ink-dim);
+}
+
+.faan-ledger__tiles {
+  --tile-sm: 24px;
+  display: inline-flex;
+  gap: 2px;
+}
+
+.faan-ledger__faan {
+  font-size: 18px;
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.faan-ledger__total {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--shade-2);
+}
+
+.faan-ledger__total-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.faan-ledger__total-text strong {
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.faan-ledger__value {
+  font-size: 32px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+/* ---- who paid, as bars either side of one line ---- */
+
+.who-pays {
+  --who: 112px;
+  --chips: 56px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--shade-2);
+}
+
+.who-pays__head,
+.who-pays__row {
+  display: grid;
+  grid-template-columns: var(--who) minmax(0, 1fr) minmax(0, 1fr) var(--chips);
+  align-items: center;
+}
+
+.who-pays__head {
+  padding-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.who-pays__side { padding-left: 10px; }
+.who-pays__side--paid { padding: 0 10px 0 0; text-align: right; }
+
+.who-pays__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.who-pays__row {
+  min-height: 50px;
+}
+
+.who-pays__row--plain {
+  grid-template-columns: minmax(0, 1fr) var(--chips);
+  min-height: 44px;
+}
+
+.who-pays__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.who-pays__name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.who-pays__row--winner .who-pays__name {
+  font-weight: 800;
+}
+
+.who-pays__role {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.who-pays__lane {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+}
+
+.who-pays__lane--paid {
+  justify-content: flex-end;
+  border-right: 2px solid var(--line-strong);
+}
+
+/* The bars are one neutral tone: which side of the line, and the signed
+   number beside it, say paid or received. */
+.who-pays__bar {
+  height: 20px;
+  width: calc(var(--share) * (100% - 5ch));
+  min-width: 3px;
+  background: var(--ink-dim);
+  opacity: 0.85;
+}
+
+.who-pays__lane--paid .who-pays__bar { border-radius: 4px 0 0 4px; }
+.who-pays__lane--received .who-pays__bar { border-radius: 0 4px 4px 0; }
+
+.who-pays__delta {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.who-pays__delta--none {
+  padding-left: 10px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.who-pays__chips {
+  text-align: right;
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- the end of the game ---- */
+
+.game-over__body {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
+  min-height: 0;
+}
+
+.game-over__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.standings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.standings__row {
+  display: grid;
+  grid-template-columns: 2ch 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 50px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.standings__row:last-child {
+  border-bottom: none;
+}
+
+.standings__place {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.standings__row--top .standings__place {
+  color: var(--gold);
+}
+
+.standings__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.standings__name {
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.standings__meta {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.standings__chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.standings__count {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.standings__delta {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.line-key {
+  flex-shrink: 0;
+}
+
+.game-over__stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.game-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--raise-0);
+  border: 1px solid var(--line);
+}
+
+.game-stat__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.game-stat__value {
+  font-size: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-stat__note {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.seg--inline {
+  flex-shrink: 0;
+  border-radius: 999px;
+}
+
+.seg--inline .seg__btn {
+  min-height: 36px;
+  padding-inline: 14px;
+  border-radius: 999px;
+}
+
+.game-over__chart {
+  min-height: 0;
+}
+
+/* The chart sits on the surface its colours were validated against. */
+.chips-chart {
+  position: relative;
+  border-radius: 12px;
+  background: var(--chart-surface);
+  touch-action: pan-y;
+}
+
+.chips-chart:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.chips-chart__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.chips-chart__grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.chips-chart__start {
+  stroke: var(--chart-zero);
+  stroke-width: 1;
+}
+
+.chips-chart__tick {
+  fill: var(--ink-dim);
+  font-size: 12px;
+}
+
+.chips-chart__line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* A ring in the surface colour keeps a dot legible where it crosses a line. */
+.chips-chart__dot {
+  stroke: var(--chart-surface);
+  stroke-width: 2;
+}
+
+.chips-chart__cross {
+  stroke: var(--ink-dim);
+  stroke-width: 1;
+}
+
+.chips-chart__leader {
+  stroke: var(--ink-dim);
+  stroke-width: 1;
+}
+
+.chips-chart__label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chips-chart__tip {
+  position: absolute;
+  top: 10px;
+  transform: translateX(12px);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--tooltip-bg);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  font-size: 13px;
+}
+
+.chips-chart__tip--left {
+  transform: translateX(calc(-100% - 12px));
+}
+
+.chips-chart__tip-title {
+  font-weight: 800;
+}
+
+.chips-chart__tip-what {
+  color: var(--ink-dim);
+}
+
+.chips-chart__tip-rows {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 8px;
+}
+
+.chips-chart__tip-row {
+  display: contents;
+}
+
+.chips-chart__tip-row strong {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chips-table__scroll {
+  max-height: 340px;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--chart-surface);
+}
+
+.chips-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.chips-table th,
+.chips-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--chart-grid);
+  text-align: left;
+}
+
+.chips-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--chart-surface);
+  font-size: 12px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.chips-table__num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chips-table__delta {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .result-sheet__columns,
+  .game-over__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .result-sheet__head {
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- a phone's result, in the space above its hand ---- */
+
+/* Over the prompt, the choices and the helper, but never the hand: that row
+   stays where it always is. */
+.phone-result {
+  grid-column: 1 / -1;
+  grid-row: 2 / -2;
+  z-index: 5;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas:
+    "you table"
+    "winner table";
+  gap: 6px 14px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--modal-bg);
+  border: 1px solid var(--line);
+  --tile-sm: clamp(14px, 6cqh, 24px);
+}
+
+/* What the result covers keeps its room, so the hand does not move, but none
+   of it shows round the edges. */
+.phone--result > .phone__status,
+.phone--result > .phone__melds,
+.phone--result > .phone__dock > .phone__controls,
+.phone--result > .phone__dock > .helper {
+  visibility: hidden;
+}
+
+.phone-result--game {
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "you table";
+}
+
+.phone-result__you {
+  grid-area: you;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.phone-result__kicker {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.phone-result__line {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.phone-result__big {
+  font-size: clamp(26px, 12cqh, 44px);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-result__chips {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.phone-result__why {
+  font-size: 13px;
+}
+
+.phone-result__winner {
+  grid-area: winner;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.phone-result__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.phone-result__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.phone-result__zh {
+  color: var(--gold);
+}
+
+.phone-result__faan {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.phone-result__note {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone-result__patterns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.phone-result__pattern {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--raise-1);
+  font-size: 12px;
+}
+
+.phone-result__table {
+  grid-area: table;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.phone-result__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.phone-result__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 5ch 4ch;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
+}
+
+.phone-result__row--you {
+  font-weight: 800;
+}
+
+.phone-result__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phone-result__tag {
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 10px;
+  font-weight: 800;
+  vertical-align: 1px;
+}
+
+.phone-result__delta,
+.phone-result__count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-result__count {
+  color: var(--ink-dim);
+}
+
+.phone-result__next {
+  margin-top: auto;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone__result-open {
+  margin-left: 8px;
+}
+
+/* A short screen keeps the numbers and drops the labels around them. */
+@container (max-height: 340px) {
+  .phone-result {
+    padding-block: 4px;
+    row-gap: 4px;
+  }
+
+  .phone-result__kicker,
+  .phone-result__note {
+    display: none;
+  }
+
+  .phone-result__row {
+    min-height: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .result-sheet,
+  .result-hand--reveal .result-hand__group {
+    animation: none;
+  }
+}

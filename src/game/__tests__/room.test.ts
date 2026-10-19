@@ -151,6 +151,15 @@ describe("redaction", () => {
     );
     expect(viewFor(room, "tok-table").drawnTileId).toBeNull();
   });
+
+  it("names the drawn tile to everyone once the hand is over, when every hand is face up", () => {
+    const drawn = room.state.drawnTileId;
+    expect(drawn).not.toBeNull();
+    room.state = { ...room.state, phase: "handOver" };
+    for (const token of ["tok-0", "tok-south", "tok-table", null]) {
+      expect(viewFor(room, token).drawnTileId).toBe(drawn);
+    }
+  });
 });
 
 describe("the deal on the table screen", () => {

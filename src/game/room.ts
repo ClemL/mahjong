@@ -813,7 +813,8 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     dealership: state.dealership,
     wallCount: state.wall.length,
     lastDiscard: state.lastDiscard,
-    drawnTileId: you.role === "player" && you.seat === state.turn ? state.drawnTileId : null,
+    // Settled, every hand is face up: the drawn tile is the self-drawn winner, shown to all.
+    drawnTileId: settled || (you.role === "player" && you.seat === state.turn) ? state.drawnTileId : null,
     players,
     scores: state.scores,
     result: state.result,

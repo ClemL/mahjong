@@ -34,6 +34,7 @@ import type { SoundToggle } from "@/hooks/useRoomSound";
 import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
 import { PlayLog } from "./PlayLog";
+import { PhoneResult } from "./PhoneResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 
@@ -218,6 +219,8 @@ export function PhoneView({
   const [preview, setPreview] = useState<ClaimOption | null>(null);
   // Your open sets and flowers drawn large, for reading across a table.
   const [zoomed, setZoomed] = useState(false);
+  // The hand's result, put aside to look at the table, by the hand and phase it was for.
+  const [resultAside, setResultAside] = useState<string | null>(null);
   useEffect(() => {
     // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
@@ -613,9 +616,16 @@ export function PhoneView({
       </>
     ) : null;
 
+  const resultKey = `${view.handNumber}-${view.phase}`;
+  const showResult = over && result !== null && resultAside !== resultKey;
   const promptLine = (
     <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
       {prompt}
+      {over && result && !showResult ? (
+        <button type="button" className="btn btn--sm phone__result-open" onClick={() => setResultAside(null)}>
+          Result
+        </button>
+      ) : null}
     </p>
   );
 
@@ -715,6 +725,7 @@ export function PhoneView({
         // colour the table lights your rack with.
         yourTurn || view.claim ? "phone--acting" : "",
         hurriedBy !== null ? "phone--hurried" : "",
+        showResult ? "phone--result" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -951,6 +962,9 @@ export function PhoneView({
           </div>
         )}
       </div>
+      {showResult ? (
+        <PhoneResult view={view} seat={seat} nameOf={nameOf} onHide={() => setResultAside(resultKey)} />
+      ) : null}
       {hurriedBy !== null ? (
         <div className="phone__hurry" role="alert">
           <span className="phone__hurry-text">{hurriedBy} says hurry up!</span>

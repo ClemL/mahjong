@@ -1,0 +1,55 @@
+/**
+ * A finished game told from its hand history: where everyone ended, how they
+ * got there, and the handful of facts a table talks about afterwards.
+ */
+import type { HandRecord } from "./engine";
+import { STARTING_CHIPS } from "./rules";
+import type { Seat } from "./tiles";
+
+const SEATS: Seat[] = [0, 1, 2, 3];
+
+export interface GameSummary {
+  hands: number;
+  /** Hands won, by seat. */
+  wins: number[];
+  selfDraws: number;
+  /** Winning tiles each seat threw. */
+  thrown: number[];
+  washouts: number;
+  /** The highest-scoring win, the earlier on a tie; null if nobody won a hand. */
+  biggest: HandRecord | null;
+  /** Chips by seat, from the chips everyone sat down with to the end of each hand. */
+  chips: number[][];
+  /** Seats from the most chips to the fewest; a tie keeps seat order. */
+  standings: Seat[];
+  /** Each seat's place, a tie sharing the higher one (1, 1, 3, 4). */
+  place: number[];
+}
+
+export function summarizeGame(history: readonly HandRecord[]): GameSummary {
+  const wins = [0, 0, 0, 0];
+  const thrown = [0, 0, 0, 0];
+  let selfDraws = 0;
+  let washouts = 0;
+  let biggest: HandRecord | null = null;
+  for (const hand of history) {
+    if (hand.type === "washout" || hand.winner === null) {
+      washouts += 1;
+      continue;
+    }
+    wins[hand.winner] += 1;
+    if (hand.from === null) selfDraws += 1;
+    else thrown[hand.from] += 1;
+    if ((hand.faan ?? 0) > (biggest?.faan ?? -1)) biggest = hand;
+  }
+
+  const chips = SEATS.map((seat) => [
+    STARTING_CHIPS,
+    ...history.map((hand) => STARTING_CHIPS + hand.scores[seat]),
+  ]);
+  const final = SEATS.map((seat) => chips[seat][chips[seat].length - 1]);
+  const standings = [...SEATS].sort((a, b) => final[b] - final[a] || a - b);
+  const place = SEATS.map((seat) => 1 + final.filter((c) => c > final[seat]).length);
+
+  return { hands: history.length, wins, selfDraws, thrown, washouts, biggest, chips, standings, place };
+}

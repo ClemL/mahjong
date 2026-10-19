@@ -100,9 +100,11 @@ describe("TableTop", () => {
     );
   });
 
-  it("names the winner and lists the faan their hand scored", () => {
+  it("names the winner and lists the faan their hand scored, with the tiles behind each", () => {
     feltSize();
-    const view = tableView(dealt([0, 2]));
+    const view = tableView(dealt([0, 1, 2]));
+    const hand = "m1 m1 m1 p2 p2 p2 s3 s3 s3 dr dr dr we we".split(" ").map((code, i) => ({ id: `w${i}`, code }));
+    const players = view.players.map((p) => (p.seat === 2 ? { ...p, hand, handCount: 14, melds: [], flowers: [] } : p));
     const score = {
       faan: 4,
       scoredFaan: 4,
@@ -110,18 +112,38 @@ describe("TableTop", () => {
       limitReached: false,
       patterns: [
         { key: "allPungs", chinese: "對對糊", name: "All Pungs", faan: 3 },
-        { key: "dragon", chinese: "中", name: "Red Dragon", faan: 1 },
+        { key: "dragonPung", chinese: "三元牌", name: "Dragon Triplet", faan: 1 },
       ],
     };
     const over = {
       ...view,
+      players,
       phase: "handOver" as const,
+      log: [
+        ...view.log,
+        { id: 9999, seat: 2 as const, text: "win", play: { kind: "win" as const, tiles: ["we"], hand: view.handNumber, from: 1 as const } },
+      ],
       result: { type: "win" as const, winner: 2 as const, from: 1 as const, score, payments: [0, -16, 16, 0], dealerKeeps: false },
     };
     const { container } = render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
     expect(container.querySelector(".console__headline")!.textContent).toBe(`${NAMES[2]} wins`);
-    const rows = Array.from(container.querySelectorAll(".faan-list__row")).map((r) => r.textContent);
-    expect(rows).toEqual(["All Pungs 對對糊3", "Red Dragon 中1", "Total4"]);
+
+    const rows = Array.from(container.querySelectorAll(".faan-ledger__row"));
+    expect(
+      rows.map((r) => `${r.querySelector(".faan-ledger__name")!.textContent}${r.querySelector(".faan-ledger__faan")!.textContent}`),
+    ).toEqual(["All Pungs 對對糊3", "Dragon Triplet 三元牌1"]);
+    // A pattern about the whole hand shows no tiles; a dragon set shows its three.
+    expect(rows[0].querySelector(".faan-ledger__tiles")).toBeNull();
+    expect(within(rows[1] as HTMLElement).getByRole("img").getAttribute("aria-label")).toBe(
+      Array(3).fill(tileName("dr")).join(", "),
+    );
+    expect(container.querySelector(".faan-ledger__total")!.textContent).toContain("Total 4 faan");
+
+    // The tile it went out on is ringed once, and its set says whose it was.
+    const ringed = container.querySelectorAll(".result-hand .tile--won-on");
+    expect(ringed).toHaveLength(1);
+    expect(ringed[0].getAttribute("title")).toBe(tileName("we"));
+    expect(screen.getByText(`won on ${NAMES[1]}'s tile`)).toBeTruthy();
   });
 
   it("lays the result over the felt, the winning hand in its sets, and can be put aside", () => {
@@ -148,11 +170,20 @@ describe("TableTop", () => {
       "Pair",
     ]);
     expect(groups.map((g) => g.querySelectorAll(".tile").length)).toEqual([3, 3, 3, 3, 2]);
-    expect(
-      Array.from(sheet.querySelectorAll(".result-chips__delta")).map((d) => d.textContent),
-    ).toEqual(["-8", "-8", "+24", "-8"]);
+    // Payers first, the winner last; a self-draw costs everyone the same.
+    const rows = Array.from(sheet.querySelectorAll(".who-pays__row"));
+    expect(rows[0].querySelector(".who-pays__name")!.textContent).toBe(NAMES[0]);
+    expect(rows[3].querySelector(".who-pays__name")!.textContent).toBe(NAMES[2]);
+    expect(rows.map((r) => r.querySelector(".who-pays__delta")!.textContent)).toEqual(["−8", "−8", "−8", "+24"]);
+    expect(rows.map((r) => r.querySelector(".who-pays__role")!.textContent)).toEqual([
+      "full share",
+      "full share",
+      "full share",
+      "winner",
+    ]);
+    expect(within(sheet).getByText("Self-drawn: everyone pays")).toBeTruthy();
     // The middle of the felt keeps only the gist.
-    expect(container.querySelector(".console__result .faan-list")).toBeNull();
+    expect(container.querySelector(".console__result .faan-ledger")).toBeNull();
 
     fireEvent.click(within(sheet).getByRole("button", { name: "See the table" }));
     expect(screen.queryByRole("dialog", { name: "Hand result" })).toBeNull();

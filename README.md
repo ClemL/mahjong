@@ -310,6 +310,8 @@ src/game/          Rules engine — no React, no DOM
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   sets.ts, waits.ts, helper.ts   Hints: finished sets, waits, sets started
+  patternTiles.ts  The tiles behind each faan pattern, for the result
+  summary.ts       A finished game's standings and facts
   room.ts          Multiplayer room model: seating, draining, redaction
   presence.ts      Away and heartbeat timings
   tables.ts        The three fixed tables
@@ -401,18 +403,37 @@ concerns. Audio is created lazily on your first action, since browsers refuse to
 start it before a gesture, and every call is wrapped so a failed cue can never
 interrupt play. Toggle it with **Sound**.
 
-### Score history
+### Hand results and the end of the game
 
-Every settled hand is recorded — winner, faan, value, per-seat payments and the
-cumulative scores after it. The **Score history** panel lists them as they
-happen, and the end-of-round summary shows final standings, a cumulative-score
-line chart, and the full hand-by-hand table.
+At the end of a hand the tablet lays its result over the felt: who won and what
+it paid them, the winning hand in its sets with the tile it went out on ringed,
+the faan ledger, and who paid. The ledger shows the tiles behind each pattern
+when there are four or fewer of them — a dragon or wind set, a flower, the
+self-drawn tile; a pattern about the whole hand, such as a flush, shows none,
+since the hand is already above it. **Who pays** draws each seat's payment as a
+bar either side of one line, paid to the left and received to the right, with
+the signed amount and each seat's chips after it.
+
+Each phone shows its own result in the space above the hand: what the hand cost
+or paid you and why ("You threw the winning tile, so you pay the full share"),
+the winner's hand and faan, and the table's chips. **Hide** puts it aside;
+**Result** brings it back.
+
+Every settled hand is recorded — winner, faan, value, its biggest pattern,
+per-seat payments and the cumulative scores after it. When the game ends the
+tablet shows the final chips in order, four facts about the game (the biggest
+hand, self-draws, who threw the most winning tiles, washouts) and everyone's
+chips after each hand, as a line chart or, under **Hand by hand**, as a table.
+**New game** goes back to the lobby with everyone still seated; each phone shows
+its place.
 
 The chart's four series use categorical slots 1–4 of a reference palette,
-validated against the panel's dark-green surface: worst adjacent CVD ΔE 8.4,
-normal-vision ΔE 19.8, all four above 3:1 contrast. Identity is never carried by
-color alone — every series is direct-labeled, listed in the legend, and repeated
-in the table.
+validated against each theme's chart surface: on the dark themes, worst adjacent
+CVD ΔE 8.4, normal-vision ΔE 19.8, all four above 3:1 contrast. On Parchment
+three slots fall below 3:1 against the light surface, so the values are always
+readable another way. A colour follows the seat, not the standings. Identity is
+never carried by color alone — every line is named at its end, keyed in the
+final chips, and repeated in the table.
 
 ## Known limitations
 
