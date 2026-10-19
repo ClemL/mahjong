@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { type GameState, createGame } from "../engine";
-import { autoPlayHand, shouldPromptClaim } from "../controller";
+import { autoPlayHand } from "../controller";
 import { bestImprovingClaim, greedyAi, plannedClaim, randomAi } from "../ai";
 import { createRng } from "../rng";
 import { DEFAULT_RULES } from "../rules";
@@ -116,46 +116,6 @@ describe("claims at a faan minimum", () => {
     state.players[seat].flowers = [{ id: "f2", code: "f2" }, { id: "f6", code: "f6" }];
     const options = [{ id: "pung:dr", type: "pung" as const, tileIds: ["h9-dr", "h10-dr"], codes: ["dr", "dr", "dr"] }];
     expect(plannedClaim(state, seat, options)?.id).toBe("pung:dr");
-  });
-});
-
-describe("claim prompting", () => {
-  const state = () => {
-    const s = seatedGame(6);
-    s.players[0].isHuman = true;
-    s.players[0].hand = hand("m1 m2 m3 m4 m5 m6 p1 p2 p3 s7 s8 s9 dr");
-    s.players[0].melds = [];
-    s.phase = "claiming";
-    return s;
-  };
-
-  it("always interrupts for a win", () => {
-    const s = state();
-    s.pendingClaims = [{ seat: 0, options: [{ id: "win", type: "win", tileIds: [], codes: ["dr"] }] }];
-    for (const mode of ["always", "useful", "wins"] as const) {
-      expect(shouldPromptClaim(s, 0, mode)).toBe(true);
-    }
-  });
-
-  it("only interrupts for a useless meld when asked to", () => {
-    const s = state();
-    s.pendingClaims = [
-      {
-        seat: 0,
-        options: [
-          { id: "chow:s7-s8", type: "chow", tileIds: ["h9-s7", "h10-s8"], codes: ["s7", "s8", "s9"] },
-        ],
-      },
-    ];
-    expect(shouldPromptClaim(s, 0, "always")).toBe(true);
-    expect(shouldPromptClaim(s, 0, "useful")).toBe(false);
-    expect(shouldPromptClaim(s, 0, "wins")).toBe(false);
-  });
-
-  it("does not interrupt when there is nothing to claim", () => {
-    const s = state();
-    s.pendingClaims = [];
-    expect(shouldPromptClaim(s, 0, "always")).toBe(false);
   });
 });
 

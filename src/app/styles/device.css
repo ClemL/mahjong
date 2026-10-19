@@ -13,10 +13,6 @@
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 
-.tableview__bar {
-  padding-top: max(10px, env(safe-area-inset-top));
-}
-
 /* Touch input: 44px is Apple's minimum and 48px Material's. Buttons were 31px
    tall, and Pass sits next to Win with a claim timer running — the cost of a
    mis-tap here is losing a hand. */
@@ -96,4 +92,3 @@
   background: var(--chip-neg);
   color: var(--ink);
 }
-

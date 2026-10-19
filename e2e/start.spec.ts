@@ -9,9 +9,11 @@ for (const [label, viewport] of [
     const errors = watchErrors(page);
     await page.setViewportSize(viewport);
     await page.goto("/");
-    for (const mode of ["Play solo", "Multiplayer", "Tablet mode"]) {
+    for (const mode of ["Multiplayer", "Tablet mode"]) {
       await expect(page.getByRole("link", { name: new RegExp(mode) })).toBeVisible();
     }
+    // No game on this device alone: a game is a tablet and phones.
+    await expect(page.getByRole("link", { name: /solo/i })).toHaveCount(0);
     await expectNoSidewaysScroll(page);
     expect(errors).toEqual([]);
   });

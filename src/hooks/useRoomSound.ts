@@ -7,19 +7,21 @@ import { signatureMoment } from "@/components/moments";
 
 const STORAGE_KEY = "hk-mahjong.muted";
 
+/** This device's mute switch, handed to the settings that show it. */
+export interface SoundToggle {
+  muted: boolean;
+  setMuted: (value: boolean) => void;
+}
+
 /**
  * Table cues for a polled room.
  *
- * The single-player table derives its sounds by diffing consecutive engine
- * states; a room does the same over consecutive views, which is all the
+ * Sounds are derived by diffing consecutive views, which is all the
  * information a poll carries anyway. This is what makes the shared tablet
  * audible — a clack when someone discards, a distinct cue for a claim, a run
  * of notes on a win.
  */
-export function useRoomSound(view: RoomView | null): {
-  muted: boolean;
-  setMuted: (value: boolean) => void;
-} {
+export function useRoomSound(view: RoomView | null): SoundToggle {
   const [muted, setMutedState] = useState(false);
   const mutedRef = useRef(muted);
   mutedRef.current = muted;

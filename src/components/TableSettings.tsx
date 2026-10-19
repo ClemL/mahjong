@@ -10,7 +10,7 @@ import { GAME_LENGTHS } from "./gameLength";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 import { positionOf } from "./tableLayout";
 
 const SPEEDS: ChoiceOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({

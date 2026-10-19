@@ -2,7 +2,6 @@
  * Glue between the pure engine and whoever is driving it (React, or a test
  * harness). Everything here is deterministic given an `Rng`.
  */
-import type { Seat } from "./tiles";
 import {
   type GameState,
   advanceTurn,
@@ -14,7 +13,7 @@ import {
   discard,
   resolveClaims,
 } from "./engine";
-import { type AiStrategy, bestImprovingClaim, greedyAi } from "./ai";
+import { type AiStrategy, greedyAi } from "./ai";
 import type { Rng } from "./rng";
 
 /** True when the discard is settled and the next player still has to draw. */
@@ -22,46 +21,10 @@ export function needsTurnAdvance(state: GameState): boolean {
   return state.phase === "action" && state.lastDiscard !== null && state.drawnTileId === null;
 }
 
-/** The seat being asked about the discard right now, if any. */
-export function claimingSeats(state: GameState): Seat[] {
+/** True when a person, not the computer, is the one being asked about the discard. */
+function awaitingHumanClaim(state: GameState): boolean {
   const turn = claimTurn(state);
-  return turn ? [turn.seat] : [];
-}
-
-/** Seat controlled by the player, or null when every seat is an AI. */
-export function humanSeat(state: GameState): Seat | null {
-  return state.players.find((p) => p.isHuman)?.seat ?? null;
-}
-
-/**
- * How often the table stops to ask the player about a claim.
- * `useful` only interrupts when a claim would actually improve the hand.
- */
-export type ClaimPrompt = "always" | "useful" | "wins";
-
-/**
- * Whether a pending claim is worth interrupting the player for. A winning
- * claim always is; otherwise `useful` applies the same judgment the greedy
- * opponent uses on its own hand.
- */
-export function shouldPromptClaim(
-  state: GameState,
-  seat: Seat,
-  mode: ClaimPrompt,
-): boolean {
-  const turn = claimTurn(state);
-  const options = turn?.seat === seat ? turn.options : [];
-  if (options.length === 0) return false;
-  if (options.some((o) => o.type === "win")) return true;
-  if (mode === "always") return true;
-  if (mode === "wins") return false;
-  return bestImprovingClaim(state, seat, options) !== null;
-}
-
-/** True when the human is the one being asked about the discard. */
-export function awaitingHumanClaim(state: GameState): boolean {
-  const seat = humanSeat(state);
-  return seat !== null && claimTurn(state)?.seat === seat;
+  return Boolean(turn && state.players[turn.seat].isHuman);
 }
 
 /** Perform one action for the AI whose turn it is. */

@@ -5,13 +5,11 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { GamePanel } from "./GamePanel";
-import { PlayPanel } from "./PlayPanel";
 import { AppearancePanel } from "./AppearancePanel";
 import { Choice, type ChoiceOption } from "./Choice";
 import { FilmDialog } from "./FilmPlayer";
 import { BuildFooter } from "./BuildFooter";
 import { TABLES, type TableInfo, findTable } from "@/game/tables";
-import { describeSavedGame, readSavedGame } from "@/hooks/soloSave";
 
 /** Which table this device last chose, so a returning player lands on it again. */
 const TABLE_KEY = "hk-mahjong.table";
@@ -32,16 +30,13 @@ interface Mode {
   detail: string;
 }
 
-function modes(table: TableInfo, savedSolo: string | null): Mode[] {
+/**
+ * The two ways in. A game always needs both: a tablet in the middle as the
+ * table, and a phone per player held sideways — seats nobody takes are played
+ * by the computer.
+ */
+function modes(table: TableInfo): Mode[] {
   return [
-    savedSolo
-      ? { href: "/solo", glyph: "獨", name: "Resume solo game", detail: savedSolo }
-      : {
-          href: "/solo",
-          glyph: "獨",
-          name: "Play solo",
-          detail: "You against three computer opponents, on this device",
-        },
     {
       href: `/room/${table.id}`,
       glyph: "眾",
@@ -97,12 +92,8 @@ export function StartPage() {
   // The phone layout is read from storage during the first render, which the
   // server cannot do; hold that one control back until hydration is over.
   const [mounted, setMounted] = useState(false);
-  // An unfinished solo game on this device, described for the Resume button.
-  const [savedSolo, setSavedSolo] = useState<string | null>(null);
   useEffect(() => {
     setMounted(true);
-    const saved = readSavedGame();
-    setSavedSolo(saved ? describeSavedGame(saved) : null);
     try {
       const stored = findTable(window.localStorage.getItem(TABLE_KEY) ?? "");
       if (stored) setTable(stored);
@@ -182,8 +173,8 @@ export function StartPage() {
           <span>麻雀</span>Hong Kong Mahjong
         </h1>
         <p className="lobby__lead">
-          Old-style Hong Kong rules with the full 144-tile set. Set the table up the way you like
-          it, then choose how to play.
+          Old-style Hong Kong rules with the full 144-tile set. Play with a tablet in the middle as
+          the table and a phone each, held sideways; seats nobody takes are played by the computer.
         </p>
       </header>
 
@@ -214,7 +205,7 @@ export function StartPage() {
       </div>
 
       <nav className="start__modes" aria-label="How to play">
-        {modes(table, savedSolo).map((mode) => (
+        {modes(table).map((mode) => (
           <a key={mode.name} className="start__mode" href={mode.href}>
             <span className="start__mode-glyph" aria-hidden="true">
               {mode.glyph}
@@ -229,11 +220,6 @@ export function StartPage() {
         <button type="button" className="btn btn--sm btn--primary topbar__film" onClick={() => setFilm(true)}>
           How to play
         </button>
-        {savedSolo ? (
-          <a className="btn btn--sm btn--ghost" href="/solo?new">
-            New solo game
-          </a>
-        ) : null}
         <span className="start__spacer" />
         <button
           type="button"
@@ -254,11 +240,7 @@ export function StartPage() {
       <h2 className="start__section">Settings</h2>
       <div className="start__settings">
         <div className="start__column">
-          <GamePanel
-            api={prefs}
-            note="Used for solo games, and set on the multiplayer table when this device opens it in tablet mode."
-          />
-          <PlayPanel api={prefs} />
+          <GamePanel api={prefs} note="Set on the table when this device opens it in tablet mode." />
           <section className="panel">
             <details open>
               <summary>This phone</summary>

@@ -3,8 +3,6 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StartPage } from "../StartPage";
 import { normalizePreferences, readPreferences } from "@/hooks/usePreferences";
-import { writeSavedGame } from "@/hooks/soloSave";
-import { createGame } from "@/game/engine";
 
 // The film pulls in a canvas renderer jsdom cannot run; only the button matters here.
 vi.mock("../FilmPlayer", () => ({ FilmDialog: () => null }));
@@ -34,23 +32,12 @@ afterEach(() => {
 });
 
 describe("StartPage", () => {
-  it("offers the three ways in", () => {
+  it("offers the two ways in, both at a table, and no game on this device alone", () => {
     render(<StartPage />);
     const href = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
-    expect(href(/Play solo/)).toBe("/solo");
     expect(href(/Multiplayer/)).toBe("/room/TABLE");
     expect(href(/Tablet mode/)).toBe("/room/TABLE?seat=table");
-  });
-
-  it("offers to resume a solo game left unfinished, or start a new one", async () => {
-    const state = createGame({ seed: 3 });
-    state.scores = [12, -4, -4, -4];
-    writeSavedGame(state);
-    render(<StartPage />);
-    const resume = await screen.findByRole("link", { name: /Resume solo game/ });
-    expect(resume.getAttribute("href")).toBe("/solo");
-    expect(resume.textContent).toMatch(/East round, hand 1 · you are \+12/);
-    expect(screen.getByRole("link", { name: "New solo game" }).getAttribute("href")).toBe("/solo?new");
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).not.toContain("/solo");
   });
 
   it("remembers the house minimum for the next game", () => {
@@ -127,20 +114,11 @@ describe("StartPage", () => {
 
 describe("normalizePreferences", () => {
   it("keeps valid choices and replaces anything else with the default", () => {
-    expect(
-      normalizePreferences({ version: 2, minFaan: 5, speed: "warp", showHints: false, opponents: "random" }),
-    ).toEqual({
+    // Fields a solo game used to store are dropped.
+    expect(normalizePreferences({ version: 2, minFaan: 5, speed: "warp", opponents: "random" })).toEqual({
       minFaan: 5,
       rounds: 4,
-      speed: "normal",
-      showHints: false,
-      helper: false,
-      muted: false,
-      opponents: "random",
-      claimPrompt: "useful",
     });
-    expect(normalizePreferences({ helper: true }).helper).toBe(true);
-    expect(normalizePreferences({ helper: "yes" }).helper).toBe(false);
     expect(normalizePreferences(null).minFaan).toBe(3);
     // An older build saved its 0 default with every change; that is not a choice to keep.
     expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(3);

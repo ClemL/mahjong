@@ -1,24 +1,5 @@
 /* ------------------------------------------------------------- your hand */
 
-.hand {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--shade-3);
-  border: 1px solid var(--panel-border);
-}
-
-/* What a ready hand wins on: each tile with how many are still unseen. A
-   dead wait is struck through and dimmed, and its count says 0 in words. */
-.waits__line {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-}
-
 .waits {
   display: inline-flex;
   flex-wrap: wrap;
@@ -45,36 +26,8 @@
   text-decoration: line-through;
 }
 
-.hand__tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  align-items: flex-end;
-  min-height: 70px;
-  padding-top: 8px;
-}
-
 .hand__gap {
   width: 14px;
-}
-
-.hand__prompt {
-  font-size: 13px;
-  color: var(--gold);
-  min-height: 18px;
-  font-weight: 600;
-}
-
-.hand__prompt--muted {
-  color: var(--ink-dim);
-  font-weight: 400;
-}
-
-.hand__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
 /* ---------------------------------------------------------------- helper */
@@ -115,8 +68,6 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px 18px;
-  max-height: 28vh;
-  overflow-y: auto;
 }
 
 .helper__toggle {
@@ -141,4 +92,3 @@
   color: var(--gold);
   border-color: var(--gold);
 }
-

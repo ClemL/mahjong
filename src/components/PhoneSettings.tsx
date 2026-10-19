@@ -9,7 +9,7 @@ import { canVibrate } from "@/hooks/useHaptics";
 import { Choice, type ChoiceOption } from "./Choice";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 
 const SOUND: ChoiceOption<"on" | "off">[] = [
   { value: "on", label: "On", hint: "Clacks on discards, claims and wins" },
@@ -90,7 +90,6 @@ export function PhoneSettings({
   fullscreenHint = false,
   layout,
   display,
-  controller = false,
   sort,
   table,
   onLeave,
@@ -104,8 +103,6 @@ export function PhoneSettings({
   layout?: CompactLayout;
   /** This phone's display choices. */
   display?: PhoneDisplay;
-  /** A sideways controller beside a table screen: it alone has a size and a play log. */
-  controller?: boolean;
   /** How the hand is laid out; absent where there is no hand yet. */
   sort?: HandOrder;
   /** Which of the tables this phone is at, e.g. "Table 2". */
@@ -140,7 +137,7 @@ export function PhoneSettings({
               onChange={(value) => layout.setCompact(value === "compact")}
             />
           ) : null}
-          {display && controller ? (
+          {display ? (
             <>
               <Choice label="Size" options={SIZE} value={display.size} onChange={display.setSize} />
               <Choice

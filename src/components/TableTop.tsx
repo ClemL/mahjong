@@ -28,10 +28,10 @@ import { signatureMoment, winningTileOf } from "./moments";
 import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./TableWall";
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
-import { MeldRow, bonusClass, isFreshClaim } from "./SeatPanel";
+import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings } from "./TableSettings";
-import type { SoundToggle } from "./TableView";
+import type { SoundToggle } from "@/hooks/useRoomSound";
 import {
   POSITION_ROTATION,
   type TableLayout,

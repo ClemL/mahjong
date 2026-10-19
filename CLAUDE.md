@@ -31,11 +31,16 @@ These apply to every request in this repo.
 
 ## What this project is
 
-A Hong Kong old-style mahjong table for the browser. You play East; three computer opponents play
-the other seats. Next.js App Router, deployed to Vercel. The solo game runs entirely client-side;
-multiplayer rooms go through a few API routes backed by Upstash Redis (`UPSTASH_REDIS_REST_URL`,
-`UPSTASH_REDIS_REST_TOKEN`), and fall back to process memory without them — enough for local runs and
-the browser tests, not for production.
+A Hong Kong old-style mahjong table for the browser, played around a tablet acting as the table with
+a phone per player, held sideways; seats nobody takes are played by the computer. Next.js App Router,
+deployed to Vercel. Rooms go through a few API routes backed by Upstash Redis
+(`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`), and fall back to process memory without them —
+enough for local runs and the browser tests, not for production.
+
+* **Landscape only, and never one device alone.** A game needs the tablet as the table and at least
+  one phone; only the table deals. Phones are always the landscape controller (`PhoneView`), turned
+  on its side by CSS when held upright. There is no solo game and no upright layout — do not add one
+  back. The start page and the lobby's seat picker, before play, may be used either way up.
 
 ## Layout
 
@@ -47,13 +52,12 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
   scoring.ts       Faan patterns, exclusions, payout
   rules.ts         House ruleset — every tunable number lives here
   engine.ts        State machine: deal, draw, discard, claims, settlement, history
-  shanten.ts       Distance-to-ready; drives both the AI and the claim prompts
+  shanten.ts       Distance-to-ready; drives the computer opponents
   ai.ts            AiStrategy interface + the random and skilled opponents
   controller.ts    Steps the table one beat at a time
   sound.ts         Web Audio cues, synthesised at runtime
   room.ts          Multiplayer room: seating, draining, redaction (pure)
   rng.ts           Seeded PRNG (mulberry32) for reproducible games
-  replay.ts        A finished hand as compact frames, for the replay
 src/server/        Room store (Upstash + memory) and room service — server only
 src/app/api/       Room endpoints
 src/hooks/         React bindings for the engine and for a room
@@ -64,7 +68,7 @@ src/film/          The explainer film — hand-drawn canvas animation, no React
   script.ts        Subtitles and chapters
   scenes.ts        The twelve scenes
   film.ts          renderFrame(ctx, t) — the whole film from a timestamp
-src/components/    Tiles, pip artwork, seats, pond, hand, modals, chart, replay, footer
+src/components/    Tiles, pip artwork, the felt, the phone controller, settings, results, footer
 src/app/           Next.js entry
   globals.css      Imports src/app/styles/*.css in cascade order
   styles/          One stylesheet per area of the screen
@@ -91,8 +95,8 @@ public/updates.txt Changelog, oldest first
   + Testing Library) cover behavior, not layout or rendering. Every UI bug
   found so far — a double discard, a broken mobile grid, an invisible suit mark — was caught by
   driving the built app in Chromium, not by the test suite. Do that before claiming a UI change works,
-  and when a flow breaks, add the check to `e2e/` so it stays caught. `/solo?seed=<n>` deals a known
-  hand for exactly that.
+  and when a flow breaks, add the check to `e2e/` so it stays caught. `e2e/room.spec.ts` shows how
+  to drive a tablet and a phone together.
 * **Before writing chart code, load the `dataviz` skill and run its palette validator** against the
   surface the chart actually sits on. The existing chart's colors are validated; do not add series
   colors by eye.

@@ -6,7 +6,7 @@ import type { ScoreResult } from "@/game/scoring";
 import { arrangeWinningHand } from "@/game/winning";
 import { type Seat, isFlower } from "@/game/tiles";
 import { TileFace } from "./TileView";
-import { MeldRow, bonusClass } from "./SeatPanel";
+import { MeldRow, bonusClass } from "./MeldRow";
 import { FaanBreakdown } from "./FaanBreakdown";
 import { ChipStack, chipsOf } from "./TableEffects";
 

@@ -1,48 +1,16 @@
 "use client";
 
-import type { GameSettings, Speed } from "@/hooks/usePreferences";
+import type { GameSettings } from "@/hooks/usePreferences";
 import { MIN_FAAN_CHOICES } from "@/game/rules";
 import { GAME_LENGTHS } from "./gameLength";
-import { Choice, type ChoiceOption } from "./Choice";
+import { Choice } from "./Choice";
 
-const SPEEDS: ChoiceOption<Speed>[] = [
-  { value: "slow", label: "Slow", hint: "A long pause between opponents' turns" },
-  { value: "normal", label: "Normal", hint: "The default pace" },
-  { value: "fast", label: "Fast", hint: "Opponents play almost immediately" },
-];
-
-const ON_OFF: ChoiceOption<"on" | "off">[] = [
-  { value: "on", label: "On", hint: "" },
-  { value: "off", label: "Off", hint: "" },
-];
-
-const HINTS = ON_OFF.map((o) => ({
-  ...o,
-  hint:
-    o.value === "on"
-      ? "Marks the throws that leave you ready, and counts the tiles you are waiting on"
-      : "No help with your hand",
-}));
-
-const HELPER = ON_OFF.map((o) => ({
-  ...o,
-  hint:
-    o.value === "on"
-      ? "A wheelchair button by your hand that lists the tiles that finish each pair and part-run"
-      : "No helper button",
-}));
-
-const SOUND = ON_OFF.map((o) => ({
-  ...o,
-  hint: o.value === "on" ? "Clacks on discards, claims and wins" : "Silent",
-}));
-
-/** Everything about how the game plays that is not a move in it. */
+/** The house rules a table starts with when this device opens it in tablet mode. */
 export function GamePanel({ api, note }: { api: GameSettings; note?: string }) {
   return (
     <section className="panel">
       <details open>
-        <summary>Game</summary>
+        <summary>House rules</summary>
         <div className="appearance">
           <label className="field">
             <span className="field__label">Min faan</span>
@@ -65,30 +33,6 @@ export function GamePanel({ api, note }: { api: GameSettings; note?: string }) {
             options={GAME_LENGTHS}
             value={String(api.rounds) as `${number}`}
             onChange={(value) => api.setRounds(Number(value))}
-          />
-          <Choice
-            label="Speed"
-            options={SPEEDS}
-            value={api.speed}
-            onChange={(value) => api.setSpeed(value)}
-          />
-          <Choice
-            label="Hints"
-            options={HINTS}
-            value={api.showHints ? "on" : "off"}
-            onChange={(value) => api.setShowHints(value === "on")}
-          />
-          <Choice
-            label="Helper"
-            options={HELPER}
-            value={api.helper ? "on" : "off"}
-            onChange={(value) => api.setHelper(value === "on")}
-          />
-          <Choice
-            label="Sound"
-            options={SOUND}
-            value={api.muted ? "off" : "on"}
-            onChange={(value) => api.setMuted(value === "off")}
           />
         </div>
       </details>

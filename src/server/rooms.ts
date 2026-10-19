@@ -15,8 +15,6 @@ import {
   moveSeat,
   isHumanSeat,
   pendingHumanClaimants,
-  mayDeal,
-  mayRegroup,
   newRoom,
   normalizeRoom,
   notePlayed,
@@ -287,10 +285,8 @@ export type TableCommand =
   | { type: "forcePass" };
 
 /**
- * Commands the table device issues. The one exception is the opening deal,
- * which a seated player may press when there is no tablet in the room —
- * otherwise a group playing on phones alone could never start. A seated
- * player may also rename their own chair.
+ * Commands the table device issues. A seated player may only rename their own
+ * chair or move it; the deal, like every rule, belongs to the table.
  */
 export async function control(
   id: string,
@@ -301,8 +297,6 @@ export async function control(
     const isTable = r.table !== null && r.table.token === token;
     if (isTable) r.table!.lastSeen = now;
     else if (
-      !(command.type === "deal" && mayDeal(r, token)) &&
-      !(command.type === "regroup" && mayRegroup(r, token)) &&
       !(command.type === "rename" && identify(r, token).seat === command.seat) &&
       !(command.type === "moveSeat" && identify(r, token).seat === command.seat)
     ) {
@@ -314,7 +308,7 @@ export async function control(
         if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
         startPlay(r, now);
         break;
-      // Abandon a solo warm-up now that somebody has turned up: everyone back
+      // Abandon a warm-up now that somebody has turned up: everyone back
       // to the seating screen, and the practice scores do not count.
       case "regroup": {
         if (!r.warmup) throw new RoomError("This is not a warm-up game", 409);

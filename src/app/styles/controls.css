@@ -103,12 +103,6 @@
 
 /* ----------------------------------------------------------------- panels */
 
-.side {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
 .panel {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -123,53 +117,6 @@
   letter-spacing: 0.09em;
   color: var(--ink-dim);
   font-weight: 700;
-}
-
-.scores {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.scores__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  padding: 3px 0;
-}
-
-.scores__row + .scores__row {
-  border-top: 1px solid var(--line-soft);
-}
-
-.scores__name {
-  flex: 1;
-}
-
-.scores__value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-}
-
-.log {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
-  max-height: 240px;
-  overflow-y: auto;
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.log__entry {
-  color: var(--ink-dim);
-  padding: 2px 0;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.log__entry--own {
-  color: var(--ink);
 }
 
 .rules dl {
@@ -267,41 +214,6 @@ details[open] > summary::after {
   font-size: 13px;
 }
 
-.modal__tiles {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-bottom: 14px;
-}
-
-.modal__total {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line);
-  font-weight: 700;
-}
-
-.modal__payments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0 16px;
-}
-
-.chip {
-  font-size: 12px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: var(--raise-1);
-  font-variant-numeric: tabular-nums;
-}
-
-.chip--pos { background: var(--chip-pos); }
-.chip--neg { background: var(--chip-neg); }
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -313,4 +225,3 @@ details[open] > summary::after {
   white-space: nowrap;
   border: 0;
 }
-

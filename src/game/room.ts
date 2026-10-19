@@ -195,9 +195,9 @@ export interface RoomView {
   version: number;
   /** False while the room is still gathering; no tiles have been dealt. */
   started: boolean;
-  /** Whether this viewer may deal: the table, or any player with no tablet. */
+  /** Whether this viewer may deal: only the table device. */
   canDeal: boolean;
-  /** True while a solo game against the computer is running. */
+  /** True while a warm-up against the computer is running: dealt with one person seated. */
   warmup: boolean;
   /** Somebody new has sat down mid-warm-up, and this viewer can deal them in. */
   canRegroup: boolean;
@@ -329,7 +329,7 @@ export function dealShowMs(state: GameState): number {
 
 /** How long the table needs to show a fresh deal and its opening flowers. */
 export function openingHoldMs(room: Room): number {
-  // Only the tablet animates the deal; phones on their own go straight in.
+  // Only the tablet animates the deal; with it gone, the phones go straight in.
   if (!room.table) return 0;
   return dealShowMs(room.state);
 }
@@ -510,7 +510,7 @@ export function hasAnyPlayer(room: Room): boolean {
 }
 
 /**
- * Somebody turned up while a solo game was running. The table offers to deal
+ * Somebody turned up while a warm-up was running. The table offers to deal
  * everyone in rather than leaving them to watch the computer play.
  */
 export function shouldRegroup(room: Room): boolean {
@@ -518,15 +518,12 @@ export function shouldRegroup(room: Room): boolean {
 }
 
 /**
- * Who may abandon a warm-up and go back to the seating screen. The table
- * always may; a lone player may too, because a solo game usually has no tablet
- * in it — but only while it is still the warm-up they started, so this can
- * never reset a real four-person game.
+ * Who may abandon a warm-up and go back to the seating screen: the table, and
+ * only while it is still the warm-up, so this can never reset a real game.
  */
 export function mayRegroup(room: Room, token: string | null): boolean {
   if (!room.started || !room.warmup) return false;
-  const who = identify(room, token);
-  return who.role === "table" || (room.table === null && who.role === "player");
+  return identify(room, token).role === "table";
 }
 
 /** Mirror seat occupancy onto the engine, which decides who it may step. */
@@ -710,9 +707,8 @@ export function drain(room: Room, now = Date.now()): boolean {
 }
 
 /**
- * Who holds the deal. The tablet is the shared screen everyone is looking at,
- * so it holds the button — but a group playing on phones alone still needs
- * someone able to press it.
+ * Who holds the deal: the tablet. A game needs it as the table, so phones
+ * alone never deal — there would be no screen showing the ponds.
  *
  * This is a question of role, not of readiness: the tablet holds the deal from
  * the moment it is set down, so it can show the button greyed out with the
@@ -721,8 +717,7 @@ export function drain(room: Room, now = Date.now()): boolean {
  */
 export function mayDeal(room: Room, token: string | null): boolean {
   if (room.started) return false;
-  const who = identify(room, token);
-  return who.role === "table" || (room.table === null && who.role === "player");
+  return identify(room, token).role === "table";
 }
 
 /** Open a claim window if the current discard needs one. */
@@ -867,73 +862,6 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS
         ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - now }
         : null,
-  };
-}
-
-/**
- * A solo game as the felt draws it: the table device's view of a game the
- * browser runs for itself. The redaction is the table's — no concealed tile on
- * the cloth until the hand is settled — because the player's own tiles are
- * drawn in their hand below the felt, not on it.
- *
- * The engine forgets a discard as soon as the next seat draws, so the caller
- * keeps the newest one (`lastPlayed`), as a room does.
- */
-export function soloTableView(
-  state: GameState,
-  lastPlayed: { tile: Tile; from: Seat } | null,
-  awaitingClaimSeats: Seat[],
-): RoomView {
-  const settled = state.phase === "handOver" || state.phase === "gameOver";
-  return {
-    roomId: "solo",
-    version: 0,
-    started: true,
-    canDeal: false,
-    warmup: false,
-    canRegroup: false,
-    seatedCount: 1,
-    phase: state.phase,
-    turn: state.turn,
-    dealer: state.dealer,
-    roundWind: state.roundWind,
-    handNumber: state.handNumber,
-    dealership: state.dealership,
-    wallCount: state.wall.length,
-    lastDiscard: state.lastDiscard,
-    drawnTileId: null,
-    players: state.players.map((p) => ({
-      seat: p.seat,
-      handCount: p.hand.length,
-      hand: settled ? p.hand : hiddenTiles(p.seat, p.hand.length),
-      melds: p.melds,
-      flowers: p.flowers,
-      discards: p.discards,
-      // Named as the score panel names it; a bare "You" would have the felt
-      // say "You wins" and "Off You's discard".
-      occupant: p.isHuman
-        ? { kind: "human", name: `${SEAT_NAMES[p.seat]} (you)`, away: false }
-        : { kind: "ai", name: null, away: false },
-    })),
-    scores: state.scores,
-    result: state.result,
-    history: state.history,
-    log: state.log,
-    config: state.config,
-    you: { role: "table", seat: null },
-    displacedFrom: null,
-    tablePresent: false,
-    awaitingClaimSeats,
-    claim: null,
-    actions: null,
-    settings: { ...DEFAULT_ROOM_SETTINGS, turnLimit: 0 },
-    lastPlayed,
-    turnDeadlineIn: null,
-    turnExtended: false,
-    turnAllowance: 0,
-    openingLeft: 0,
-    hurry: null,
-    hurryCooldown: null,
   };
 }
 
