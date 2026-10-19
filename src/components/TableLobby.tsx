@@ -6,7 +6,7 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay } from "@/game/rules";
+import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, othersPayHalfInPlay } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { QrCode } from "./QrCode";
@@ -301,6 +301,18 @@ export function TableLobby({
               >
                 <option value="on">In play</option>
                 <option value="off">Off</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field__label">Others pay on a discard</span>
+              <select
+                className="field__select"
+                value={othersPayHalfInPlay(view.config) ? "on" : "off"}
+                disabled={api.busy}
+                onChange={(e) => void api.control({ type: "othersPayHalf", value: e.target.value === "on" })}
+              >
+                <option value="on">Half each</option>
+                <option value="off">Discarder only</option>
               </select>
             </label>
           </>

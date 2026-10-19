@@ -32,6 +32,15 @@ function Standings({ scores }: { scores: number[] }) {
   );
 }
 
+/**
+ * Who paid a discard win, read from what was actually paid rather than the
+ * table's current rule, which may have changed since.
+ */
+function discardSplit(payments: number[], winner: Seat, from: Seat): string {
+  const other = payments.find((paid, seat) => seat !== winner && seat !== from) ?? 0;
+  return other < 0 ? `from the discarder, ${-other} from each of the others` : "from the discarder";
+}
+
 export function ResultModal({ state, onNextHand, onNewGame, onReplay }: Props) {
   if (state.phase === "gameOver") {
     const wins = state.history.filter((h) => h.type === "win").length;
@@ -178,7 +187,8 @@ export function ResultModal({ state, onNextHand, onNewGame, onReplay }: Props) {
           <div className="modal__total">
             <span>Total</span>
             <span>
-              {result.score.scoredFaan} faan → {result.score.value} points each payer
+              {result.score.scoredFaan} faan → {result.score.value} points{" "}
+              {result.from === null ? "each payer" : discardSplit(result.payments, result.winner!, result.from)}
             </span>
           </div>
         ) : null}
