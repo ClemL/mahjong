@@ -247,6 +247,12 @@ export interface RoomView {
    * it has played out or its target has moved.
    */
   hurry: { seat: Seat; by: string; id: number } | null;
+  /**
+   * The table resting after a hurry-up: at whom it was aimed, who sent it, and
+   * how long until another is taken, in ms. Every seat sees it, so every Hurry
+   * up button waits it out, not only the sender's. Null once another would be.
+   */
+  hurryCooldown: { seat: Seat; by: Seat; left: number } | null;
 }
 
 const HIDDEN: TileCode = "back";
@@ -857,6 +863,10 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
             id: room.hurry.at,
           }
         : null,
+    hurryCooldown:
+      room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS
+        ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - now }
+        : null,
   };
 }
 
@@ -923,6 +933,7 @@ export function soloTableView(
     turnAllowance: 0,
     openingLeft: 0,
     hurry: null,
+    hurryCooldown: null,
   };
 }
 

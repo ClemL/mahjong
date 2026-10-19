@@ -49,7 +49,7 @@ body:has(.app--handset) {
 }
 
 /* Outside the controller the confirm bar and the actions keep their own
-   places in the column, the action row sticky at the bottom. */
+   places in the dock's column, above the hand. */
 .phone__controls {
   display: contents;
 }
@@ -74,6 +74,32 @@ body:has(.app--handset) {
 /* The ghost of a discard is placed in the controller's own frame. */
 .phone--landscape {
   position: relative;
+}
+
+/* The dock's parts take their own places in the grid. */
+.phone--landscape .phone__dock {
+  display: contents;
+}
+
+/* The helper, while open, has a row of its own straight above the hand. The
+   choices keep the room they need and the helper scrolls in what is left, so
+   neither can push the hand off the bottom or spill over it. */
+.phone--landscape:has(> .phone__dock > .helper) {
+  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto;
+  grid-template-areas:
+    "bar bar"
+    "prompt melds"
+    "controls controls"
+    "helper helper"
+    "hand hand";
+}
+
+.phone--landscape .helper {
+  grid-area: helper;
+  max-height: 34cqh;
+  overflow-y: auto;
+  padding: 4px 10px;
+  --tile-sm: clamp(16px, 7cqh, 26px);
 }
 
 /* A discard leaves the phone the way it would leave a hand: lifted, then
@@ -162,9 +188,6 @@ body:has(.app--handset) {
 }
 
 .phone--landscape .phone__actions {
-  position: static;
-  padding: 0;
-  background: none;
   justify-content: center;
 }
 
@@ -321,6 +344,16 @@ body:has(.app--handset) {
     "controls"
     "hand";
   gap: 4px;
+}
+
+.phone--landscape.phone--compact:has(> .phone__dock > .helper) {
+  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto;
+  grid-template-areas:
+    "bar"
+    "melds"
+    "controls"
+    "helper"
+    "hand";
 }
 
 .phone--compact .phone__bar {

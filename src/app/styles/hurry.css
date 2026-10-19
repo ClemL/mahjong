@@ -2,6 +2,23 @@
 
 .phone__hurry-btn {
   flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Resting after anyone's hurry-up: the seconds until the table takes another,
+   and a bar draining under them as the turn clock does. Brighter than other
+   disabled buttons, so the count can be read. */
+.phone__hurry-btn--resting:disabled {
+  opacity: 0.7;
+}
+
+.phone__hurry-btn--resting::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold) calc(var(--left, 1) * 100%), var(--line) 0);
 }
 
 /* Someone at the table has asked this player to hurry: the whole screen
@@ -16,6 +33,19 @@
   background: color-mix(in srgb, var(--danger) 45%, transparent);
   box-shadow: inset 0 0 0 6px var(--danger);
   animation: hurry-flash 0.4s steps(1, end) 6;
+}
+
+/* Everything but the hand: it stays its own colour, so the tiles can still be
+   read and thrown while the screen says to hurry. On the controller the flash
+   covers the rows above the hand; upright, the docked hand rises over it. */
+.phone--landscape .phone__hurry {
+  position: absolute;
+  grid-column: 1 / -1;
+  grid-row: 1 / hand-start;
+}
+
+.phone--hurried:not(.phone--landscape) .phone__dock {
+  z-index: 91;
 }
 
 .phone__hurry-text {

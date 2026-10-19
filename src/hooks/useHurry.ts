@@ -9,25 +9,28 @@ const HURRY_PATTERN = [120, 80, 120, 80, 120];
 
 /**
  * Who has just told this seat to hurry up, while the screen should be flashing
- * for it. Each nudge flashes once, however many polls carry it.
+ * for it. Each nudge flashes and buzzes once, however many polls carry it.
+ *
+ * The buzz does not wait on `flash`: the Hurry up setting is this phone's own
+ * button and flash, and a player who never turned it on is still the one the
+ * table is waiting for. Only the Vibrate setting silences it.
  */
-export function useHurryFlash(view: RoomView, enabled: boolean, vibrate: boolean): string | null {
+export function useHurryFlash(view: RoomView, flash: boolean, vibrate: boolean): string | null {
   const [by, setBy] = useState<string | null>(null);
   const shown = useRef<number | null>(null);
   const hurry = view.hurry;
-  const id = enabled && hurry !== null && hurry.seat === view.you.seat ? hurry.id : null;
+  const id = hurry !== null && hurry.seat === view.you.seat ? hurry.id : null;
   const from = hurry?.by ?? null;
   // Keyed on the nudge's id, not the view: every poll is a new view object,
   // and a timer reset by each one would never let the flash end.
   useEffect(() => {
-    // The move was made, the nudge has lapsed, or the flash was turned off.
+    // The move was made or the nudge has lapsed.
     if (id === null) {
       setBy(null);
       return;
     }
     if (shown.current === id) return;
     shown.current = id;
-    setBy(from);
     if (vibrate && canVibrate()) {
       try {
         navigator.vibrate(HURRY_PATTERN);
@@ -35,8 +38,9 @@ export function useHurryFlash(view: RoomView, enabled: boolean, vibrate: boolean
         // A buzz is a courtesy; the flash still says it.
       }
     }
+    setBy(from);
     const timer = window.setTimeout(() => setBy(null), HURRY_FLASH_MS);
     return () => window.clearTimeout(timer);
   }, [id]);
-  return by;
+  return flash ? by : null;
 }
