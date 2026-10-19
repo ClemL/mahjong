@@ -191,14 +191,9 @@ export function PhoneView({
   useHaptics(view, display.vibrate === "on");
   const hurriedBy = useHurryFlash(view, display.hurry === "on", display.vibrate === "on");
   const [helperOpen, setHelperOpen] = useState(false);
-  // A hurry-up just sent from here: the button rests until the table would
-  // take another, rather than inviting presses the server will refuse.
-  const [hurrySent, setHurrySent] = useState(false);
-  useEffect(() => {
-    if (!hurrySent) return;
-    const timer = window.setTimeout(() => setHurrySent(false), HURRY_COOLDOWN_MS);
-    return () => window.clearTimeout(timer);
-  }, [hurrySent]);
+  // The table resting after anyone's hurry-up: every button waits it out,
+  // rather than inviting presses the server will refuse.
+  const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   // Density is a choice for the controller; the phone that stands in for the
   // whole table keeps its single column.
@@ -567,19 +562,30 @@ export function PhoneView({
       : view.phase === "action" && view.lastDiscard === null && onTurn.kind === "human" && !onTurn.away
         ? view.turn
         : null;
+  // The count can outlive the view's cooldown by a render, so both are checked.
+  const cooldown = view.hurryCooldown !== null && hurryLeft !== null && hurryLeft > 0 ? view.hurryCooldown : null;
+  const cooldownSeconds = Math.ceil((hurryLeft ?? 0) / 1000);
+  const cooldownStyle: CSSProperties & { "--left": number } = {
+    "--left": Math.min(1, (hurryLeft ?? 0) / HURRY_COOLDOWN_MS),
+  };
   const hurryButton =
     display.hurry === "on" && waitingOn !== null && waitingOn !== seat ? (
       <button
         type="button"
-        className="btn btn--sm btn--ghost phone__hurry-btn"
-        disabled={api.busy || hurrySent}
-        aria-label={hurrySent ? `${nameOf(waitingOn)} has been hurried` : `Hurry up ${nameOf(waitingOn)}: flash their screen`}
-        onClick={() => {
-          setHurrySent(true);
-          void api.act({ type: "hurry" });
-        }}
+        className={`btn btn--sm btn--ghost phone__hurry-btn${cooldown ? " phone__hurry-btn--resting" : ""}`}
+        style={cooldown ? cooldownStyle : undefined}
+        disabled={api.busy || cooldown !== null}
+        aria-label={
+          cooldown
+            ? `${cooldown.by === seat ? "You" : nameOf(cooldown.by)} hurried ${nameOf(cooldown.seat)}: hurry up again in ${cooldownSeconds} seconds`
+            : `Hurry up ${nameOf(waitingOn)}: flash their screen`
+        }
+        onClick={() => void api.act({ type: "hurry" })}
       >
-        {hurrySent ? "Hurried" : compact ? "Hurry" : "Hurry up"}
+        {/* "Hurried" while it is this wait that was nudged; once the turn has
+            moved on, the button is only resting. */}
+        {cooldown?.seat === waitingOn ? "Hurried" : compact ? "Hurry" : "Hurry up"}
+        {cooldown ? ` ${cooldownSeconds}s` : null}
       </button>
     ) : null;
 
@@ -832,121 +838,125 @@ export function PhoneView({
         </div>
       )}
 
-      {showHelper ? (
-        <HelperPanel
-          hand={me.hand}
-          melds={me.melds}
-          seats={view.players}
-          seatWind={seatWind(seat)}
-          roundWind={view.roundWind}
-          config={view.config}
-        />
-      ) : null}
-
       {exposedInHeader ? null : exposed}
 
-      {hidden ? (
-        <button
-          type="button"
-          className="phone__hand phone__hand--hidden"
-          aria-label={`Hand hidden, ${me.hand.length} tiles. Show hand`}
-          onClick={() => setHidden(false)}
-        >
-          {me.hand.map((t) => (
-            <TileBack key={t.id} size="lg" />
-          ))}
-          <span className="phone__hidden-label" aria-hidden>
-            Tap to show
-          </span>
-        </button>
-      ) : (
-        <div
-          ref={handRef}
-          className={[
-            "phone__hand",
-            dragging ? "phone__hand--dragging" : "",
-            canThrow ? "phone__hand--throw" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          onPointerDown={onHandPointerDown}
-          onPointerMove={onHandPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
-        >
-          {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
-          {order.drawn ? (
-            <>
-              <span className="hand__gap" aria-hidden />
-              {handTile(order.drawn, true)}
-            </>
+      {/* The hand is always last, with the choices and the helper above it, so
+          nothing that comes and goes can push it off the bottom or cover it. */}
+      <div className="phone__dock">
+        <div className="phone__controls">
+          {landscape && display.playLog === "on" ? (
+            <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
           ) : null}
-        </div>
-      )}
+          {armedTile && yourTurn ? (
+            <div className="confirm-bar" role="status">
+              <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>
+              <button
+                type="button"
+                className="btn btn--win"
+                disabled={api.busy}
+                onClick={() => discard(armedTile.id)}
+              >
+                Discard
+              </button>
+              <button type="button" className="btn btn--ghost" onClick={() => setArmed(null)}>
+                Keep
+              </button>
+            </div>
+          ) : null}
 
-      <div className="phone__controls">
-        {landscape && display.playLog === "on" ? (
-          <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
-        ) : null}
-        {armedTile && yourTurn ? (
-          <div className="confirm-bar" role="status">
-            <span className="confirm-bar__text">Discard {tileName(armedTile.code)}?</span>
-            <button
-              type="button"
-              className="btn btn--win"
-              disabled={api.busy}
-              onClick={() => discard(armedTile.id)}
-            >
-              Discard
-            </button>
-            <button type="button" className="btn btn--ghost" onClick={() => setArmed(null)}>
-              Keep
-            </button>
+          <div className="actions phone__actions">
+            {view.claim && view.lastDiscard ? (
+              <ClaimChoices
+                options={view.claim.options}
+                discard={view.lastDiscard.tile.code}
+                deadlineIn={view.claim.deadlineIn}
+                busy={api.busy}
+                onClaim={(optionId) => {
+                  setPreview(null);
+                  void api.act({ type: "claim", optionId });
+                }}
+                onPreview={setPreview}
+              />
+            ) : (
+              <>
+                {view.actions?.canWin ? (
+                  <button
+                    type="button"
+                    className="btn btn--win"
+                    disabled={api.busy}
+                    onClick={() => void api.act({ type: "win" })}
+                  >
+                    Win 自摸
+                  </button>
+                ) : null}
+                {(view.actions?.kongs ?? []).map((kong) => (
+                  <button
+                    key={`${kong.kind}-${kong.code}`}
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={api.busy}
+                    onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
+                  >
+                    {kong.kind === "concealed" ? "Kong" : "Add to kong"}
+                    <span className="btn__preview">
+                      <TileFace code={kong.code} size="sm" />
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
           </div>
+        </div>
+
+        {showHelper ? (
+          <HelperPanel
+            hand={me.hand}
+            melds={me.melds}
+            seats={view.players}
+            seatWind={seatWind(seat)}
+            roundWind={view.roundWind}
+            config={view.config}
+          />
         ) : null}
 
-        <div className="actions phone__actions">
-          {view.claim && view.lastDiscard ? (
-            <ClaimChoices
-              options={view.claim.options}
-              discard={view.lastDiscard.tile.code}
-              deadlineIn={view.claim.deadlineIn}
-              busy={api.busy}
-              onClaim={(optionId) => {
-                setPreview(null);
-                void api.act({ type: "claim", optionId });
-              }}
-              onPreview={setPreview}
-            />
-          ) : (
-            <>
-              {view.actions?.canWin ? (
-                <button
-                  type="button"
-                  className="btn btn--win"
-                  disabled={api.busy}
-                  onClick={() => void api.act({ type: "win" })}
-                >
-                  Win 自摸
-                </button>
-              ) : null}
-              {(view.actions?.kongs ?? []).map((kong) => (
-                <button
-                  key={`${kong.kind}-${kong.code}`}
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={api.busy}
-                  onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
-                >
-                  {kong.kind === "concealed" ? "Kong" : "Add to kong"}
-                  <span className="btn__preview">
-                    <TileFace code={kong.code} size="sm" />
-                  </span>
-                </button>
-              ))}
-            </>
-          )}
-        </div>
+        {hidden ? (
+          <button
+            type="button"
+            className="phone__hand phone__hand--hidden"
+            aria-label={`Hand hidden, ${me.hand.length} tiles. Show hand`}
+            onClick={() => setHidden(false)}
+          >
+            {me.hand.map((t) => (
+              <TileBack key={t.id} size="lg" />
+            ))}
+            <span className="phone__hidden-label" aria-hidden>
+              Tap to show
+            </span>
+          </button>
+        ) : (
+          <div
+            ref={handRef}
+            className={[
+              "phone__hand",
+              dragging ? "phone__hand--dragging" : "",
+              canThrow ? "phone__hand--throw" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            onPointerDown={onHandPointerDown}
+            onPointerMove={onHandPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
+            {order.drawn ? (
+              <>
+                <span className="hand__gap" aria-hidden />
+                {handTile(order.drawn, true)}
+              </>
+            ) : null}
+          </div>
+        )}
       </div>
       {hurriedBy !== null ? (
         <div className="phone__hurry" role="alert">

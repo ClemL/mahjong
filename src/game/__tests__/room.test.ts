@@ -625,6 +625,24 @@ describe("hurry up", () => {
     expect(hurryUp(robots, 2)).toMatch(/Nobody/);
   });
 
+  it("tells every seat the table is resting, and for how long, so only one hurry-up is out at a time", () => {
+    const room = dealt("TEST", 5, [0, 1, 2]);
+    const t0 = Date.now();
+    expect(viewFor(room, "tok-1", t0).hurryCooldown).toBeNull();
+    expect(hurryUp(room, 2, t0)).toBeNull();
+    for (const token of ["tok-0", "tok-1", "tok-2", null]) {
+      expect(viewFor(room, token, t0 + 4_000).hurryCooldown).toEqual({
+        seat: 0,
+        by: 2,
+        left: HURRY_COOLDOWN_MS - 4_000,
+      });
+    }
+    // Someone else at the table is refused for as long as the view says.
+    expect(hurryUp(room, 1, t0 + 4_000)).toMatch(/just been hurried/);
+    expect(viewFor(room, "tok-1", t0 + HURRY_COOLDOWN_MS).hurryCooldown).toBeNull();
+    expect(hurryUp(room, 1, t0 + HURRY_COOLDOWN_MS)).toBeNull();
+  });
+
   it("stops flashing once its target has moved", () => {
     const room = dealt("TEST", 5, [0, 2]);
     const t0 = Date.now();

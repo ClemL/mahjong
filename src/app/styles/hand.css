@@ -108,16 +108,32 @@
   color: var(--ink-dim);
 }
 
+/* On a phone the helper sits just above the hand, its entries side by side
+   rather than stacked, so it costs a line or two of the screen, not the hand. */
+.phone__dock .helper {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  max-height: 28vh;
+  overflow-y: auto;
+}
+
 .helper__toggle {
   flex: none;
   line-height: 1;
-  padding-block: 2px;
 }
 
-/* The sticker stands a little taller than the text beside it, so it reads at a glance. */
+/* Over .btn--sm's padding, which is imported later. */
+.btn.helper__toggle {
+  padding-block: 0;
+}
+
+/* The sticker fills the whole height of a touch-sized button, so it reads at
+   a glance without making the header any taller. */
 .helper__icon {
   display: block;
-  height: 30px;
+  height: 42px;
   width: auto;
 }
 

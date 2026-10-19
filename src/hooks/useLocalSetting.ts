@@ -109,12 +109,15 @@ export interface PhoneDisplay {
   setHelper: (value: OnOff) => void;
 }
 
+/** Players whose seat has the assists on until they say otherwise, lower-cased. */
+const ASSISTED = new Set(["zaid", "lucy"]);
+
 /**
- * Hurry up and the helper start off for everyone but Zaid, whose seat has them
- * on until they say otherwise. A choice made in settings always wins.
+ * Hurry up and the helper start off for everyone but the players in
+ * `ASSISTED`. A choice made in settings always wins.
  */
 export function assistsDefault(name: string | null | undefined): OnOff {
-  return name?.trim().toLowerCase() === "zaid" ? "on" : "off";
+  return ASSISTED.has(name?.trim().toLowerCase() ?? "") ? "on" : "off";
 }
 
 /** `name` is whoever holds this phone's seat, which sets the assists' default. */

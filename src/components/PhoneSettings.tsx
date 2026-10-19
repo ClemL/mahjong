@@ -37,7 +37,11 @@ const PLAY_LOG: ChoiceOption<OnOff>[] = [
 ];
 
 const VIBRATE: ChoiceOption<OnOff>[] = [
-  { value: "on", label: "On", hint: "A buzz when it is your turn, when you can claim, and when you win" },
+  {
+    value: "on",
+    label: "On",
+    hint: "A buzz when it is your turn, when you can claim, when someone hurries you up, and when you win",
+  },
   { value: "off", label: "Off", hint: "Never buzzes" },
 ];
 
@@ -56,7 +60,7 @@ const HURRY: ChoiceOption<OnOff>[] = [
     label: "On",
     hint: "A Hurry up button while someone else is holding up the table, and this screen flashes when someone presses theirs",
   },
-  { value: "off", label: "Off", hint: "No button, and this screen never flashes" },
+  { value: "off", label: "Off", hint: "No button, and this screen never flashes; the phone still buzzes if Vibrate is on" },
 ];
 
 const HELPER: ChoiceOption<OnOff>[] = [

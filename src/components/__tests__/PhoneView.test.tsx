@@ -375,8 +375,6 @@ describe("PhoneView — whose move it is", () => {
     const name = theirs.players[seat].occupant.name;
     fireEvent.click(within(elsewhere).getByRole("button", { name: `Hurry up ${name}: flash their screen` }));
     expect(api.act).toHaveBeenCalledWith({ type: "hurry" });
-    // Resting until the table would take another.
-    expect(within(elsewhere).getByRole("button", { name: `${name} has been hurried` })).toHaveProperty("disabled", true);
 
     expect(hurryUp(room, other)).toBeNull();
     const mine = playerView(room, seat);
@@ -385,6 +383,51 @@ describe("PhoneView — whose move it is", () => {
     expect(within(container).getByRole("alert").textContent).toBe(`${NAMES[other]} says hurry up!`);
     // Nobody is offered a button to hurry themselves.
     expect(within(container).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
+  });
+
+  it("rests every Hurry up button at the table after anyone's, counting down the seconds", () => {
+    window.localStorage.setItem("hk-mahjong.hurry", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));
+    const { room, seat } = onTurn();
+    const sender = ((seat + 1) % 4) as Seat;
+    const bystander = ((seat + 2) % 4) as Seat;
+    const name = NAMES[seat];
+    expect(hurryUp(room, sender)).toBeNull();
+
+    const sent = playerView(room, sender);
+    const { container: theirs } = render(<PhoneView api={fakeApi(sent)} view={sent} sound={sound} />);
+    const own = within(theirs).getByRole("button", { name: new RegExp(`^You hurried ${name}: hurry up again in \\d+ seconds$`) });
+    expect(own).toHaveProperty("disabled", true);
+    expect(own.textContent).toMatch(/^Hurried \d+s$/);
+
+    // Only one at a time: someone else at the table waits it out too.
+    const other = playerView(room, bystander);
+    const { container: elsewhere } = render(<PhoneView api={fakeApi(other)} view={other} sound={sound} />);
+    const theirButton = within(elsewhere).getByRole("button", { name: new RegExp(`^${NAMES[sender]} hurried ${name}`) });
+    expect(theirButton).toHaveProperty("disabled", true);
+    expect(within(elsewhere).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
+  });
+
+  it("buzzes the phone being hurried, even with its own Hurry up setting off", () => {
+    const vibrate = vi.fn(() => true);
+    Object.defineProperty(window.navigator, "vibrate", { value: vibrate, configurable: true });
+    onTestFinished(() => {
+      delete (window.navigator as { vibrate?: unknown }).vibrate;
+    });
+    const { room, seat } = onTurn();
+    hurryUp(room, ((seat + 1) % 4) as Seat);
+    const mine = playerView(room, seat);
+    const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    // No flash without the setting, but the buzz still comes.
+    expect(container.querySelector(".phone__hurry")).toBeNull();
+    expect(vibrate).toHaveBeenCalledWith([120, 80, 120, 80, 120]);
+
+    // The Vibrate setting is what silences it.
+    vibrate.mockClear();
+    window.localStorage.setItem("hk-mahjong.vibrate", "off");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.vibrate"));
+    render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    expect(vibrate).not.toHaveBeenCalledWith([120, 80, 120, 80, 120]);
   });
 
   it("leaves the hurry-up button and the flash off unless the phone turns them on", () => {
@@ -401,11 +444,11 @@ describe("PhoneView — whose move it is", () => {
     }
   });
 
-  it("turns the assists on by default for Zaid, however it is typed, but never over a choice", () => {
+  it.each([" zAiD ", "LUCY"])("turns the assists on by default for %j, however it is typed, but never over a choice", (typed) => {
     const { room, seat } = onTurn();
     const other = ((seat + 1) % 4) as Seat;
     const occupant = room.seats[other];
-    if (occupant.kind === "human") occupant.name = " zAiD ";
+    if (occupant.kind === "human") occupant.name = typed;
     const theirs = playerView(room, other);
     const first = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
     expect(within(first.container).getByRole("button", { name: /^Hurry up/ })).toBeTruthy();
@@ -446,5 +489,9 @@ describe("PhoneView — whose move it is", () => {
     expect(rows.some((r) => r.includes("run with") && r.includes("3 Dots") && r.includes("6 Dots"))).toBe(true);
     expect(rows.some((r) => r.includes("run with") && r.includes("8 Bamboo"))).toBe(true);
     expect(rows.some((r) => r.includes("pung with") && r.includes(tileName("dr")))).toBe(true);
+    // Straight above the hand, and the hand last of all.
+    const row = container.querySelector(".phone__hand")!;
+    expect(row.previousElementSibling).toBe(container.querySelector(".helper"));
+    expect(row.parentElement!.lastElementChild).toBe(row);
   });
 });
