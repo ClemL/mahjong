@@ -120,7 +120,9 @@ export function TableLobby({
         </p>
         {/* The same drawer as during play, so the look and the house rules can
             be settled while people are still sitting down. */}
-        <SettingsMenu>
+        <SettingsMenu
+          sheet={isTable ? { title: "Table settings", subtitle: `${tableName(view.roomId)} · Before the deal` } : undefined}
+        >
           {isTable ? (
             <TableSettings
               api={api}

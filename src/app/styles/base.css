@@ -26,6 +26,8 @@
   --tile-back: #1f7a5c;
   --tile-back-2: #14503d;
   --gold: #e8c46a;
+  /* Text and marks drawn on a gold fill: dark on brass, light where a theme darkens the gold. */
+  --on-gold: #2a2110;
   --danger: #d9534f;
   --panel: rgba(0, 0, 0, 0.28);
   --panel-border: rgba(255, 255, 255, 0.12);

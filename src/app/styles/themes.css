@@ -65,6 +65,7 @@
   --ink: #1f231c;
   --ink-dim: #5b6157;
   --gold: #8a6a12;
+  --on-gold: #fffaf0;
   --danger: #b03a36;
   /* Ivory tiles on a light table need a firmer edge to stay defined. */
   --tile-edge: #a2977a;

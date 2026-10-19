@@ -34,11 +34,11 @@
 .btn--primary {
   background: var(--gold);
   border-color: var(--gold);
-  color: #2a2110;
+  color: var(--on-gold);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #f0d284;
+  filter: brightness(1.08);
 }
 
 .btn--win {

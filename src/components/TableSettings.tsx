@@ -1,74 +1,147 @@
 "use client";
 
+import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
 import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS } from "@/game/room";
 import { SEAT_NAMES } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, othersPayHalfInPlay, roundsInGame } from "@/game/rules";
+import type { SoundToggle } from "@/hooks/useRoomSound";
+import { THEMES, TILE_STYLES } from "@/game/appearance";
+import {
+  MIN_FAAN_CHOICES,
+  type RuleConfig,
+  describeRounds,
+  flowersInPlay,
+  halfShare,
+  liabilityInPlay,
+  othersPayHalfInPlay,
+  roundsInGame,
+} from "@/game/rules";
 import { GAME_LENGTHS } from "./gameLength";
-import { Choice, type ChoiceOption } from "./Choice";
+import { type SegmentOption, Segmented, SwitchRow } from "./SettingControls";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
-import type { SoundToggle } from "@/hooks/useRoomSound";
 import { positionOf } from "./tableLayout";
 
-const SPEEDS: ChoiceOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
+const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
   value: `${s.level}` as `${SpeedLevel}`,
   label: s.label,
   hint: `About ${s.turnMs / 1000} seconds per computer turn, with the animations paced to match`,
 }));
 
-const LIMITS: ChoiceOption<string>[] = TURN_LIMITS.map((seconds) => ({
+const limitLabel = (seconds: number) =>
+  seconds === 0 ? "Off" : seconds < 60 ? `${seconds}s` : `${seconds / 60} min`;
+
+const LIMITS: SegmentOption<string>[] = TURN_LIMITS.map((seconds) => ({
   value: String(seconds),
-  label: seconds === 0 ? "Off" : seconds < 60 ? `${seconds}s` : `${seconds / 60} min`,
+  label: limitLabel(seconds),
   hint:
     seconds === 0
       ? "Wait as long as a player takes"
       : `After ${seconds < 60 ? `${seconds} seconds` : `${seconds / 60} minute${seconds > 60 ? "s" : ""}`}, the tile just drawn is discarded for them`,
 }));
 
+const MIN_FAAN: SegmentOption<`${number}`>[] = MIN_FAAN_CHOICES.map((n) => ({
+  value: `${n}` as `${number}`,
+  label: String(n),
+  sub: n === 0 ? "chicken" : n === 1 ? "easy" : n === 3 ? "HK standard" : "hard",
+  hint:
+    n === 0
+      ? "No minimum: even a chicken hand (雞糊) wins, for one point"
+      : `A win must be worth at least ${n} faan, bonus tiles included`,
+}));
+
+const FLOWERS: SegmentOption<OnOff>[] = [
+  { value: "on", label: "In play", sub: "144 tiles", hint: "Flowers and Seasons score as bonus tiles" },
+  { value: "off", label: "Left out", sub: "136 tiles", hint: "Nothing is scored for bonus tiles" },
+];
+
+const OTHERS_PAY_HALF: SegmentOption<OnOff>[] = [
+  {
+    value: "on",
+    label: "Others pay half",
+    sub: "House rule",
+    hint: "The thrower pays the hand's value; the two players who didn't throw it pay half each, rounded up",
+  },
+  { value: "off", label: "Discarder only", sub: "出銃全包", hint: "The thrower alone pays a win off their discard" },
+];
+
 const EDGES = ["bottom", "right", "top", "left"];
 
-const TURN_GLOW: ChoiceOption<OnOff>[] = [
-  { value: "on", label: "On", hint: "The discard area of whoever is to play is lit a little" },
-  { value: "off", label: "Off", hint: "Only the rack shows whose turn it is" },
-];
+type Section = "rules" | "pace" | "tablet" | "look" | "reference";
 
-const WALL: ChoiceOption<OnOff>[] = [
-  {
-    value: "on",
-    label: "Show",
-    hint: "The tiles still to be drawn, faint under the table; draws leave from it",
-  },
-  { value: "off", label: "Hide", hint: "A plain felt" },
-];
+/** The worked example under the paying rules: what a win off a discard costs at this table. */
+function PayoutExample({ config }: { config: RuleConfig }) {
+  // The smallest win most tables see, at the HK standard or this table's own minimum.
+  const faan = Math.min(Math.max(config.minFaan, 3), config.limitFaan);
+  const value = config.payoutTable[faan] ?? 0;
+  const half = othersPayHalfInPlay(config) ? halfShare(value) : 0;
+  return (
+    <div className="payout">
+      <span className="payout__title">
+        A {faan}-faan win off a discard ({value} points)
+      </span>
+      <dl className="payout__rows">
+        <dt>The thrower</dt>
+        <dd className="payout__paid">−{value}</dd>
+        <dt>Each of the other two</dt>
+        <dd className={half > 0 ? "payout__paid" : undefined}>{half > 0 ? `−${half}` : "0"}</dd>
+        <dt className="payout__win">The winner</dt>
+        <dd className="payout__win payout__got">+{value + 2 * half}</dd>
+      </dl>
+    </div>
+  );
+}
 
-const FLOWERS: ChoiceOption<OnOff>[] = [
-  { value: "on", label: "In play", hint: "144 tiles; Flowers and Seasons score as bonus tiles" },
-  { value: "off", label: "Left out", hint: "136 tiles; nothing is scored for bonus tiles" },
-];
+function Card({ title, aside, children, tall = false }: { title: string; aside?: ReactNode; children: ReactNode; tall?: boolean }) {
+  return (
+    <section className={`tset-card${tall ? " tset-card--tall" : ""}`}>
+      <div className="tset-card__head">
+        <h3 className="tset-card__title">{title}</h3>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
 
-const LIABILITY: ChoiceOption<OnOff>[] = [
-  { value: "on", label: "In play", hint: "Feeding a third dragon set or a fourth set pays that player's self-draw alone" },
-  { value: "off", label: "Off", hint: "A self-drawn win is always paid by all three" },
-];
+const ICONS: Record<Section, ReactNode> = {
+  rules: (
+    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  ),
+  pace: (
+    <>
+      <circle cx="12" cy="13" r="8" />
+      <path d="M12 9v4l2 2M9 2h6" />
+    </>
+  ),
+  tablet: (
+    <>
+      <rect x="3" y="4" width="18" height="14" rx="2" />
+      <path d="M8 21h8" />
+    </>
+  ),
+  look: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 3a9 9 0 0 0 0 18" />
+    </>
+  ),
+  reference: (
+    <>
+      <path d="M9 9a3 3 0 1 1 3 3v2" />
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 17h.01" />
+    </>
+  ),
+};
 
-const OTHERS_PAY_HALF: ChoiceOption<OnOff>[] = [
-  {
-    value: "on",
-    label: "Half each",
-    hint: "On a win off a discard, the two players who did not throw it pay half the hand's value each",
-  },
-  { value: "off", label: "Discarder only", hint: "On a win off a discard, the discarder alone pays (出銃全包)" },
-];
-
-const SOUND: ChoiceOption<"on" | "off">[] = [
-  { value: "on", label: "On", hint: "Clacks on discards, claims and wins" },
-  { value: "off", label: "Off", hint: "Silent" },
-];
-
-/** What the table is set to, as opposed to what it is doing. */
+/**
+ * What the table is set to, as opposed to what it is doing: the house rules,
+ * the pace, this tablet's own display, the look, and the rules for reference,
+ * one section at a time beside a rail that says what each is set to.
+ */
 export function TableSettings({
   api,
   view,
@@ -83,121 +156,255 @@ export function TableSettings({
   /** This tablet's own display choices. */
   display?: TabletDisplay;
 }) {
+  const [section, setSection] = useState<Section>("rules");
+  const ids = useId();
+  const tabs = useRef<(HTMLButtonElement | null)[]>([]);
+  const config = view.config;
   const handLive = view.started && view.phase !== "handOver" && view.phase !== "gameOver";
+  const rounds = roundsInGame(config);
+  const lengthLabel = GAME_LENGTHS.find((g) => g.value === String(rounds))?.label ?? describeRounds(rounds);
+  const speedLabel = SPEED_LEVELS.find((s) => s.level === view.settings.speed)?.label ?? "Normal";
+  const themeLabel = THEMES.find((t) => t.value === appearance.appearance.theme)?.label ?? "";
+  const facesLabel = TILE_STYLES.find((t) => t.value === appearance.appearance.tiles)?.label ?? "";
+
+  const sections: { key: Section; name: string; summary: string }[] = [
+    { key: "rules", name: "House rules", summary: `${config.minFaan} faan · ${lengthLabel}` },
+    {
+      key: "pace",
+      name: "Pace & turns",
+      summary: `${speedLabel} computers · ${view.settings.turnLimit === 0 ? "no turn limit" : `${limitLabel(view.settings.turnLimit)} turns`}`,
+    },
+    {
+      key: "tablet",
+      name: "This tablet",
+      summary: [
+        sound ? (sound.muted ? "Sound off" : "Sound on") : null,
+        display ? (display.wall === "on" ? "wall shown" : "wall hidden") : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    },
+    { key: "look", name: "Look", summary: `${themeLabel} · ${facesLabel} faces` },
+    { key: "reference", name: "Rules & faan", summary: "Full rules · faan table" },
+  ];
+
+  // Up and down move between sections, as in any list of tabs.
+  const onTabKey = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step = e.key === "ArrowDown" ? 1 : e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = (index + step + sections.length) % sections.length;
+    setSection(sections[next].key);
+    tabs.current[next]?.focus();
+  };
+
+  const inForce = [
+    `Min ${config.minFaan} faan`,
+    lengthLabel,
+    flowersInPlay(config) ? "Flowers in" : "No flowers",
+    liabilityInPlay(config) ? "包 Liability" : "No liability",
+    othersPayHalfInPlay(config) ? "Others pay half" : "Discarder pays alone",
+  ];
+
   return (
-    <>
-      <section className="panel">
-        <details open>
-          <summary>Table</summary>
-          <div className="appearance">
-            <label className="field">
-              <span className="field__label">Min faan</span>
-              <select
-                className="field__select"
-                value={view.config.minFaan}
-                disabled={api.busy}
-                onChange={(e) => void api.control({ type: "minFaan", value: Number(e.target.value) })}
+    <div className="tset">
+      <nav className="tset__rail" aria-label="Settings sections">
+        <div role="tablist" aria-orientation="vertical" className="tset__tabs">
+          {sections.map((s, i) => {
+            const on = s.key === section;
+            return (
+              <button
+                key={s.key}
+                ref={(el) => {
+                  tabs.current[i] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`${ids}-tab-${s.key}`}
+                aria-selected={on}
+                aria-controls={`${ids}-panel`}
+                tabIndex={on ? 0 : -1}
+                className={`tset__tab${on ? " tset__tab--on" : ""}`}
+                onClick={() => setSection(s.key)}
+                onKeyDown={(e) => onTabKey(e, i)}
               >
-                {MIN_FAAN_CHOICES.map((n) => (
-                  <option key={n} value={n}>
-                    {n === 0 ? "0 (chicken)" : n === 3 ? "3 (HK standard)" : n}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <Choice
-              label="Game length"
-              options={GAME_LENGTHS}
-              value={String(roundsInGame(view.config)) as `${number}`}
-              disabled={api.busy}
-              onChange={(value) => void api.control({ type: "rounds", value: Number(value) })}
-            />
-
-            {/* The tile set is fixed by the deal, so it only changes between hands. */}
-            <Choice
-              label="Flowers"
-              options={FLOWERS}
-              value={flowersInPlay(view.config) ? "on" : "off"}
-              disabled={api.busy || handLive}
-              note={handLive ? "Can be changed once this hand is over" : undefined}
-              onChange={(value) => void api.control({ type: "flowers", value: value === "on" })}
-            />
-
-            <Choice
-              label="Liability (包)"
-              options={LIABILITY}
-              value={liabilityInPlay(view.config) ? "on" : "off"}
-              disabled={api.busy}
-              onChange={(value) => void api.control({ type: "liability", value: value === "on" })}
-            />
-
-            <Choice
-              label="Others pay on a discard"
-              options={OTHERS_PAY_HALF}
-              value={othersPayHalfInPlay(view.config) ? "on" : "off"}
-              disabled={api.busy}
-              onChange={(value) => void api.control({ type: "othersPayHalf", value: value === "on" })}
-            />
-
-            <Choice
-              label="Computer speed"
-              options={SPEEDS}
-              value={`${view.settings.speed}` as `${SpeedLevel}`}
-              onChange={(value) => void api.control({ type: "speed", value: Number(value) })}
-            />
-
-            <Choice
-              label="Turn time limit"
-              options={LIMITS}
-              value={String(view.settings.turnLimit)}
-              onChange={(value) => void api.control({ type: "turnLimit", value: Number(value) })}
-            />
-
-            {/* For a tablet laid down at a different angle to the chairs. */}
-            <div className="choice">
-              <span className="choice__label">Board</span>
-              <div className="choice__options">
-                <button
-                  type="button"
-                  className="choice__btn"
-                  disabled={api.busy}
-                  onClick={() => void api.control({ type: "rotate" })}
+                <svg
+                  className="tset__icon"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
                 >
-                  Rotate clockwise ↻
-                </button>
-              </div>
-              <span className="choice__hint">
-                {SEAT_NAMES[0]} sits at the {EDGES[positionOf(0, view.settings.rotation)]} edge
-              </span>
+                  {ICONS[s.key]}
+                </svg>
+                <span className="tset__tab-text">
+                  <span className="tset__tab-name">{s.name}</span>
+                  <span className="tset__tab-sum">{s.summary}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* For a tablet laid down at a different angle to the chairs. */}
+        <div className="tset__board">
+          <span className="tset__board-label">Board</span>
+          <span className="tset__board-text">
+            {SEAT_NAMES[0]} sits at the {EDGES[positionOf(0, view.settings.rotation)]} edge of this tablet
+          </span>
+          <button
+            type="button"
+            className="btn tset__rotate"
+            disabled={api.busy}
+            onClick={() => void api.control({ type: "rotate" })}
+          >
+            <span aria-hidden="true">↻</span> Rotate a quarter turn
+          </button>
+        </div>
+      </nav>
+
+      <div className="tset__content" role="tabpanel" id={`${ids}-panel`} aria-labelledby={`${ids}-tab-${section}`}>
+        {section === "rules" ? (
+          <>
+            <div className="tset__force">
+              <span className="tset__force-label">In force</span>
+              {inForce.map((rule) => (
+                <span key={rule} className="tset__chip">
+                  {rule}
+                </span>
+              ))}
             </div>
-
-            {sound ? (
-              <Choice
-                label="Sound"
-                options={SOUND}
-                value={sound.muted ? "off" : "on"}
-                onChange={(value) => sound.setMuted(value === "off")}
-              />
-            ) : null}
-
-            {display ? (
-              <>
-                <Choice
-                  label="Turn light"
-                  options={TURN_GLOW}
-                  value={display.turnGlow}
-                  onChange={display.setTurnGlow}
+            <div className="tset__grid">
+              <Card title="Winning">
+                <Segmented
+                  label="Minimum faan"
+                  options={MIN_FAAN}
+                  value={`${config.minFaan}` as `${number}`}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "minFaan", value: Number(value) })}
                 />
-                <Choice label="Wall" options={WALL} value={display.wall} onChange={display.setWall} />
-              </>
-            ) : null}
+                <Segmented
+                  label="Game length"
+                  options={GAME_LENGTHS}
+                  value={String(rounds) as `${number}`}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "rounds", value: Number(value) })}
+                />
+              </Card>
+
+              <Card title="Paying" tall>
+                <SwitchRow
+                  label="包 Liability"
+                  hint="Whoever feeds a third dragon set or a fourth set pays that player's whole self-drawn win"
+                  checked={liabilityInPlay(config)}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "liability", value })}
+                />
+                <Segmented
+                  label="On a win off a discard"
+                  options={OTHERS_PAY_HALF}
+                  value={othersPayHalfInPlay(config) ? "on" : "off"}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "othersPayHalf", value: value === "on" })}
+                />
+                <PayoutExample config={config} />
+                <span className="tset__foot">Paying rules can change mid-hand; they count from the next hand settled.</span>
+              </Card>
+
+              {/* The tile set is fixed by the deal, so it only changes between hands. */}
+              <Card
+                title="Tiles"
+                aside={
+                  handLive ? (
+                    <span className="tset__lock">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                        <rect x="4" y="11" width="16" height="10" rx="2" />
+                        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                      </svg>
+                      Locked until this hand ends
+                    </span>
+                  ) : null
+                }
+              >
+                <Segmented
+                  label="Flowers and Seasons"
+                  options={FLOWERS}
+                  value={flowersInPlay(config) ? "on" : "off"}
+                  disabled={api.busy || handLive}
+                  note={handLive ? "The tile set is fixed when a hand is dealt" : undefined}
+                  onChange={(value) => void api.control({ type: "flowers", value: value === "on" })}
+                />
+              </Card>
+            </div>
+          </>
+        ) : null}
+
+        {section === "pace" ? (
+          <div className="tset__grid tset__grid--one">
+            <Card title="Computer players">
+              <Segmented
+                label="Speed"
+                options={SPEEDS}
+                value={`${view.settings.speed}` as `${SpeedLevel}`}
+                onChange={(value) => void api.control({ type: "speed", value: Number(value) })}
+              />
+            </Card>
+            <Card title="People">
+              <Segmented
+                label="Turn time limit"
+                options={LIMITS}
+                value={String(view.settings.turnLimit)}
+                onChange={(value) => void api.control({ type: "turnLimit", value: Number(value) })}
+              />
+            </Card>
           </div>
-        </details>
-      </section>
-      <AppearancePanel api={appearance} />
-      <RulesPanel config={view.config} />
-      <FaanPanel config={view.config} />
-    </>
+        ) : null}
+
+        {section === "tablet" ? (
+          <div className="tset__grid tset__grid--one">
+            <Card title="On this tablet">
+              {sound ? (
+                <SwitchRow
+                  label="Sound"
+                  hint="Clacks on discards, claims and wins"
+                  checked={!sound.muted}
+                  onChange={(on) => sound.setMuted(!on)}
+                />
+              ) : null}
+              {display ? (
+                <>
+                  <SwitchRow
+                    label="Turn light"
+                    hint="The discard area of whoever is to play is lit a little"
+                    checked={display.turnGlow === "on"}
+                    onChange={(on) => display.setTurnGlow(on ? "on" : "off")}
+                  />
+                  <SwitchRow
+                    label="Wall"
+                    hint="The tiles still to be drawn, faint under the table; draws leave from it"
+                    checked={display.wall === "on"}
+                    onChange={(on) => display.setWall(on ? "on" : "off")}
+                  />
+                </>
+              ) : null}
+            </Card>
+          </div>
+        ) : null}
+
+        {section === "look" ? <AppearancePanel api={appearance} /> : null}
+
+        {section === "reference" ? (
+          <>
+            <RulesPanel config={config} />
+            <FaanPanel config={config} />
+          </>
+        ) : null}
+      </div>
+    </div>
   );
 }

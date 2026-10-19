@@ -842,7 +842,12 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
               Full screen
             </button>
           ) : null}
-          <SettingsMenu>
+          <SettingsMenu
+            sheet={{
+              title: "Table settings",
+              subtitle: `${tableName(view.roomId)} · Hand ${view.handNumber} · ${roundName(view.roundWind)} round`,
+            }}
+          >
             <TableSettings
               api={api}
               view={view}
