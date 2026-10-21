@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
@@ -8,6 +8,8 @@ import { tableName } from "@/game/tables";
 
 interface Props {
   view: RoomView;
+  /** The chair a scanned code asked for, if it is still free to sit in. */
+  picked?: Seat | null;
   onClaim: (seat: Seat | "table", name: string) => Promise<void>;
   /** Empty the room, table included. */
   onReset: () => void;
@@ -16,10 +18,19 @@ interface Props {
 }
 
 /** Pick a seat and sit down. There is nothing else to get past. */
-export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
-  const [choice, setChoice] = useState<Seat | "table" | null>(null);
-
+export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error }: Props) {
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
+  // Somebody may have sat down there between the code being shown and scanned.
+  const arrived = picked !== null && !taken(picked) ? picked : null;
+  const [choice, setChoice] = useState<Seat | "table" | null>(arrived);
+
+  // Arriving from a chair's code, naming yourself is all that is left to do.
+  // Focused without scrolling, so the line saying whose chair it is stays in view.
+  const nameBox = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (arrived !== null) nameBox.current?.focus({ preventScroll: true });
+    // Only on arrival: a later tap on another chair is the person's own choice.
+  }, []);
   const namesInUse = view.players
     .map((p) => p.occupant.name)
     .filter((n): n is string => n !== null);
@@ -41,6 +52,14 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
         <p className="lobby__warn" role="status">
           Somebody else scanned the code for seat {view.displacedFrom + 1},{" "}
           {SEAT_NAMES[view.displacedFrom]}, and took your place. Pick a seat to sit back down.
+        </p>
+      ) : null}
+      {arrived !== null && choice === arrived ? (
+        <p className="lobby__warn" role="status">
+          {view.players[arrived].occupant.kind === "ai"
+            ? `You are taking over ${view.players[arrived].occupant.name} at seat ${arrived + 1}, ${SEAT_NAMES[arrived]}, hand and all.`
+            : `Seat ${arrived + 1}, ${SEAT_NAMES[arrived]}, is yours.`}{" "}
+          Type your name and sit down.
         </p>
       ) : null}
       <p className="lobby__lead">
@@ -102,6 +121,7 @@ export function SeatPicker({ view, onClaim, onReset, busy, error }: Props) {
               <input
                 className="field__input"
                 value={name}
+                ref={nameBox}
                 maxLength={16}
                 placeholder={DEFAULT_NAMES[choice as Seat]}
                 onChange={(e) => setName(e.target.value)}

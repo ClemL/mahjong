@@ -11,6 +11,16 @@
   gap: 8px;
 }
 
+/* Held upright the page is turned on its side (layout.css); the table still
+   takes exactly the frame, and its top is the glass's right edge. */
+@media (orientation: portrait) {
+  .screen > .app--felt {
+    overflow: hidden;
+    padding-top: max(8px, env(safe-area-inset-right));
+    padding-bottom: max(8px, env(safe-area-inset-left));
+  }
+}
+
 .tabletop {
   flex: 1;
   min-height: 0;
@@ -300,6 +310,6 @@
 }
 
 .console__headline {
-  font-size: clamp(18px, 2.4vw, 30px);
+  font-size: clamp(18px, 2.4cqw, 30px);
   color: var(--gold);
 }

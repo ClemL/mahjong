@@ -37,6 +37,7 @@ import { PlayLog } from "./PlayLog";
 import { PhoneResult } from "./PhoneResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
+import { intoFrame, screenAngle } from "./screenFrame";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
 const DRAG_THRESHOLD = 10;
@@ -99,29 +100,6 @@ function offsetWithin(el: HTMLElement, box: HTMLElement): { x: number; y: number
     node = parent;
   }
   return node === box ? { x, y } : null;
-}
-
-/** How far an element is turned on screen, in radians, by the transforms above it. */
-function screenAngle(node: Element | null): number {
-  let angle = 0;
-  for (let n = node; n; n = n.parentElement) {
-    const m = /matrix\(([^)]+)\)/.exec(getComputedStyle(n).transform);
-    if (m) {
-      const [a, b] = m[1].split(",").map(Number);
-      angle += Math.atan2(b, a);
-    }
-  }
-  return angle;
-}
-
-/**
- * A movement on screen in the controller's own frame. Turned on its side, the
- * controller's "up" is across the glass, and a throw has to be read that way.
- */
-function intoFrame(dx: number, dy: number, angle: number): { x: number; y: number } {
-  const cos = Math.cos(angle);
-  const sin = Math.sin(angle);
-  return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos };
 }
 
 /** How a tile already in a set is marked: the kind of set, and the faan an honor set scores. */

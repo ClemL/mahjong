@@ -50,8 +50,8 @@ export function TileReference({ api }: { api: AppearanceApi }) {
         Show every tile
       </button>
       {/* Portalled so the sheet escapes the settings drawer, which would clip
-          it. A phone held upright turns the whole controller on its side, so
-          there the sheet stays inside the controller and turns with it. */}
+          it. Held upright the whole page is turned on its side inside the
+          screen frame, so the sheet goes there and turns with it. */}
       {open
         ? createPortal(
             <Modal open title="Every tile" onClose={() => setOpen(false)} className="modal--wide tile-ref">
@@ -83,7 +83,7 @@ export function TileReference({ api }: { api: AppearanceApi }) {
                 </section>
               ))}
             </Modal>,
-            trigger.current?.closest(".app--handset") ?? document.body,
+            trigger.current?.closest(".screen") ?? document.body,
           )
         : null}
     </>

@@ -38,7 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             theme never flashes the default one. */}
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_INIT_SCRIPT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {/* Every screen is landscape: held upright, this frame turns the page on its side. */}
+        <div className="screen">{children}</div>
+      </body>
     </html>
   );
 }

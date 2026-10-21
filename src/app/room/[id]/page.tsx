@@ -28,6 +28,20 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   const [joiningTable, setJoiningTable] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
+  // A computer chair's code from the table's side panel opens the picker on
+  // that chair, with a box for the newcomer's name, rather than sitting them
+  // down unnamed. Read once and stripped, like a seat code.
+  const [picked, setPicked] = useState<Seat | null>(null);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const asked = url.searchParams.get("pick");
+    if (asked === null) return;
+    url.searchParams.delete("pick");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    const seat = Number(asked);
+    if (Number.isInteger(seat) && seat >= 0 && seat <= 3) setPicked(seat as Seat);
+  }, []);
+
   const claim = useCallback(
     async (seat: Seat | "table", name: string, replace = false) => {
       const response = await fetch(`/api/rooms/${roomId}/claim`, {
@@ -147,6 +161,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
       <main className="app">
         <SeatPicker
           view={view}
+          picked={picked}
           busy={api.busy}
           onReset={() => void api.resetTable()}
           error={joinError ?? api.error}

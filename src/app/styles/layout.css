@@ -10,9 +10,62 @@
   gap: 12px;
 }
 
-@media (max-width: 760px) {
+@media (orientation: landscape) and (max-width: 760px), (orientation: portrait) and (max-height: 760px) {
   .app {
     padding: 10px 10px 16px;
+  }
+}
+
+/* ------------------------------------------------------ always landscape */
+
+/* Every screen — the start page, the seat picker, the lobby, the table and the
+   phone — is laid out landscape. In landscape the frame is not there at all. */
+.screen {
+  display: contents;
+}
+
+/* Held upright, or with rotation locked (which a page cannot override outside
+   full screen), the frame turns the whole page on its side. Turned clockwise,
+   it reads correctly with the device rotated to the left, the way Android
+   calls landscape. The frame is a size container, so a size the page gives
+   in cqw and cqh is measured along the page's own sides, not the glass; and a
+   media query about the page's width has to ask about the glass's height when
+   upright, so each one names both orientations. */
+@media (orientation: portrait) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .screen {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vh;
+    width: 100dvh;
+    height: 100vw;
+    height: 100dvw;
+    overflow: hidden;
+    container-type: size;
+    transform-origin: top left;
+    transform: translateX(100vw) rotate(90deg);
+    transform: translateX(100dvw) rotate(90deg);
+  }
+
+  /* The page scrolls inside the frame rather than the document. Anything
+     fixed — a dialog, a drawer — is placed in the frame, so it turns with the
+     page and stays put while the page scrolls. The safe-area insets turn too:
+     the page's top is the glass's right edge, its left the glass's top. */
+  .screen > .app {
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: max(12px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom))
+      max(20px, env(safe-area-inset-left)) max(16px, env(safe-area-inset-top));
   }
 }
 

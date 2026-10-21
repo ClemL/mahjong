@@ -95,13 +95,16 @@ export function ChipsChart({
   const labels = spread(ends);
   const final = (seat: Seat) => chips[seat][hands];
 
-  const pick = (clientX: number) => {
-    const box = svg.current?.getBoundingClientRect();
-    if (!box || box.width === 0) return;
-    const px = ((clientX - box.left) / box.width) * W;
+  const pick = (clientX: number, clientY: number) => {
+    // Read through the chart's own transform rather than its screen box: a
+    // tablet held upright turns the page on its side, and across the glass is
+    // then along the chart's height.
+    const ctm = svg.current?.getScreenCTM?.();
+    if (!ctm) return;
+    const px = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse()).x;
     setAt(Math.max(0, Math.min(hands, Math.round(((px - LEFT) / (W - LEFT - RIGHT)) * hands))));
   };
-  const onPointer = (e: PointerEvent<SVGSVGElement>) => pick(e.clientX);
+  const onPointer = (e: PointerEvent<SVGSVGElement>) => pick(e.clientX, e.clientY);
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
       e.preventDefault();
