@@ -67,7 +67,7 @@
 .side__scores { order: 2; }
 .side__join { order: 3; }
 .side__settings { order: 4; }
-.side__rules { order: 5; }
+.side__scoring { order: 5; }
 
 @container side (min-width: 640px) {
   .side__cols {
@@ -91,6 +91,57 @@
   border-radius: 14px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
+}
+
+.side__cardhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Closes the pane. Quiet until it is wanted, but a full finger's width on a
+   touch screen. */
+.side__hide {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-dim);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.side__hide:focus-visible {
+  outline: 2px solid var(--gold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .side__hide:hover {
+    background: var(--raise-1);
+    color: var(--ink);
+  }
+}
+
+@media (pointer: coarse) {
+  .side__hide {
+    width: 44px;
+    height: 44px;
+    margin: -12px -12px -12px 0;
+  }
+}
+
+/* Every pane closed or not: the way back sits under whatever is left. */
+.side__restore {
+  margin-top: 8px;
+  align-self: flex-start;
 }
 
 .side__title {
@@ -290,30 +341,32 @@
 
 /* ------------------------------------------------------------- join in */
 
-.side__codes {
+/* One code, with whose chair it is beside it. */
+.side__code {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  align-items: center;
+  gap: 14px;
 }
 
-.side__code {
-  flex: 1 1 120px;
-  max-width: 180px;
+.side__code-text {
+  flex: 1 1 150px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
-  text-align: center;
+}
+
+.side__another {
+  margin-top: 4px;
 }
 
 /* Large enough to scan from a chair: about two centimetres at the least. */
 .qr--side {
-  width: 100%;
-  max-width: 160px;
-  min-width: 120px;
+  flex: none;
+  width: 150px;
+  max-width: 100%;
 }
 
 .qr--pending {
@@ -325,7 +378,7 @@
 
 .side__code-name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 /* ------------------------------------------------------------ settings */

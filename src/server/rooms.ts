@@ -13,6 +13,7 @@ import {
   seatName,
   sitDown,
   moveSeat,
+  replaceWithComputer,
   isHumanSeat,
   pendingHumanClaimants,
   newRoom,
@@ -280,6 +281,7 @@ export type TableCommand =
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
   | { type: "freeSeat"; seat: Seat }
+  | { type: "replaceWithComputer"; seat: Seat }
   | { type: "rename"; seat: Seat; name: string }
   | { type: "moveSeat"; seat: Seat; step: 1 | -1 }
   | { type: "forcePass" };
@@ -394,6 +396,11 @@ export async function control(
         r.seats[command.seat] = { kind: "open" };
         syncSeats(r);
         break;
+      case "replaceWithComputer": {
+        const refused = replaceWithComputer(r, command.seat, now);
+        if (refused) throw new RoomError(refused, 409);
+        break;
+      }
       case "rename": {
         const occupant = r.seats[command.seat];
         if (occupant?.kind !== "human") throw new RoomError("Nobody is sitting there", 409);

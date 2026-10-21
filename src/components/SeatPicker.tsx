@@ -50,8 +50,10 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
       {/* Dropping back here without a word reads as the app losing the seat. */}
       {view.displacedFrom !== null ? (
         <p className="lobby__warn" role="status">
-          Somebody else scanned the code for seat {view.displacedFrom + 1},{" "}
-          {SEAT_NAMES[view.displacedFrom]}, and took your place. Pick a seat to sit back down.
+          {view.displacedByTable
+            ? `The table gave seat ${view.displacedFrom + 1}, ${SEAT_NAMES[view.displacedFrom]}, to the computer.`
+            : `Somebody else scanned the code for seat ${view.displacedFrom + 1}, ${SEAT_NAMES[view.displacedFrom]}, and took your place.`}{" "}
+          Pick a seat to sit back down.
         </p>
       ) : null}
       {arrived !== null && choice === arrived ? (
@@ -86,7 +88,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
               // while the computer is actually playing it.
               <span className="seat-card__state seat-card__state--open">
                 {view.players[seat].occupant.kind === "ai"
-                  ? `${robotName(seat)} — sit in`
+                  ? `${view.players[seat].occupant.name ?? robotName(seat)} — sit in`
                   : DEFAULT_NAMES[seat]}
               </span>
             )}

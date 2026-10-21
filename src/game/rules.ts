@@ -111,11 +111,13 @@ export const DEFAULT_FAAN: FaanTable = {
  */
 export const STARTING_CHIPS = 100;
 
-/** Classic Hong Kong doubling table, 3 faan minimum, 10 faan limit. */
+/** Classic Hong Kong doubling table, to a 10 faan limit. */
 export const DEFAULT_PAYOUT_TABLE = [1, 2, 4, 8, 16, 24, 32, 48, 64, 96, 128];
 
 export const DEFAULT_RULES: RuleConfig = {
-  minFaan: 3,
+  // One faan, not the Hong Kong standard of three: a table of mixed hands
+  // finishes far more of them, and the minimum is one tap away in settings.
+  minFaan: 1,
   limitFaan: 10,
   payoutTable: DEFAULT_PAYOUT_TABLE,
   othersPayHalf: true,

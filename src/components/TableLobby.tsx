@@ -199,7 +199,9 @@ export function TableLobby({
                     {EDGES[positionOf(seat, view.settings.rotation)]} edge
                   </span>
                   {/* Joined state must not rest on the colour of the card alone. */}
-                  <span className="gather__state">{here ? "✓ Seated" : "Open"}</span>
+                  <span className="gather__state">
+                    {here ? "✓ Seated" : occupant.kind === "ai" ? `Computer · ${name}` : "Open"}
+                  </span>
 
                   {/* One chair either way round the table; a taken chair
                       means the two players trade places. Labelled with where

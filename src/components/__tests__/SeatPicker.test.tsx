@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { robotName, viewFor } from "@/game/room";
+import { replaceWithComputer, robotName, viewFor } from "@/game/room";
 import { SeatPicker } from "../SeatPicker";
 import { NAMES, dealt } from "./fixtures";
 
@@ -31,5 +31,17 @@ describe("SeatPicker", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByRole("button", { name: "Sit down" })).toHaveProperty("disabled", true);
     expect(screen.getByText(NAMES[2])).toBeTruthy();
+  });
+
+  it("tells a phone the table gave its chair to the computer, which then goes by its name", () => {
+    const room = dealt([0, 1]);
+    replaceWithComputer(room, 1);
+    render(
+      <SeatPicker view={viewFor(room, "tok-1")} onClaim={vi.fn()} onReset={() => {}} busy={false} error={null} />,
+    );
+    expect(screen.getByRole("status").textContent).toBe(
+      "The table gave seat 2, South, to the computer. Pick a seat to sit back down.",
+    );
+    expect(screen.getByText(`Robot ${NAMES[1]} — sit in`)).toBeTruthy();
   });
 });

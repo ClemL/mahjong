@@ -11,8 +11,9 @@ function hand(spec: string): Tile[] {
   return spec.split(" ").map((code, i) => ({ id: `h${i}-${code}`, code }));
 }
 
-function seatedGame(seed: number): GameState {
-  const state = createGame({ seed });
+/** The computer in all four seats, at the default rules or the minimum given. */
+function seatedGame(seed: number, minFaan = DEFAULT_RULES.minFaan): GameState {
+  const state = createGame({ seed, config: { ...DEFAULT_RULES, minFaan } });
   for (const p of state.players) p.isHuman = false;
   return state;
 }
@@ -90,7 +91,7 @@ describe("greedy claims", () => {
 
 describe("claims at a faan minimum", () => {
   it("keeps a hand concealed rather than open it for a set that costs the minimum", () => {
-    const state = seatedGame(6);
+    const state = seatedGame(6, 3);
     const seat: Seat = 1;
     // Concealed runs are worth 3 faan; opened with a chow they are worth 2.
     state.players[seat].hand = hand("m1 m2 p1 p2 p3 s7 s8 s9 m5 m6 p7 p8 wn");
@@ -157,14 +158,24 @@ describe("greedy play holds the engine's invariants", () => {
     expect(play(greedyAi)).toBeGreaterThan(play(randomAi) + 10);
   }, 120000);
 
-  it("rarely washes out at the default 3 faan minimum", () => {
-    expect(DEFAULT_RULES.minFaan).toBe(3);
+  it("rarely washes out at the Hong Kong standard 3 faan minimum", () => {
+    let washouts = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      const { state } = autoPlayHand(seatedGame(seed * 7919 + 3, 3), createRng(seed + 101), greedyAi);
+      if (state.result?.type !== "win") washouts += 1;
+    }
+    // These seeds wash out 4 times; an opponent blind to the minimum lost about 14.
+    expect(washouts).toBeLessThanOrEqual(6);
+  }, 120000);
+
+  it("all but never washes out at the default 1 faan minimum", () => {
+    expect(DEFAULT_RULES.minFaan).toBe(1);
     let washouts = 0;
     for (let seed = 0; seed < 40; seed++) {
       const { state } = autoPlayHand(seatedGame(seed * 7919 + 3), createRng(seed + 101), greedyAi);
       if (state.result?.type !== "win") washouts += 1;
     }
-    // These seeds wash out 4 times; an opponent blind to the minimum lost about 14.
-    expect(washouts).toBeLessThanOrEqual(6);
+    // Over 300 of these seeds there were none; at 3 faan, 44.
+    expect(washouts).toBeLessThanOrEqual(2);
   }, 120000);
 });

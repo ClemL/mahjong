@@ -87,6 +87,47 @@ export function useTabletDisplay(): TabletDisplay {
   return { turnGlow, setTurnGlow, wall, setWall };
 }
 
+/** The panes beside a squared felt, each of which the tablet can close. */
+export const SIDE_PANES = ["round", "scores", "scoring", "join", "settings"] as const;
+export type SidePane = (typeof SIDE_PANES)[number];
+
+const HIDDEN_PANES_KEY = "hk-mahjong.side-hidden";
+
+/**
+ * Which side-panel panes this tablet has closed. A per-screen choice that
+ * outlives the game: a table that never wants the scoring rules up should not
+ * have to close them again every evening.
+ */
+export function useHiddenPanes(): {
+  hidden: SidePane[];
+  hide: (pane: SidePane) => void;
+  showAll: () => void;
+} {
+  const [hidden, setHidden] = useState<SidePane[]>(() => {
+    try {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem(HIDDEN_PANES_KEY) : null;
+      return SIDE_PANES.filter((pane) => (stored ?? "").split(",").includes(pane));
+    } catch {
+      return [];
+    }
+  });
+
+  const save = useCallback((next: SidePane[]) => {
+    setHidden(next);
+    try {
+      window.localStorage.setItem(HIDDEN_PANES_KEY, next.join(","));
+    } catch {
+      // A choice that cannot be saved still applies for this session.
+    }
+  }, []);
+
+  return {
+    hidden,
+    hide: useCallback((pane: SidePane) => save([...hidden.filter((p) => p !== pane), pane]), [hidden, save]),
+    showAll: useCallback(() => save([]), [save]),
+  };
+}
+
 export type PhoneSize = "compact" | "standard" | "comfy";
 
 /** What the phone shows besides the hand and its choices. */

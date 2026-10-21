@@ -386,6 +386,60 @@
   color: var(--ink-dim);
 }
 
+/* Who sits where, and the way to take a person out of a chair. */
+.tset__players {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tset__player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 0;
+}
+
+.tset__player + .tset__player {
+  border-top: 1px solid var(--line-soft);
+}
+
+.tset__player-wind {
+  flex: none;
+  width: 28px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+  text-align: center;
+}
+
+.tset__player-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tset__player-name {
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tset__player-sub {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.tset__kick {
+  flex: none;
+}
+
 /* A small tablet: the cards stack, then the rail goes above them. */
 @media (orientation: landscape) and (max-width: 1000px), (orientation: portrait) and (max-height: 1000px) {
   .tset__grid {

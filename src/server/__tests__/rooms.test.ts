@@ -309,6 +309,19 @@ describe("table control", () => {
     );
   });
 
+  it("lets only the table hand a person's chair to the computer", async () => {
+    const id = await room();
+    const kris = (await claimSeat(id, { seat: 1, name: "Kris" })).token;
+    const srini = (await claimSeat(id, { seat: 2, name: "Srini" })).token;
+    const { token } = await claimSeat(id, { seat: "table" });
+    await expect(control(id, srini, { type: "replaceWithComputer", seat: 1 })).rejects.toMatchObject({ status: 403 });
+
+    const view = await control(id, token, { type: "replaceWithComputer", seat: 1 });
+    expect(view.players[1].occupant).toEqual({ kind: "ai", name: "Robot Kris", away: false });
+    expect((await readRoom(id, kris)).displacedByTable).toBe(true);
+    await expect(control(id, token, { type: "replaceWithComputer", seat: 1 })).rejects.toMatchObject({ status: 409 });
+  });
+
   it("lets the table cut the deal short, so the opening turn starts now", async () => {
     const { id, table } = await dealtRoom([0]);
     const before = await readRoom(id, table);

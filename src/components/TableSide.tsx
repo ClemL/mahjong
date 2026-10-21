@@ -8,7 +8,7 @@ import { tableName } from "@/game/tables";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { FullscreenApi } from "@/hooks/useFullscreen";
-import type { TabletDisplay } from "@/hooks/useLocalSetting";
+import { SIDE_PANES, type SidePane, type TabletDisplay, useHiddenPanes } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import type { WakeLockState } from "@/hooks/useWakeLock";
 import { QrCode } from "./QrCode";
@@ -51,20 +51,43 @@ export function gameProgress(view: Pick<RoomView, "roundWind" | "dealership" | "
   return { deal: Math.min(deal, total), total };
 }
 
-function Card({ title, className, children }: { title: string; className: string; children: ReactNode }) {
+const PANE_TITLES: Record<SidePane, string> = {
+  round: "Round",
+  scores: "Scores",
+  scoring: "Scoring",
+  join: "Join in",
+  settings: "Settings",
+};
+
+/** A pane, with a way to close it for anyone who would rather see less. */
+function Card({
+  pane,
+  onHide,
+  children,
+}: {
+  pane: SidePane;
+  onHide: (pane: SidePane) => void;
+  children: ReactNode;
+}) {
   const id = useId();
+  const title = PANE_TITLES[pane];
   return (
-    <section className={`side__card ${className}`} aria-labelledby={id}>
-      <h3 className="side__title" id={id}>
-        {title}
-      </h3>
+    <section className={`side__card side__${pane}`} aria-labelledby={id}>
+      <div className="side__cardhead">
+        <h3 className="side__title" id={id}>
+          {title}
+        </h3>
+        <button type="button" className="side__hide" aria-label={`Hide ${title}`} onClick={() => onHide(pane)}>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
       {children}
     </section>
   );
 }
 
 /** The round, the dealership, the wall, and who the table is waiting on. */
-function RoundCard({ view }: { view: RoomView }) {
+function RoundCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) => void }) {
   const name = (seat: Seat) => occupantName(view.players[seat]);
   const { deal, total } = gameProgress(view);
   const doing =
@@ -79,7 +102,7 @@ function RoundCard({ view }: { view: RoomView }) {
           : `${name(view.turn)} to play`;
 
   return (
-    <Card title="Round" className="side__round">
+    <Card pane="round" onHide={onHide}>
       <div className="side__roundline">
         <span className="side__roundwind" aria-hidden>
           {tileGlyph(view.roundWind)}
@@ -112,7 +135,7 @@ function RoundCard({ view }: { view: RoomView }) {
 }
 
 /** Everyone's chips, their place, and what the last hand did to them. */
-function ScoreCard({ view }: { view: RoomView }) {
+function ScoreCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) => void }) {
   const name = (seat: Seat) => occupantName(view.players[seat]);
   const place = standings(view.scores);
   const last = view.history.at(-1) ?? null;
@@ -125,7 +148,7 @@ function ScoreCard({ view }: { view: RoomView }) {
     : null;
 
   return (
-    <Card title="Scores" className="side__scores">
+    <Card pane="scores" onHide={onHide}>
       <table className="side__board">
         <thead>
           <tr>
@@ -182,11 +205,11 @@ function ScoreCard({ view }: { view: RoomView }) {
 }
 
 /** The rules a win is paid under: what is in force, and points for each faan. */
-function RulesCard({ config }: { config: RuleConfig }) {
+function RulesCard({ config, onHide }: { config: RuleConfig; onHide: (pane: SidePane) => void }) {
   const from = Math.max(0, config.minFaan);
   const faans = Array.from({ length: Math.max(0, config.limitFaan - from + 1) }, (_, i) => from + i);
   return (
-    <Card title="Scoring" className="side__rules">
+    <Card pane="scoring" onHide={onHide}>
       <div className="side__chips-row">
         {rulesInForce(config).map((rule) => (
           <span key={rule} className="tset__chip">
@@ -220,48 +243,72 @@ function RulesCard({ config }: { config: RuleConfig }) {
 }
 
 /**
- * A code for every chair the computer is playing. Scanning one opens that
- * chair on the phone with a box for the newcomer's name; sitting down takes
- * the seat over from the computer, hand and all.
+ * One code at a time, for a chair the computer is playing. Scanning it opens
+ * that chair on the phone with a box for the newcomer's name; sitting down
+ * takes the seat over, hand and all, and the next computer chair round the
+ * table comes up. One code is what the person scanning needs: four would
+ * leave them to work out which is theirs.
  */
-function JoinCard({ view, seats }: { view: RoomView; seats: Seat[] }) {
+function JoinCard({
+  view,
+  seats,
+  onHide,
+}: {
+  view: RoomView;
+  seats: Seat[];
+  onHide: (pane: SidePane) => void;
+}) {
   // Built in the browser: the page has no idea what host it is served from.
   const [origin, setOrigin] = useState<string | null>(null);
   useEffect(() => setOrigin(window.location.origin), []);
 
+  // The chair last asked for. Once somebody sits in it, the next computer
+  // chair after it takes its place.
+  const [wanted, setWanted] = useState<Seat>(seats[0]);
+  const after = (from: Seat) => seats.find((s) => s > from) ?? seats[0];
+  const seat = seats.includes(wanted) ? wanted : after(wanted);
+  const name = occupantName(view.players[seat]);
+  const more = seats.length - 1;
+
   return (
-    <Card title="Join in" className="side__join">
-      <p className="side__note">
-        Scan a chair to take it over from the computer. You type your name on your phone, and play its hand from
-        there.
-      </p>
-      <ul className="side__codes">
-        {seats.map((seat) => {
-          const name = occupantName(view.players[seat]);
-          return (
-            <li key={seat} className="side__code">
-              {origin ? (
-                <QrCode
-                  value={`${origin}/room/${view.roomId}?pick=${seat}`}
-                  label={`Scan to take over seat ${seat + 1}, ${SEAT_NAMES[seat]}, from ${name}`}
-                  className="qr--side"
-                />
-              ) : (
-                <span className="qr qr--side qr--pending" aria-hidden />
-              )}
-              <span className="side__code-name">
-                <span className="side__wind" aria-hidden>
-                  {tileGlyph(seatWind(seat))}
-                </span>{" "}
-                {name}
-              </span>
-              <span className="seat__meta">
-                {SEAT_NAMES[seat]} · {EDGES[positionOf(seat, view.settings.rotation)]} edge
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+    <Card pane="join" onHide={onHide}>
+      <div className="side__code">
+        {origin ? (
+          <QrCode
+            value={`${origin}/room/${view.roomId}?pick=${seat}`}
+            label={`Scan to take over seat ${seat + 1}, ${SEAT_NAMES[seat]}, from ${name}`}
+            className="qr--side"
+          />
+        ) : (
+          <span className="qr qr--side qr--pending" aria-hidden />
+        )}
+        <div className="side__code-text">
+          <span className="side__code-name">
+            <span className="side__wind" aria-hidden>
+              {tileGlyph(seatWind(seat))}
+            </span>{" "}
+            {name}
+          </span>
+          <span className="seat__meta">
+            Seat {seat + 1} · {SEAT_NAMES[seat]} · {EDGES[positionOf(seat, view.settings.rotation)]} edge
+          </span>
+          <p className="side__note">Scan to take this chair over from the computer. You type your name on your phone.</p>
+          {more > 0 ? (
+            <>
+              <p className="side__note">
+                {more} more computer {more === 1 ? "chair" : "chairs"}: the next comes up once somebody sits here.
+              </p>
+              <button
+                type="button"
+                className="btn btn--sm btn--ghost side__another"
+                onClick={() => setWanted(after(seat))}
+              >
+                Another chair ›
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -272,14 +319,16 @@ function SettingsCard({
   view,
   sound,
   display,
+  onHide,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
   display: TabletDisplay;
+  onHide: (pane: SidePane) => void;
 }) {
   return (
-    <Card title="Settings" className="side__settings">
+    <Card pane="settings" onHide={onHide}>
       {sound ? (
         <SwitchRow
           label="Sound"
@@ -336,6 +385,8 @@ export function TableSide({
   fullscreen: FullscreenApi;
 }) {
   const computer = SEATS.filter((seat) => view.players[seat].occupant.kind === "ai");
+  const panes = useHiddenPanes();
+  const shown = (pane: SidePane) => !panes.hidden.includes(pane);
 
   return (
     <aside className="side" aria-label={`${tableName(view.roomId)}: the game`}>
@@ -358,15 +409,24 @@ export function TableSide({
       <div className="side__body">
         <div className="side__cols">
           <div className="side__col">
-            <RoundCard view={view} />
-            <ScoreCard view={view} />
-            <RulesCard config={view.config} />
+            {shown("round") ? <RoundCard view={view} onHide={panes.hide} /> : null}
+            {shown("scores") ? <ScoreCard view={view} onHide={panes.hide} /> : null}
+            {shown("scoring") ? <RulesCard config={view.config} onHide={panes.hide} /> : null}
           </div>
           <div className="side__col">
-            {computer.length > 0 ? <JoinCard view={view} seats={computer} /> : null}
-            <SettingsCard api={api} view={view} sound={sound} display={display} />
+            {shown("join") && computer.length > 0 ? (
+              <JoinCard view={view} seats={computer} onHide={panes.hide} />
+            ) : null}
+            {shown("settings") ? (
+              <SettingsCard api={api} view={view} sound={sound} display={display} onHide={panes.hide} />
+            ) : null}
           </div>
         </div>
+        {panes.hidden.length > 0 ? (
+          <button type="button" className="btn btn--sm btn--ghost side__restore" onClick={panes.showAll}>
+            Show hidden panes ({SIDE_PANES.filter((p) => panes.hidden.includes(p)).map((p) => PANE_TITLES[p]).join(", ")})
+          </button>
+        ) : null}
       </div>
     </aside>
   );

@@ -81,6 +81,11 @@ export function robotName(seat: Seat): string {
   return `Robot ${DEFAULT_NAMES[seat]}`;
 }
 
+/** A person's name as the computer plays it on: Robot Kris — but never Robot Robot Kris. */
+export function robotVersion(name: string): string {
+  return /robot/i.test(name) ? name : `Robot ${name}`;
+}
+
 /** Seconds a person may take over a discard before the table makes it; 0 is no limit. */
 export const TURN_LIMITS = [0, 15, 30, 60, 120] as const;
 
@@ -114,7 +119,8 @@ export { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS };
 /** A seat is empty, played by the computer, or held by a person. */
 export type Occupant =
   | { kind: "open" }
-  | { kind: "ai" }
+  /** Named when the computer took the chair over from somebody. */
+  | { kind: "ai"; name?: string }
   | { kind: "human"; name: string; token: string; lastSeen: number };
 
 export interface TableDevice {
@@ -168,11 +174,12 @@ export interface Room {
    */
   moreTime: { seat: Seat; from: number } | null;
   /**
-   * Seat tokens taken over by somebody scanning that chair's code, newest
-   * last, so the phone that lost its chair can be told why rather than just
-   * dropping back to the seat picker.
+   * Seat tokens taken over — by somebody scanning that chair's code, or by
+   * the table handing the chair to the computer — newest last, so the phone
+   * that lost its chair can be told why rather than just dropping back to the
+   * seat picker.
    */
-  displaced: { token: string; seat: Seat }[];
+  displaced: { token: string; seat: Seat; byTable?: boolean }[];
   /** The last hurry-up: who it was aimed at, who sent it, and when. */
   hurry: { seat: Seat; by: Seat; at: number } | null;
 }
@@ -221,6 +228,8 @@ export interface RoomView {
   you: { role: Role; seat: Seat | null };
   /** The chair this viewer held until somebody else scanned its code, if that happened. */
   displacedFrom: Seat | null;
+  /** That chair was handed to the computer by the table, rather than scanned by somebody. */
+  displacedByTable: boolean;
   tablePresent: boolean;
   /** Seats still waiting to answer the discard on the table. */
   awaitingClaimSeats: Seat[];
@@ -458,6 +467,20 @@ export function sitDown(
     room.displaced = [...room.displaced, { token: occupant.token, seat }].slice(-DISPLACED_KEPT);
   }
   room.seats[seat] = { kind: "human", name: seatName(input.name, seat), token: input.token, lastSeen: now };
+  syncSeats(room, now);
+  return null;
+}
+
+/**
+ * Take a person out of their chair and let the computer play it on under
+ * their name, so the table still reads as the same four players. Their phone
+ * is told why the next time it looks, and anybody can sit back in.
+ */
+export function replaceWithComputer(room: Room, seat: Seat, now = Date.now()): string | null {
+  const occupant = room.seats[seat];
+  if (occupant?.kind !== "human") return "Nobody is sitting there";
+  room.displaced = [...room.displaced, { token: occupant.token, seat, byTable: true }].slice(-DISPLACED_KEPT);
+  room.seats[seat] = { kind: "ai", name: robotVersion(occupant.name) };
   syncSeats(room, now);
   return null;
 }
@@ -741,6 +764,8 @@ function occupantSummary(
   if (occupant.kind === "human") {
     return { kind: "human", name: occupant.name, away: isAway(occupant, now) };
   }
+  // Handed to the computer by the table: the computer's whether or not a hand is dealt.
+  if (occupant.kind === "ai" && occupant.name) return { kind: "ai", name: occupant.name, away: false };
   return playing
     ? { kind: "ai", name: robotName(seat), away: false }
     : { kind: "open", name: null, away: false };
@@ -796,6 +821,8 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
 
   const actions =
     you.role === "player" && you.seat !== null ? turnActions(state, you.seat) : null;
+  const displaced =
+    you.role === "spectator" && token ? room.displaced.filter((d) => d.token === token).pop() : undefined;
 
   return {
     roomId: room.id,
@@ -822,10 +849,8 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     log: state.log,
     config: state.config,
     you,
-    displacedFrom:
-      you.role === "spectator" && token
-        ? (room.displaced.filter((d) => d.token === token).pop()?.seat ?? null)
-        : null,
+    displacedFrom: displaced?.seat ?? null,
+    displacedByTable: displaced?.byTable === true,
     tablePresent: room.table !== null,
     awaitingClaimSeats: pendingHumanClaimants(room, now),
     claim,

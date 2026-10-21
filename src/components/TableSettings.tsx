@@ -1,8 +1,8 @@
 "use client";
 
 import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "react";
-import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS } from "@/game/room";
-import { SEAT_NAMES } from "@/game/tiles";
+import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS, robotVersion } from "@/game/room";
+import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
@@ -86,7 +86,69 @@ export function rulesInForce(config: RuleConfig): string[] {
   ];
 }
 
-type Section = "rules" | "pace" | "tablet" | "look" | "reference";
+type Section = "rules" | "players" | "pace" | "tablet" | "look" | "reference";
+
+const SEATS: Seat[] = [0, 1, 2, 3];
+
+/**
+ * Who sits in each chair, and a way to take a person out of one: their phone
+ * has died, they have gone home, or they are holding up the table. The
+ * computer plays the chair on under their name, and anybody can sit back in.
+ */
+function PlayersCard({ api, view }: { api: RoomApi; view: RoomView }) {
+  return (
+    <Card title="At the table">
+      <ul className="tset__players">
+        {SEATS.map((seat) => {
+          const occupant = view.players[seat].occupant;
+          const name = occupant.name ?? SEAT_NAMES[seat];
+          return (
+            <li key={seat} className="tset__player">
+              <span className="tset__player-wind" aria-hidden="true">
+                {tileGlyph(seatWind(seat))}
+              </span>
+              <span className="tset__player-text">
+                <span className="tset__player-name">{occupant.kind === "open" ? "Open" : name}</span>
+                <span className="tset__player-sub">
+                  Seat {seat + 1} · {SEAT_NAMES[seat]} ·{" "}
+                  {occupant.kind === "human"
+                    ? occupant.away
+                      ? "away"
+                      : "on a phone"
+                    : occupant.kind === "ai"
+                      ? "the computer"
+                      : "nobody yet"}
+                </span>
+              </span>
+              {occupant.kind === "human" ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost tset__kick"
+                  disabled={api.busy}
+                  aria-label={`Replace ${name} with the computer`}
+                  onClick={() => {
+                    if (
+                      confirm(
+                        `Take ${name} out of seat ${seat + 1}? The computer plays on as ${robotVersion(name)}, and ${name}'s phone goes back to choosing a seat.`,
+                      )
+                    ) {
+                      void api.control({ type: "replaceWithComputer", seat });
+                    }
+                  }}
+                >
+                  Replace with computer
+                </button>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+      <span className="tset__foot">
+        Anybody can sit back in a computer&apos;s chair by scanning its code, or from the seat picker.
+      </span>
+    </Card>
+  );
+}
 
 /** The worked example under the paying rules: what a win off a discard costs at this table. */
 function PayoutExample({ config }: { config: RuleConfig }) {
@@ -126,6 +188,12 @@ function Card({ title, aside, children, tall = false }: { title: string; aside?:
 const ICONS: Record<Section, ReactNode> = {
   rules: (
     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+  ),
+  players: (
+    <>
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6" />
+    </>
   ),
   pace: (
     <>
@@ -185,6 +253,15 @@ export function TableSettings({
 
   const sections: { key: Section; name: string; summary: string }[] = [
     { key: "rules", name: "House rules", summary: `${config.minFaan} faan · ${lengthLabel(config)}` },
+    {
+      key: "players",
+      name: "Players",
+      summary: (() => {
+        const people = view.players.filter((p) => p.occupant.kind === "human").length;
+        const computer = view.players.filter((p) => p.occupant.kind === "ai").length;
+        return [`${people} on phones`, computer > 0 ? `${computer} computer` : null].filter(Boolean).join(" · ");
+      })(),
+    },
     {
       key: "pace",
       name: "Pace & turns",
@@ -352,6 +429,12 @@ export function TableSettings({
               </Card>
             </div>
           </>
+        ) : null}
+
+        {section === "players" ? (
+          <div className="tset__grid tset__grid--one">
+            <PlayersCard api={api} view={view} />
+          </div>
         ) : null}
 
         {section === "pace" ? (
