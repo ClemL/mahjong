@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Placement, layoutTable, positionOf } from "../tableLayout";
+import { MIN_SIDE, type Placement, WIDE_RATIO, layoutTable, positionOf, splitTable } from "../tableLayout";
 
 /** Screen rectangle a placed box covers once it is turned to face its seat. */
 function footprint(p: Placement) {
@@ -25,6 +25,10 @@ const SCREENS: [string, number, number][] = [
   ["iPad mini landscape", 1118, 660],
   ["portrait tablet", 784, 1160],
   ["laptop window", 1340, 590],
+  // The square felts a widescreen tablet is given beside its side panel.
+  ["Galaxy Tab, squared", 696, 696],
+  ["iPad, squared", 804, 804],
+  ["iPad mini, squared", 728, 728],
 ];
 
 describe("table layout", () => {
@@ -81,5 +85,50 @@ describe("rotation", () => {
     // East goes from the bottom edge to the left one, South from right to bottom.
     expect([0, 1, 2, 3].map((seat) => positionOf(seat, 1))).toEqual([3, 0, 1, 2]);
     expect([0, 1, 2, 3].map((seat) => positionOf(seat, 4))).toEqual([0, 1, 2, 3]);
+  });
+});
+
+// Whole table areas — the screen less the page's padding, bar included — in
+// the CSS pixels each browser hands the page.
+const WIDE: [string, number, number][] = [
+  ["Galaxy Tab S9 in Chrome", 1248, 696],
+  ["iPad in Safari", 1148, 804],
+  ["iPad mini in Safari", 1101, 728],
+  ["laptop window", 1408, 760],
+  ["1080p monitor, full screen", 1888, 1064],
+];
+const SQUARE: [string, number, number][] = [
+  // Opened out, the OnePlus Open's inner screen is 2440 x 2268.
+  ["OnePlus Open in Chrome", 898, 764],
+  ["OnePlus Open, full screen", 898, 848],
+  ["Galaxy Z Fold in Chrome", 850, 720],
+  ["square desktop window", 1168, 984],
+];
+
+describe("splitting a widescreen tablet", () => {
+  for (const [name, width, height] of WIDE) {
+    it(`squares the felt and keeps a side panel on a ${name}`, () => {
+      const split = splitTable(width, height)!;
+      expect(split).not.toBeNull();
+      expect(split.felt).toBe(Math.floor(height));
+      expect(split.side).toBeGreaterThanOrEqual(MIN_SIDE);
+      expect(split.felt + split.side).toBeLessThanOrEqual(width);
+    });
+  }
+
+  for (const [name, width, height] of SQUARE) {
+    it(`keeps the felt the full width on a ${name}`, () => {
+      expect(width / height).toBeLessThan(WIDE_RATIO);
+      expect(splitTable(width, height)).toBeNull();
+    });
+  }
+
+  it("does not split before the table has been measured", () => {
+    expect(splitTable(0, 0)).toBeNull();
+  });
+
+  it("does not leave a panel too narrow to hold anything", () => {
+    // Wide enough by its shape, but the felt would leave a sliver.
+    expect(splitTable(520, 300)).toBeNull();
   });
 });

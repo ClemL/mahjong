@@ -38,9 +38,17 @@ deployed to Vercel. Rooms go through a few API routes backed by Upstash Redis
 enough for local runs and the browser tests, not for production.
 
 * **Landscape only, and never one device alone.** A game needs the tablet as the table and at least
-  one phone; only the table deals. Phones are always the landscape controller (`PhoneView`), turned
-  on its side by CSS when held upright. There is no solo game and no upright layout — do not add one
-  back. The start page and the lobby's seat picker, before play, may be used either way up.
+  one phone; only the table deals. Phones are always the landscape controller (`PhoneView`). There is
+  no solo game and no upright layout anywhere — not the start page, the seat picker or the lobby
+  either — so do not add one back. Held upright, every page is turned on its side by the `.screen`
+  frame in the root layout (`layout.css`). Inside a page, size things in `cqw`/`cqh` rather than
+  `vw`/`vh`, write a width media query for both orientations, and turn screen rectangles back with
+  `screenFrame.ts`, or a turned page measures the glass the wrong way round.
+* **A widescreen tablet squares the felt.** Wider than `WIDE_RATIO` (`tableLayout.ts`), the felt is
+  square and the width left over is a side panel (`TableSide`): the round, the scores, the rules in
+  force, quick settings, and a QR code for each computer-played chair. Closer to square — a foldable
+  like a OnePlus Open — keeps the full-width felt under its bar. Both draw their buttons from
+  `TableControls`.
 
 ## Layout
 

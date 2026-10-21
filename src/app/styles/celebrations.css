@@ -201,7 +201,7 @@
 }
 
 .moment__chinese {
-  font-size: clamp(34px, 6vw, 64px);
+  font-size: clamp(34px, 6cqw, 64px);
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.08em;

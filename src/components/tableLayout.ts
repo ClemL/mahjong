@@ -247,6 +247,38 @@ export function layoutTable({
   };
 }
 
+/**
+ * Width over height below which a screen counts as close to square — a
+ * foldable opened out, like a OnePlus Open, sits around 1.1 to 1.2 — and keeps
+ * the felt edge to edge under its bar. A 4:3 iPad is comfortably over it.
+ */
+export const WIDE_RATIO = 1.3;
+/** The narrowest side panel worth having: a scoreboard row, or a QR code big enough to scan. */
+export const MIN_SIDE = 280;
+/** Between the squared felt and the side panel. */
+export const SIDE_GAP = 10;
+
+export interface TableSplit {
+  /** The felt's side: it is square, and as tall as the screen allows. */
+  felt: number;
+  /** The width left beside it, for the side panel. */
+  side: number;
+}
+
+/**
+ * How the tablet's screen is shared out. A table is square, so a widescreen
+ * tablet gets a square felt and gives the width left over to a side panel;
+ * one close to square has nothing to spare and keeps today's layout, the felt
+ * the whole width under a bar. `width` and `height` are the whole area below
+ * the page's own padding, bar included.
+ */
+export function splitTable(width: number, height: number): TableSplit | null {
+  if (width <= 0 || height <= 0 || width / height < WIDE_RATIO) return null;
+  const felt = Math.floor(height);
+  const side = Math.floor(width - felt - SIDE_GAP);
+  return side >= MIN_SIDE ? { felt, side } : null;
+}
+
 /** Inline style for a placed box. */
 export function placementStyle(p: Placement): CSSProperties {
   return {

@@ -15,10 +15,9 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     background_color: "#0d3b2e",
     theme_color: "#0d3b2e",
-    // The solo game and the seating screen work upright, while the table and
-    // a phone used as a controller want landscape — so nothing is forced here,
-    // and the controller locks itself sideways when it goes full screen.
-    orientation: "any",
+    // Every screen is landscape. Installed, the app opens sideways; in a
+    // browser held upright the page turns itself on its side instead.
+    orientation: "landscape",
     categories: ["games"],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

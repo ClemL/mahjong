@@ -88,10 +88,12 @@ export function FilmPlayer({ onClose }: { onClose?: () => void }) {
     const shell = shellRef.current;
     if (!canvas || !shell) return;
     const resize = () => {
-      const rect = shell.getBoundingClientRect();
-      if (rect.width < 2) return;
+      // The laid-out width, not the screen box: held upright the page is
+      // turned on its side, and the box would be the film's height.
+      const width = shell.clientWidth;
+      if (width < 2) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const px = Math.min(Math.round(rect.width * dpr), MAX_PIXELS);
+      const px = Math.min(Math.round(width * dpr), MAX_PIXELS);
       if (canvas.width !== px) {
         canvas.width = px;
         canvas.height = Math.round((px * H) / W);

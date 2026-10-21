@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SEAT_IDLE_MS, drain, robotName } from "@/game/room";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
 import { TableTop } from "../TableTop";
+import { gameProgress, standings } from "../TableSide";
 import { NAMES, claimable, dealt, fakeApi, sound, tableView } from "./fixtures";
 
 /** A felt measured at a landscape tablet's size, as soon as it is observed. */
@@ -50,7 +51,7 @@ describe("TableTop", () => {
     );
     const dealerRack = racks(container)[view.dealer];
     expect(dealerRack.textContent).toContain("Dealer");
-    expect(container.querySelectorAll(".seat__badge")).toHaveLength(1);
+    expect(container.querySelector(".felt")!.querySelectorAll(".seat__badge")).toHaveLength(1);
   });
 
   it("keeps the newest discard in the middle, dropped in from a phone, until the next one", () => {
@@ -294,5 +295,105 @@ describe("TableTop", () => {
     expect(container.querySelector(".console__caption")!.textContent).toBe(
       `${view.players[discard.from].occupant.name} · ${tileName(discard.tile.code)} · punged by ${view.players[claimer].occupant.name}`,
     );
+  });
+
+  it("squares the felt on a widescreen tablet and moves the bar into a side panel beside it", () => {
+    feltSize(1264, 700);
+    const view = tableView(dealt());
+    const api = fakeApi(view);
+    const { container } = render(<TableTop api={api} view={view} sound={sound} />);
+
+    const top = container.querySelector(".tabletop")!;
+    expect(top.className).toContain("tabletop--wide");
+    expect((top as HTMLElement).style.getPropertyValue("--felt-side")).toBe("700px");
+    expect(container.querySelector(".tabletop__bar")).toBeNull();
+
+    const side = within(screen.getByRole("complementary", { name: /the game/ }));
+    expect(side.getByText(`East round · hand ${view.handNumber}`)).toBeTruthy();
+    expect(side.getByText(/dealership 1 of 16/)).toBeTruthy();
+    expect(side.getByText(new RegExp(`${view.wallCount} tiles left`))).toBeTruthy();
+    // Every seat's chips, a place each, and the rules a win is paid under.
+    const rows = side.getAllByRole("row").filter((r) => r.closest("tbody") && r.closest(".side__board"));
+    expect(rows.map((r) => within(r).getAllByRole("cell")[0].textContent)).toEqual(["100", "100", "100", "100"]);
+    expect(side.getByText("Min 3 faan")).toBeTruthy();
+    expect(within(side.getByRole("table", { name: /Points owed/ })).getByRole("row", { name: /Points/ }).textContent).toContain("8");
+    // The bar's buttons and the settings reached for mid-game.
+    fireEvent.click(side.getByRole("button", { name: "Redeal" }));
+    expect(api.control).toHaveBeenLastCalledWith({ type: "redeal" });
+    fireEvent.click(side.getByRole("button", { name: "Fast" }));
+    expect(api.control).toHaveBeenLastCalledWith({ type: "speed", value: 4 });
+    expect(side.getByRole("switch", { name: "Sound" })).toBeTruthy();
+    expect(side.getByRole("button", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("keeps the bar and a full-width felt on a screen close to square", () => {
+    // A OnePlus Open opened out, in Chrome.
+    feltSize(898, 764);
+    const view = tableView(dealt([0, 2]));
+    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    expect(container.querySelector(".tabletop")!.className).not.toContain("tabletop--wide");
+    expect(container.querySelector(".tabletop__bar")).not.toBeNull();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    expect(screen.queryByRole("img", { name: /Scan to take over/ })).toBeNull();
+  });
+
+  it("offers a code for each chair the computer is playing, and none for people", () => {
+    feltSize(1264, 700);
+    const view = tableView(dealt([0, 2]));
+    const { unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    expect(screen.getAllByRole("img", { name: /Scan to take over/ }).map((qr) => qr.getAttribute("aria-label"))).toEqual([
+      `Scan to take over seat 2, South, from ${robotName(1)}`,
+      `Scan to take over seat 4, North, from ${robotName(3)}`,
+    ]);
+    unmount();
+
+    const full = tableView(dealt());
+    render(<TableTop api={fakeApi(full)} view={full} sound={sound} />);
+    expect(screen.queryByRole("region", { name: "Join in" })).toBeNull();
+    expect(screen.queryByRole("img", { name: /Scan to take over/ })).toBeNull();
+  });
+
+  it("says what the last hand did to everyone's chips, and who is ahead", () => {
+    feltSize(1264, 700);
+    const base = tableView(dealt());
+    const payments = [-8, -4, 16, -4];
+    const view = {
+      ...base,
+      scores: payments,
+      history: [
+        {
+          handNumber: 1,
+          roundWind: "we" as const,
+          dealer: 0 as const,
+          type: "win" as const,
+          winner: 2 as const,
+          from: 0 as const,
+          faan: 3,
+          value: 8,
+          payments,
+          scores: payments,
+        },
+      ],
+    };
+    render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    const scores = within(screen.getByRole("region", { name: "Scores" }));
+    const row = (name: string) => within(scores.getByRole("row", { name: new RegExp(name) }));
+    expect(row(NAMES[2]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["116", "+16", "1st"]);
+    expect(row(NAMES[0]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["92", "−8", "4th"]);
+    // Level on chips, level in place.
+    expect(row(NAMES[1]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["96", "−4", "2nd"]);
+    expect(row(NAMES[3]).getAllByRole("cell").map((c) => c.textContent)).toEqual(["96", "−4", "2nd"]);
+    expect(scores.getByText(`Hand 1: ${NAMES[2]} won 3 faan, off ${NAMES[0]}`)).toBeTruthy();
+  });
+
+  it("counts places with ties shared, and dealerships across the wind rounds", () => {
+    expect(standings([10, -5, 10, -15])).toEqual([0, 2, 0, 3]);
+    const config = tableView(dealt()).config;
+    expect(gameProgress({ roundWind: "we", dealership: 0, config })).toEqual({ deal: 1, total: 16 });
+    expect(gameProgress({ roundWind: "ws", dealership: 2, config })).toEqual({ deal: 7, total: 16 });
+    expect(gameProgress({ roundWind: "we", dealership: 3, config: { ...config, rounds: 1 } })).toEqual({ deal: 4, total: 4 });
   });
 });

@@ -20,23 +20,11 @@ body:has(.app--handset) {
   overscroll-behavior: none;
 }
 
-/* Held upright — or with rotation locked, which a page cannot override
-   outside full screen — the controller turns itself on its side, so it is
-   landscape whichever way the phone is held.
-   Turned clockwise, it reads correctly with the phone rotated to the left,
-   which is the way Android calls landscape. The safe-area insets turn with it. */
+/* Held upright the page is turned on its side (layout.css), and the
+   controller with it; the safe-area insets turn too. */
 @media (orientation: portrait) {
-  .app--handset {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vh;
-    width: 100dvh;
-    height: 100vw;
-    height: 100dvw;
-    transform-origin: top left;
-    transform: translateX(100vw) rotate(90deg);
-    transform: translateX(100dvw) rotate(90deg);
+  .screen > .app--handset {
+    overflow: hidden;
     padding: max(6px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
       max(6px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-top));
   }
@@ -324,7 +312,7 @@ body:has(.app--handset) {
 }
 
 @media (orientation: portrait) {
-  .app--handset:has(.phone--compact) {
+  .screen > .app--handset:has(.phone--compact) {
     padding-left: max(4px, env(safe-area-inset-top));
     padding-right: max(4px, env(safe-area-inset-bottom));
   }

@@ -45,14 +45,14 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (orientation: landscape) and (max-width: 760px), (orientation: portrait) and (max-height: 760px) {
   :root {
     --tile-lg: 40px;
     --tile-md: 30px;
   }
 }
 
-@media (max-width: 420px) {
+@media (orientation: landscape) and (max-width: 420px), (orientation: portrait) and (max-height: 420px) {
   :root {
     --tile-lg: 38px;
     --tile-sm: 24px;

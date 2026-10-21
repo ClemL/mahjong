@@ -1,0 +1,353 @@
+/* ============================ a widescreen tablet: square felt and a side == */
+
+/* A table is square. On a widescreen tablet the felt is squared to the full
+   height and the width left over is a side panel; a screen close to square
+   keeps the felt edge to edge under its bar. TableTop decides which, with
+   splitTable in tableLayout.ts, and passes the felt's side in --felt-side. */
+/* Positioned, because the result of a hand is laid over all of it: the squared
+   felt alone is too narrow for the sheet. */
+.tabletop--wide {
+  position: relative;
+  flex-direction: row;
+  /* SIDE_GAP in tableLayout.ts. */
+  gap: 10px;
+}
+
+.tabletop--wide > .felt {
+  flex: 0 0 var(--felt-side);
+}
+
+.side {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The head and the actions stay put; everything under them scrolls if a
+   short screen cannot hold it all. */
+.side__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+}
+
+/* The container is the body, not the panel: a container is also where a
+   fixed descendant is placed, and the settings sheet in the head must cover
+   the whole screen, not the panel. */
+.side__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container: side / inline-size;
+  padding-bottom: 4px;
+}
+
+.side__cols {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Narrow, the two columns are one list, in the order that matters most: where
+   the game is, the scores, the codes for anyone waiting, then the rest. */
+.side__col {
+  display: contents;
+}
+
+.side__round { order: 1; }
+.side__scores { order: 2; }
+.side__join { order: 3; }
+.side__settings { order: 4; }
+.side__rules { order: 5; }
+
+@container side (min-width: 640px) {
+  .side__cols {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  .side__col {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
+
+.side__card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+}
+
+.side__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.side__note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.side__wind {
+  color: var(--gold);
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------- this hand */
+
+.side__roundline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The round, the dealer and the wall over three short lines. */
+.side__round {
+  gap: 8px;
+}
+
+.side__roundwind {
+  flex: none;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--gold);
+}
+
+.side__roundtext {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.side__roundtext strong {
+  font-size: 16px;
+}
+
+/* One pip per dealership, a wider space between winds. Done ones are filled,
+   the current one is a larger ring, the rest hollow: shape, not colour alone. */
+.side__deals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side__deal {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-dim);
+}
+
+.side__deal:nth-child(4n + 1):not(:first-child) {
+  margin-left: 8px;
+}
+
+.side__deal--done {
+  background: var(--ink-dim);
+}
+
+.side__deal--now {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--gold);
+}
+
+.side__now {
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.side__now strong {
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------------- scores */
+
+.side__board {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.side__board th,
+.side__board td {
+  padding: 5px 4px;
+  text-align: left;
+  font-weight: inherit;
+}
+
+.side__board thead th {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.side__board tbody tr + tr {
+  border-top: 1px solid var(--line-soft);
+}
+
+.side__board .side__num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.side__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.side__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.side__chips {
+  font-weight: 800;
+}
+
+.side__change--up {
+  color: var(--gold);
+}
+
+.side__place {
+  color: var(--ink-dim);
+}
+
+/* The leader is named in the Place column; the gold only repeats it. */
+.side__row--lead .side__place {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------------- scoring */
+
+.side__chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.side__chips-row .tset__chip {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.side__payout {
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.side__payout th {
+  padding: 3px 8px 3px 0;
+  text-align: left;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.side__payout td {
+  min-width: 26px;
+  padding: 3px 4px;
+}
+
+.side__payout tr + tr td {
+  font-weight: 800;
+}
+
+/* ------------------------------------------------------------- join in */
+
+.side__codes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.side__code {
+  flex: 1 1 120px;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+
+/* Large enough to scan from a chair: about two centimetres at the least. */
+.qr--side {
+  width: 100%;
+  max-width: 160px;
+  min-width: 120px;
+}
+
+.qr--pending {
+  display: block;
+  aspect-ratio: 1;
+  background: #fff;
+  opacity: 0.2;
+}
+
+.side__code-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ------------------------------------------------------------ settings */
+
+.side__settings .switch-row {
+  gap: 12px;
+}
+
+.side__settings .seg-field {
+  gap: 6px;
+}
+
+.side__settings .seg-field__label {
+  font-size: 14px;
+}
+
+.side__settings .seg__btn {
+  min-height: 40px;
+  padding-inline: 2px;
+  font-size: 12px;
+}
+
+.side__settings .seg-field__hint {
+  font-size: 12px;
+}

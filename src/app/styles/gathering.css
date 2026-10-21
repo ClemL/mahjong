@@ -4,7 +4,7 @@
 .gather {
   display: flex;
   flex-direction: column;
-  gap: clamp(14px, 2.5vh, 28px);
+  gap: clamp(14px, 2.5cqh, 28px);
   width: 100%;
   /* Fills the tablet: this is read from across a table, not from arm's length,
      so the code and the seats get all the room the screen has. .app already
@@ -35,7 +35,7 @@
 .gather__body {
   display: grid;
   grid-template-columns: minmax(220px, 26%) 1fr;
-  gap: clamp(14px, 2vw, 26px);
+  gap: clamp(14px, 2cqw, 26px);
   align-items: stretch;
   flex: 1;
   min-height: 0;
@@ -47,7 +47,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: clamp(12px, 2vh, 22px);
+  padding: clamp(12px, 2cqh, 22px);
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--raise-0);
@@ -55,7 +55,7 @@
 
 .qr {
   width: 100%;
-  max-width: min(300px, 34vh);
+  max-width: min(300px, 34cqh);
   height: auto;
   border-radius: 8px;
   display: block;
@@ -72,7 +72,7 @@
 /* A chair's own code sits inside its card, so it is sized to the card rather
    than to the screen the single table-wide code used to have to itself. */
 .qr--seat {
-  width: min(190px, 22vh);
+  width: min(190px, 22cqh);
   max-width: 100%;
   flex: 0 0 auto;
 }
@@ -109,7 +109,7 @@
   color: var(--ink);
   font: inherit;
   font-weight: 700;
-  font-size: clamp(15px, 2.2vh, 22px);
+  font-size: clamp(15px, 2.2cqh, 22px);
   text-align: center;
 }
 
@@ -133,7 +133,7 @@
      than four thin columns strung across the top of the screen. */
   grid-template-columns: repeat(2, 1fr);
   grid-auto-rows: 1fr;
-  gap: clamp(10px, 1.6vw, 18px);
+  gap: clamp(10px, 1.6cqw, 18px);
 }
 
 .gather__seat {
@@ -142,7 +142,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: clamp(10px, 1.6vh, 18px) 10px;
+  padding: clamp(10px, 1.6cqh, 18px) 10px;
   border-radius: 14px;
   border: 1px solid var(--line);
   background: var(--raise-0);
@@ -156,14 +156,14 @@
 }
 
 .gather__wind {
-  font-size: clamp(24px, 3.4vh, 40px);
+  font-size: clamp(24px, 3.4cqh, 40px);
   line-height: 1;
   color: var(--gold);
 }
 
 .gather__seatname {
   font-weight: 700;
-  font-size: clamp(16px, 2.6vh, 26px);
+  font-size: clamp(16px, 2.6cqh, 26px);
 }
 
 /* The name a chair goes by until somebody sits in it: greyed, like a placeholder. */
@@ -182,7 +182,7 @@
 }
 
 .gather__seatmeta {
-  font-size: clamp(11px, 1.4vh, 13px);
+  font-size: clamp(11px, 1.4cqh, 13px);
   color: var(--ink-dim);
 }
 
@@ -236,7 +236,7 @@
 }
 
 /* On a phone the seats matter more than the QR — you are already in. */
-@media (max-width: 760px) {
+@media (orientation: landscape) and (max-width: 760px), (orientation: portrait) and (max-height: 760px) {
   .gather__body {
     grid-template-columns: 1fr;
     align-items: start;
@@ -300,14 +300,15 @@
 /* A tablet lying flat in landscape has width to spare and no height at all.
    Stacked, four cards carrying a code push the Deal button off the bottom, so
    there the code goes beside the chair's details rather than under them. */
-@media (min-width: 900px) and (max-height: 950px) {
+@media (orientation: landscape) and (min-width: 900px) and (max-height: 950px),
+  (orientation: portrait) and (min-height: 900px) and (max-width: 950px) {
   .gather__seat {
     flex-direction: row;
-    gap: clamp(10px, 1.4vw, 20px);
+    gap: clamp(10px, 1.4cqw, 20px);
   }
 
   .qr--seat {
-    width: min(165px, 23vh);
+    width: min(165px, 23cqh);
   }
 }
 

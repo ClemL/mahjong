@@ -1,6 +1,7 @@
 "use client";
 
-import { type CSSProperties, type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type CSSProperties, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
@@ -13,7 +14,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
-import { TableResult, isLastHand } from "./TableResult";
+import { TableResult } from "./TableResult";
 import { GameComplete } from "./GameComplete";
 import {
   ChipStack,
@@ -30,8 +31,8 @@ import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./Tabl
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
 import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
-import { SettingsMenu } from "./SettingsMenu";
-import { TableSettings } from "./TableSettings";
+import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
+import { TableSide } from "./TableSide";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import {
   POSITION_ROTATION,
@@ -39,7 +40,9 @@ import {
   layoutTable,
   placementStyle,
   positionOf,
+  splitTable,
 } from "./tableLayout";
+import { centreWithin, screenAngle } from "./screenFrame";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -54,11 +57,6 @@ const POND_CAPACITY = 24;
 
 /** Custom properties are not in React's style typing. */
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
-
-/** Who sits in a chair: a person's name, the computer's Robot name, or nobody yet. */
-function occupantName(player: PublicPlayer): string {
-  return player.occupant.name ?? (player.occupant.kind === "open" ? "Open" : SEAT_NAMES[player.seat]);
-}
 
 /**
  * The opening flowers of a hand, in the order the table lays them down —
@@ -299,20 +297,20 @@ function usePondArrival(
     const duration = parseFloat(getComputedStyle(root).getPropertyValue("--anim-gather"));
     if (!target || !middle || !(duration > 0) || typeof target.animate !== "function") return;
 
-    const box = root.getBoundingClientRect();
-    const a = middle.getBoundingClientRect();
-    const b = target.getBoundingClientRect();
+    const angle = screenAngle(root);
+    const a = centreWithin(root, middle.getBoundingClientRect(), angle);
+    const b = centreWithin(root, target.getBoundingClientRect(), angle);
     const turn = POSITION_ROTATION[position(before.from)];
     const ghost = target.cloneNode(true) as HTMLElement;
     ghost.classList.add("tile--flying");
     ghost.style.setProperty("--tile-w", `${target.offsetWidth}px`);
-    ghost.style.left = `${a.left + a.width / 2 - box.left - target.offsetWidth / 2}px`;
-    ghost.style.top = `${a.top + a.height / 2 - box.top - target.offsetHeight / 2}px`;
+    ghost.style.left = `${a.x - target.offsetWidth / 2}px`;
+    ghost.style.top = `${a.y - target.offsetHeight / 2}px`;
     root.appendChild(ghost);
     target.style.visibility = "hidden";
 
-    const dx = b.left + b.width / 2 - (a.left + a.width / 2);
-    const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
     const animation = ghost.animate(
       [
         { transform: `translate(0, 0) rotate(${turn}deg)` },
@@ -392,10 +390,10 @@ function useClaimFlight(
 
     const fly = () => {
       if (!root.isConnected || !target.isConnected) return reveal();
-      const box = root.getBoundingClientRect();
+      const angle = screenAngle(root);
       // The spot is not animated, so it is where the thrown tile comes to rest.
-      const a = spot.getBoundingClientRect();
-      const b = target.getBoundingClientRect();
+      const a = centreWithin(root, spot.getBoundingClientRect(), angle);
+      const b = centreWithin(root, target.getBoundingClientRect(), angle);
       const from = POSITION_ROTATION[position(played.from)];
       const turn = shortestTurn(from, POSITION_ROTATION[position(taker.seat)]);
       // offsetWidth is the untransformed size; the rects are the rotated boxes.
@@ -408,12 +406,12 @@ function useClaimFlight(
         .concat("tile--flying")
         .join(" ");
       ghost.style.setProperty("--tile-w", `${source.offsetWidth}px`);
-      ghost.style.left = `${a.left + a.width / 2 - box.left - source.offsetWidth / 2}px`;
-      ghost.style.top = `${a.top + a.height / 2 - box.top - source.offsetHeight / 2}px`;
+      ghost.style.left = `${a.x - source.offsetWidth / 2}px`;
+      ghost.style.top = `${a.y - source.offsetHeight / 2}px`;
       root.appendChild(ghost);
 
-      const dx = b.left + b.width / 2 - (a.left + a.width / 2);
-      const dy = b.top + b.height / 2 - (a.top + a.height / 2);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
       const animation = ghost.animate(
         [
           { transform: `translate(0, 0) rotate(${from}deg) scale(1)`, offset: 0 },
@@ -579,6 +577,11 @@ export function useResultSheet(view: RoomView) {
 
 export type ResultSheet = ReturnType<typeof useResultSheet>;
 
+/** The result where it is laid: in place over the felt, or carried out to a wider host. */
+function SheetSlot({ host, children }: { host: HTMLElement | null; children: ReactNode }) {
+  return host ? createPortal(children, host) : <>{children}</>;
+}
+
 /**
  * The cloth and everything on it: a rack along each edge for the seat sitting
  * there, every pond in front of its owner, the wall, the last discard in the
@@ -593,10 +596,16 @@ export function Felt({
   onNewGame,
   onSkipDeal,
   busy = false,
+  sheetHost = null,
 }: {
   view: RoomView;
   display: TabletDisplay;
   sheet: ResultSheet;
+  /**
+   * Where the result is laid, when not over the felt alone: a squared felt is
+   * too narrow for it, so on a widescreen tablet it covers the side panel too.
+   */
+  sheetHost?: HTMLElement | null;
   onNextHand: () => void;
   /** Back to the lobby with everyone seated, once the game is over. */
   onNewGame: () => void;
@@ -721,24 +730,26 @@ export function Felt({
           />
           {/* A moment has the felt to itself; the sheet follows it, or a skip. */}
           {sheet.open && !momentLive ? (
-            view.phase === "gameOver" ? (
-              <GameComplete
-                view={view}
-                name={(seat) => occupantName(view.players[seat])}
-                onHide={sheet.hide}
-                onNewGame={onNewGame}
-                busy={busy}
-              />
-            ) : (
-              <TableResult
-                view={view}
-                name={(seat) => occupantName(view.players[seat])}
-                tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
-                onHide={sheet.hide}
-                onNextHand={onNextHand}
-                busy={busy}
-              />
-            )
+            <SheetSlot host={sheetHost}>
+              {view.phase === "gameOver" ? (
+                <GameComplete
+                  view={view}
+                  name={(seat) => occupantName(view.players[seat])}
+                  onHide={sheet.hide}
+                  onNewGame={onNewGame}
+                  busy={busy}
+                />
+              ) : (
+                <TableResult
+                  view={view}
+                  name={(seat) => occupantName(view.players[seat])}
+                  tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
+                  onHide={sheet.hide}
+                  onNextHand={onNextHand}
+                  busy={busy}
+                />
+              )}
+            </SheetSlot>
           ) : null}
           <WinOverlay
             live={winLive}
@@ -776,101 +787,54 @@ export function Felt({
 
 /**
  * The shared tablet, drawn as the table itself: the felt under a bar of the
- * table's own controls. Concealed tiles are never on it — the server does not
- * send them to this device at all.
+ * table's own controls. On a widescreen tablet the felt is square, as a table
+ * is, and the bar becomes a side panel in the width left over. Concealed tiles
+ * are never on it — the server does not send them to this device at all.
  */
 export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; sound?: SoundToggle }) {
   const wakeLock = useWakeLock(true);
   const appearance = useAppearance();
-  const fullscreen = useFullscreen();
+  const fullscreen = useFullscreen("landscape");
   const display = useTabletDisplay();
   const sheet = useResultSheet(view);
+  const root = useRef<HTMLDivElement | null>(null);
+  // Kept as state as well, to hand the result sheet somewhere to go.
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  const attach = useCallback((el: HTMLDivElement | null) => {
+    root.current = el;
+    setHost(el);
+  }, []);
+  const size = useElementSize(root);
+  const split = splitTable(size.width, size.height);
 
   return (
-    <div className="tabletop">
-      <header className="tabletop__bar">
-        <span className="tableview__code">{tableName(view.roomId)}</span>
-        <span className="stat__value">
-          {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
-        </span>
-        <span className="seat__meta">{view.wallCount} tiles left</span>
-        {wakeLock !== "held" ? (
-          <span className="tableview__wake" title="This device may sleep during a hand">
-            {wakeLock === "unsupported"
-              ? "Screen may sleep — this browser cannot keep it awake"
-              : wakeLock === "denied"
-                ? "Screen may sleep — the browser refused to keep it awake"
-                : "Screen lock pending…"}
+    <div
+      ref={attach}
+      className={split ? "tabletop tabletop--wide" : "tabletop"}
+      style={split ? ({ "--felt-side": `${split.felt}px` } as Vars) : undefined}
+    >
+      {split ? null : (
+        <header className="tabletop__bar">
+          <span className="tableview__code">{tableName(view.roomId)}</span>
+          <span className="stat__value">
+            {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
           </span>
-        ) : null}
-        <span className="topbar__spacer" />
-        <div className="actions">
-          {sheet.aside ? (
-            <button type="button" className="btn btn--sm" onClick={sheet.show}>
-              {view.phase === "gameOver" ? "Final scores" : "Result"}
-            </button>
-          ) : null}
-          {view.phase === "handOver" ? (
-            <button
-              type="button"
-              className="btn btn--sm btn--primary"
-              disabled={api.busy}
-              onClick={() => void api.control({ type: "nextHand" })}
-            >
-              {isLastHand(view) ? "Final scores" : "Next hand"}
-            </button>
-          ) : null}
-          {view.awaitingClaimSeats.length > 0 ? (
-            <button
-              type="button"
-              className="btn btn--sm"
-              disabled={api.busy}
-              onClick={() => void api.control({ type: "forcePass" })}
-            >
-              Skip waiting ({view.awaitingClaimSeats.length})
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn--sm"
-            disabled={api.busy}
-            onClick={() => void api.control({ type: "redeal" })}
-          >
-            Redeal
-          </button>
-          <button
-            type="button"
-            className="btn btn--sm btn--ghost"
-            disabled={api.busy}
-            onClick={() => {
-              if (confirm("Reset all scores and go back to the seating screen?")) {
-                void api.control({ type: "restart" });
-              }
-            }}
-          >
-            Restart
-          </button>
-          {fullscreen.supported && !fullscreen.active ? (
-            <button type="button" className="btn btn--sm btn--ghost" onClick={fullscreen.enter}>
-              Full screen
-            </button>
-          ) : null}
-          <SettingsMenu
-            sheet={{
-              title: "Table settings",
-              subtitle: `${tableName(view.roomId)} · Hand ${view.handNumber} · ${roundName(view.roundWind)} round`,
-            }}
-          >
-            <TableSettings
+          <span className="seat__meta">{view.wallCount} tiles left</span>
+          <WakeNote state={wakeLock} />
+          <span className="topbar__spacer" />
+          <div className="actions">
+            <TableActions api={api} view={view} sheet={sheet} />
+            <TableMenu
               api={api}
               view={view}
               sound={sound}
               appearance={appearance}
               display={display}
+              fullscreen={fullscreen}
             />
-          </SettingsMenu>
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
       <Felt
         view={view}
@@ -880,7 +844,21 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         onNewGame={() => void api.control({ type: "restart" })}
         onSkipDeal={() => void api.control({ type: "skipOpening" })}
         busy={api.busy}
+        sheetHost={split ? host : null}
       />
+
+      {split ? (
+        <TableSide
+          api={api}
+          view={view}
+          sound={sound}
+          sheet={sheet}
+          wakeLock={wakeLock}
+          appearance={appearance}
+          display={display}
+          fullscreen={fullscreen}
+        />
+      ) : null}
     </div>
   );
 }

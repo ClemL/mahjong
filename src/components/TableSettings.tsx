@@ -24,7 +24,7 @@ import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
 import { positionOf } from "./tableLayout";
 
-const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
+export const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
   value: `${s.level}` as `${SpeedLevel}`,
   label: s.label,
   hint: `About ${s.turnMs / 1000} seconds per computer turn, with the animations paced to match`,
@@ -33,7 +33,7 @@ const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
 const limitLabel = (seconds: number) =>
   seconds === 0 ? "Off" : seconds < 60 ? `${seconds}s` : `${seconds / 60} min`;
 
-const LIMITS: SegmentOption<string>[] = TURN_LIMITS.map((seconds) => ({
+export const LIMITS: SegmentOption<string>[] = TURN_LIMITS.map((seconds) => ({
   value: String(seconds),
   label: limitLabel(seconds),
   hint:
@@ -68,6 +68,23 @@ const OTHERS_PAY_HALF: SegmentOption<OnOff>[] = [
 ];
 
 const EDGES = ["bottom", "right", "top", "left"];
+
+/** A game length as the table chooses it: "East round", "All four winds". */
+function lengthLabel(config: RuleConfig): string {
+  const rounds = roundsInGame(config);
+  return GAME_LENGTHS.find((g) => g.value === String(rounds))?.label ?? describeRounds(rounds);
+}
+
+/** The house rules in force, a few words each. */
+export function rulesInForce(config: RuleConfig): string[] {
+  return [
+    `Min ${config.minFaan} faan`,
+    lengthLabel(config),
+    flowersInPlay(config) ? "Flowers in" : "No flowers",
+    liabilityInPlay(config) ? "包 Liability" : "No liability",
+    othersPayHalfInPlay(config) ? "Others pay half" : "Discarder pays alone",
+  ];
+}
 
 type Section = "rules" | "pace" | "tablet" | "look" | "reference";
 
@@ -162,13 +179,12 @@ export function TableSettings({
   const config = view.config;
   const handLive = view.started && view.phase !== "handOver" && view.phase !== "gameOver";
   const rounds = roundsInGame(config);
-  const lengthLabel = GAME_LENGTHS.find((g) => g.value === String(rounds))?.label ?? describeRounds(rounds);
   const speedLabel = SPEED_LEVELS.find((s) => s.level === view.settings.speed)?.label ?? "Normal";
   const themeLabel = THEMES.find((t) => t.value === appearance.appearance.theme)?.label ?? "";
   const facesLabel = TILE_STYLES.find((t) => t.value === appearance.appearance.tiles)?.label ?? "";
 
   const sections: { key: Section; name: string; summary: string }[] = [
-    { key: "rules", name: "House rules", summary: `${config.minFaan} faan · ${lengthLabel}` },
+    { key: "rules", name: "House rules", summary: `${config.minFaan} faan · ${lengthLabel(config)}` },
     {
       key: "pace",
       name: "Pace & turns",
@@ -198,13 +214,7 @@ export function TableSettings({
     tabs.current[next]?.focus();
   };
 
-  const inForce = [
-    `Min ${config.minFaan} faan`,
-    lengthLabel,
-    flowersInPlay(config) ? "Flowers in" : "No flowers",
-    liabilityInPlay(config) ? "包 Liability" : "No liability",
-    othersPayHalfInPlay(config) ? "Others pay half" : "Discarder pays alone",
-  ];
+  const inForce = rulesInForce(config);
 
   return (
     <div className="tset">
