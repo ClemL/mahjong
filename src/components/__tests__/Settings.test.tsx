@@ -6,7 +6,7 @@ import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { PhoneDisplay, TabletDisplay } from "@/hooks/useLocalSetting";
 import { TableSettings } from "../TableSettings";
 import { PhoneSettings } from "../PhoneSettings";
-import { dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
+import { NAMES, dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
 
 const appearance: AppearanceApi = { appearance: DEFAULT_APPEARANCE, set: vi.fn(), reset: vi.fn() };
 
@@ -38,7 +38,7 @@ describe("the table's settings", () => {
     render(<TableSettings api={api} view={view} sound={sound} appearance={appearance} display={tabletDisplay()} />);
 
     expect(screen.getByRole("tab", { name: /^House rules/ }).getAttribute("aria-selected")).toBe("true");
-    for (const rule of ["Min 3 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half"]) {
+    for (const rule of ["Min 1 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half"]) {
       expect(screen.getAllByText(rule).length).toBeGreaterThan(0);
     }
 
@@ -48,6 +48,31 @@ describe("the table's settings", () => {
     expect(api.control).toHaveBeenCalledWith({ type: "othersPayHalf", value: false });
     fireEvent.click(screen.getByRole("switch", { name: "包 Liability" }));
     expect(api.control).toHaveBeenCalledWith({ type: "liability", value: false });
+  });
+
+  it("lists who sits where and hands a person's chair to the computer once confirmed", () => {
+    const view = tableView(dealt([0, 2]));
+    const api = fakeApi(view);
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    render(<TableSettings api={api} view={view} sound={sound} appearance={appearance} display={tabletDisplay()} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: /^Players/ }));
+    expect(screen.getByRole("tab", { name: /^Players/ }).textContent).toContain("2 on phones · 2 computer");
+    // Only people can be taken out; the computer's chairs have no button.
+    const buttons = screen.getAllByRole("button", { name: /with the computer$/ });
+    expect(buttons.map((b) => b.getAttribute("aria-label"))).toEqual([
+      `Replace ${NAMES[0]} with the computer`,
+      `Replace ${NAMES[2]} with the computer`,
+    ]);
+
+    fireEvent.click(buttons[1]);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(`The computer plays on as Robot ${NAMES[2]}`));
+    expect(api.control).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    fireEvent.click(buttons[1]);
+    expect(api.control).toHaveBeenCalledWith({ type: "replaceWithComputer", seat: 2 });
+    vi.unstubAllGlobals();
   });
 
   it("works the payout example from the table's own payout table and paying rule", () => {

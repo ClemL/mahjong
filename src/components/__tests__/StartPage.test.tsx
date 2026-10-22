@@ -115,15 +115,17 @@ describe("StartPage", () => {
 describe("normalizePreferences", () => {
   it("keeps valid choices and replaces anything else with the default", () => {
     // Fields a solo game used to store are dropped.
-    expect(normalizePreferences({ version: 2, minFaan: 5, speed: "warp", opponents: "random" })).toEqual({
+    expect(normalizePreferences({ version: 4, minFaan: 5, speed: "warp", opponents: "random" })).toEqual({
       minFaan: 5,
       rounds: 4,
     });
-    expect(normalizePreferences(null).minFaan).toBe(3);
-    // An older build saved its 0 default with every change; that is not a choice to keep.
-    expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(3);
-    expect(normalizePreferences({ version: 2, minFaan: 0 }).minFaan).toBe(0);
-    expect(normalizePreferences({ version: 2, minFaan: 4 }).minFaan).toBe(3);
+    expect(normalizePreferences(null).minFaan).toBe(1);
+    // Older builds saved their default minimum with every change — 0, later 3.
+    // That is not a choice to keep, so the current default replaces it.
+    expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(1);
+    expect(normalizePreferences({ version: 3, minFaan: 3, rounds: 2 })).toEqual({ minFaan: 1, rounds: 2 });
+    expect(normalizePreferences({ version: 4, minFaan: 0 }).minFaan).toBe(0);
+    expect(normalizePreferences({ version: 4, minFaan: 4 }).minFaan).toBe(1);
     // A game runs one, two or four wind rounds; anything else is the all-four default.
     expect(normalizePreferences({ version: 3, rounds: 2 }).rounds).toBe(2);
     expect(normalizePreferences({ version: 3, rounds: 3 }).rounds).toBe(4);

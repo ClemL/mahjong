@@ -54,9 +54,9 @@ test("a widescreen tablet squares the felt, and a latecomer names themselves int
   await expect(side.getByRole("region", { name: "Scores" })).toContainText("Kris");
   await expect(side.getByRole("button", { name: "Redeal" })).toBeVisible();
 
-  // One code for each chair the computer is playing, big enough to scan.
+  // One computer chair's code at a time, big enough to scan.
   const codes = side.getByRole("img", { name: /Scan to take over/ });
-  await expect(codes).toHaveCount(3);
+  await expect(codes).toHaveCount(1);
   expect((await codes.first().boundingBox())!.width).toBeGreaterThanOrEqual(120);
   await expect(side.getByRole("img", { name: /seat 2, South, from Robot Louis/ })).toBeVisible();
 
@@ -69,9 +69,26 @@ test("a widescreen tablet squares the felt, and a latecomer names themselves int
   await srini.page.getByRole("button", { name: "Sit down" }).click();
   await expect(srini.page.locator(".phone--landscape")).toBeVisible();
 
-  // The table drops that chair's code and seats Srini at it.
-  await expect(codes).toHaveCount(2);
+  // The table seats Srini there, and the next computer chair's code comes up.
   await expect(table.page.locator('.rack[data-seat="1"]')).toContainText("Srini");
+  await expect(side.getByRole("img", { name: /seat 3, West, from Robot Hanna/ })).toBeVisible();
+  await expect(codes).toHaveCount(1);
+
+  // A pane closes on its ×, and comes back.
+  await side.getByRole("button", { name: "Hide Scoring" }).click();
+  await expect(side.getByRole("region", { name: "Scoring" })).toHaveCount(0);
+  await side.getByRole("button", { name: /Show hidden panes/ }).click();
+  await expect(side.getByRole("region", { name: "Scoring" })).toBeVisible();
+
+  // The table hands Srini's chair to the computer, which keeps the name.
+  await side.getByRole("button", { name: "Settings", exact: true }).click();
+  await table.page.getByRole("tab", { name: /^Players/ }).click();
+  table.page.once("dialog", (dialog) => void dialog.accept());
+  await table.page.getByRole("button", { name: "Replace Srini with the computer" }).click();
+  await expect(table.page.getByText("Robot Srini").first()).toBeVisible();
+  await table.page.getByRole("button", { name: "Done" }).click();
+  await expect(table.page.locator('.rack[data-seat="1"]')).toContainText("Robot Srini");
+  await expect(srini.page.getByRole("status")).toContainText("The table gave seat 2, South, to the computer");
 
   // Close to square, the felt stays the full width under its bar.
   await table.page.setViewportSize(FOLDABLE);

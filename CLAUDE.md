@@ -46,9 +46,9 @@ enough for local runs and the browser tests, not for production.
   `screenFrame.ts`, or a turned page measures the glass the wrong way round.
 * **A widescreen tablet squares the felt.** Wider than `WIDE_RATIO` (`tableLayout.ts`), the felt is
   square and the width left over is a side panel (`TableSide`): the round, the scores, the rules in
-  force, quick settings, and a QR code for each computer-played chair. Closer to square — a foldable
-  like a OnePlus Open — keeps the full-width felt under its bar. Both draw their buttons from
-  `TableControls`.
+  force, quick settings, and one QR code at a time for a computer-played chair. Each pane can be
+  closed, remembered per tablet. Closer to square — a foldable like a OnePlus Open — keeps the
+  full-width felt under its bar. Both draw their buttons from `TableControls`.
 
 ## Layout
 

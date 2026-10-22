@@ -5,7 +5,7 @@ import { SEAT_IDLE_MS, drain, robotName } from "@/game/room";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
 import { TableTop } from "../TableTop";
 import { gameProgress, standings } from "../TableSide";
-import { NAMES, claimable, dealt, fakeApi, sound, tableView } from "./fixtures";
+import { NAMES, claimable, dealt, fakeApi, sit, sound, tableView } from "./fixtures";
 
 /** A felt measured at a landscape tablet's size, as soon as it is observed. */
 function feltSize(width = 1264, height = 700) {
@@ -315,7 +315,7 @@ describe("TableTop", () => {
     // Every seat's chips, a place each, and the rules a win is paid under.
     const rows = side.getAllByRole("row").filter((r) => r.closest("tbody") && r.closest(".side__board"));
     expect(rows.map((r) => within(r).getAllByRole("cell")[0].textContent)).toEqual(["100", "100", "100", "100"]);
-    expect(side.getByText("Min 3 faan")).toBeTruthy();
+    expect(side.getByText("Min 1 faan")).toBeTruthy();
     expect(within(side.getByRole("table", { name: /Points owed/ })).getByRole("row", { name: /Points/ }).textContent).toContain("8");
     // The bar's buttons and the settings reached for mid-game.
     fireEvent.click(side.getByRole("button", { name: "Redeal" }));
@@ -338,21 +338,58 @@ describe("TableTop", () => {
     expect(screen.queryByRole("img", { name: /Scan to take over/ })).toBeNull();
   });
 
-  it("offers a code for each chair the computer is playing, and none for people", () => {
+  it("offers one computer chair's code at a time, and the next once somebody sits down", () => {
     feltSize(1264, 700);
-    const view = tableView(dealt([0, 2]));
-    const { unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const room = dealt([0]);
+    const view = tableView(room);
+    const { rerender, unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const codes = () => screen.getAllByRole("img", { name: /Scan to take over/ }).map((qr) => qr.getAttribute("aria-label"));
 
-    expect(screen.getAllByRole("img", { name: /Scan to take over/ }).map((qr) => qr.getAttribute("aria-label"))).toEqual([
-      `Scan to take over seat 2, South, from ${robotName(1)}`,
-      `Scan to take over seat 4, North, from ${robotName(3)}`,
-    ]);
+    expect(codes()).toEqual([`Scan to take over seat 2, South, from ${robotName(1)}`]);
+    expect(screen.getByText(/2 more computer chairs/)).toBeTruthy();
+    // Somebody standing at another chair can have its code instead.
+    fireEvent.click(screen.getByRole("button", { name: "Another chair ›" }));
+    expect(codes()).toEqual([`Scan to take over seat 3, West, from ${robotName(2)}`]);
+    fireEvent.click(screen.getByRole("button", { name: "Another chair ›" }));
+    fireEvent.click(screen.getByRole("button", { name: "Another chair ›" }));
+    expect(codes()).toEqual([`Scan to take over seat 2, South, from ${robotName(1)}`]);
+
+    // Srini sits at South: the next computer chair round the table comes up.
+    sit(room, 1, "Srini");
+    const after = tableView(room);
+    rerender(<TableTop api={fakeApi(after)} view={after} sound={sound} />);
+    expect(codes()).toEqual([`Scan to take over seat 3, West, from ${robotName(2)}`]);
+    expect(screen.getByText(/1 more computer chair:/)).toBeTruthy();
     unmount();
 
+    // Nobody left to replace: no pane at all.
     const full = tableView(dealt());
     render(<TableTop api={fakeApi(full)} view={full} sound={sound} />);
     expect(screen.queryByRole("region", { name: "Join in" })).toBeNull();
     expect(screen.queryByRole("img", { name: /Scan to take over/ })).toBeNull();
+  });
+
+  it("closes a pane on its ×, remembers it on this tablet, and brings them all back", () => {
+    feltSize(1264, 700);
+    window.localStorage.clear();
+    const view = tableView(dealt([0]));
+    const { unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide Scoring" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hide Join in" }));
+    expect(screen.queryByRole("region", { name: "Scoring" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Join in" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Scores" })).toBeTruthy();
+    unmount();
+
+    // Still closed the next time the table is drawn.
+    render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    expect(screen.queryByRole("region", { name: "Scoring" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Show hidden panes (Scoring, Join in)" }));
+    expect(screen.getByRole("region", { name: "Scoring" })).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Join in" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Show hidden panes/ })).toBeNull();
+    window.localStorage.clear();
   });
 
   it("says what the last hand did to everyone's chips, and who is ahead", () => {

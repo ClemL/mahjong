@@ -23,9 +23,12 @@ import {
   dealShowMs,
   normalizeRoom,
   pendingHumanClaimants,
+  replaceWithComputer,
   returnToLobby,
   robotName,
+  robotVersion,
   shouldRegroup,
+  sitDown,
   startPlay,
   syncSeats,
   touch,
@@ -307,6 +310,67 @@ describe("lobby", () => {
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("open");
     startPlay(room);
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("ai");
+  });
+});
+
+describe("handing a chair to the computer", () => {
+  it("names the computer after the person it replaces, once", () => {
+    expect(robotVersion("Kris")).toBe("Robot Kris");
+    expect(robotVersion("Robot Kris")).toBe("Robot Kris");
+    expect(robotVersion("MrRobot")).toBe("MrRobot");
+    expect(robotVersion("robot")).toBe("robot");
+  });
+
+  it("takes a person out mid-hand, and the computer plays on under their name", () => {
+    const room = dealt("TEST", 7, [0, 1]);
+    room.seats[1] = { kind: "human", name: "Kris", token: "tok-1", lastSeen: Date.now() };
+    expect(replaceWithComputer(room, 1)).toBeNull();
+
+    expect(room.seats[1]).toEqual({ kind: "ai", name: "Robot Kris" });
+    expect(room.state.players[1].isHuman).toBe(false);
+    expect(viewFor(room, "tok-0").players[1].occupant).toEqual({ kind: "ai", name: "Robot Kris", away: false });
+    // Nobody can take an empty or computer chair "out".
+    expect(replaceWithComputer(room, 1)).toBe("Nobody is sitting there");
+    expect(replaceWithComputer(room, 2)).toBe("Nobody is sitting there");
+  });
+
+  it("tells the phone it was the table, and shows it no tiles", () => {
+    const room = dealt("TEST", 7, [0, 1]);
+    replaceWithComputer(room, 1);
+
+    const theirs = viewFor(room, "tok-1");
+    expect(theirs.you).toEqual({ role: "spectator", seat: null });
+    expect(theirs.displacedFrom).toBe(1);
+    expect(theirs.displacedByTable).toBe(true);
+    expect(theirs.players.every((p) => p.hand.every((t) => t.code === "back"))).toBe(true);
+    // Only that phone hears about it.
+    expect(viewFor(room, "tok-0").displacedFrom).toBeNull();
+    expect(viewFor(room, "tok-0").displacedByTable).toBe(false);
+    expect(viewFor(room, null).displacedByTable).toBe(false);
+  });
+
+  it("stops waiting on a claim the person it replaced had not answered", () => {
+    const room = dealt("TEST", 21, [0, 1, 2, 3]);
+    drain(room);
+    const dealer = room.state.dealer;
+    room.state = discard(room.state, dealer, room.state.players[dealer].hand[0].id);
+    if (room.state.phase !== "claiming") return; // nothing claimable on this deal
+    const [asked] = pendingHumanClaimants(room);
+    expect(asked).toBeDefined();
+
+    replaceWithComputer(room, asked);
+    expect(pendingHumanClaimants(room)).not.toContain(asked);
+  });
+
+  it("keeps the computer's name in the lobby, and lets somebody sit back in", () => {
+    const room = newRoom("TEST", undefined, 42);
+    seat(room, 2, "tok-2", "Steven");
+    replaceWithComputer(room, 2);
+    expect(viewFor(room, null).players[2].occupant).toEqual({ kind: "ai", name: "Robot Steven", away: false });
+
+    expect(sitDown(room, 2, { token: "tok-new", name: "James" })).toBeNull();
+    expect(viewFor(room, "tok-new").you).toEqual({ role: "player", seat: 2 });
+    expect(room.state.players[2].isHuman).toBe(true);
   });
 });
 

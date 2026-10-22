@@ -41,6 +41,12 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     const seat = Number(asked);
     if (Number.isInteger(seat) && seat >= 0 && seat <= 3) setPicked(seat as Seat);
   }, []);
+  // Spent once this phone sits down: if it is later put out of its chair, the
+  // picker must not offer that chair back as though the code were scanned again.
+  const seated = view !== null && view.you.role !== "spectator";
+  useEffect(() => {
+    if (seated) setPicked(null);
+  }, [seated]);
 
   const claim = useCallback(
     async (seat: Seat | "table", name: string, replace = false) => {
