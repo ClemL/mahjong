@@ -343,6 +343,10 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   hand arrives face down until you turn it up.
 - **Set hints**, the **helper** and **hurry up** are each phone's own choice,
   under the phone's settings.
+- **Hurry up** flashes the screen of whoever the table is waiting on. Nobody can
+  be hurried in the first three seconds of their turn (or of their call on a
+  discard); the button counts those seconds down. After a hurry-up, every button
+  at the table rests for ten seconds.
 - **Min faan**, **Game length**, **Flowers**, **Liability** and who pays on a
   discard win are the table's, set from the tablet: in the lobby, or in its
   settings at any point. Game length runs the East round alone, East and South,

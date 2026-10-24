@@ -8,6 +8,7 @@ import {
   HEARTBEAT_WRITE_MS,
   HURRY_COOLDOWN_MS,
   HURRY_FLASH_MS,
+  HURRY_GRACE_MS,
   MORE_TIME_MS,
   OPENING_TURN_BONUS_MS,
   SEAT_IDLE_MS,
@@ -20,6 +21,7 @@ import {
   mayDeal,
   mayRegroup,
   newRoom,
+  noteActing,
   dealShowMs,
   normalizeRoom,
   pendingHumanClaimants,
@@ -40,6 +42,16 @@ import type { Seat } from "../tiles";
 function seat(room: Room, index: Seat, token: string, name = "Someone"): void {
   room.seats[index] = { kind: "human", name, token, lastSeen: Date.now() };
   syncSeats(room);
+}
+
+/**
+ * The turn on the table already under way: stamped from when its deal was
+ * shown, and past the first moments nobody may hurry it in. Returns the
+ * first moment it may be.
+ */
+function underway(room: Room): number {
+  noteActing(room, room.lastStepAt);
+  return room.lastStepAt + HURRY_GRACE_MS;
 }
 
 /** A room past its lobby, which is where most of these tests start. */
@@ -646,7 +658,7 @@ describe("hurry up", () => {
   it("flashes only the person the table is waiting on, once, and briefly", () => {
     const room = dealt("TEST", 5, [0, 2]);
     expect(room.state.turn).toBe(0);
-    const t0 = Date.now();
+    const t0 = underway(room);
     expect(hurryUp(room, 2, t0)).toBeNull();
     const view = viewFor(room, "tok-0", t0 + 100);
     expect(view.hurry).toEqual({ seat: 0, by: "Someone", id: t0 });
@@ -657,7 +669,7 @@ describe("hurry up", () => {
 
   it("refuses hurrying yourself, the computer, or twice in a row", () => {
     const room = dealt("TEST", 5, [0, 2]);
-    const t0 = Date.now();
+    const t0 = underway(room);
     expect(hurryUp(room, 0, t0)).toMatch(/your move/);
     expect(hurryUp(room, 2, t0)).toBeNull();
     expect(hurryUp(room, 2, t0 + 1000)).toMatch(/just been hurried/);
@@ -670,7 +682,7 @@ describe("hurry up", () => {
 
   it("tells every seat the table is resting, and for how long, so only one hurry-up is out at a time", () => {
     const room = dealt("TEST", 5, [0, 1, 2]);
-    const t0 = Date.now();
+    const t0 = underway(room);
     expect(viewFor(room, "tok-1", t0).hurryCooldown).toBeNull();
     expect(hurryUp(room, 2, t0)).toBeNull();
     for (const token of ["tok-0", "tok-1", "tok-2", null]) {
@@ -688,17 +700,62 @@ describe("hurry up", () => {
 
   it("stops flashing once its target has moved", () => {
     const room = dealt("TEST", 5, [0, 2]);
-    const t0 = Date.now();
-    hurryUp(room, 2, t0);
+    const t0 = underway(room);
+    expect(hurryUp(room, 2, t0)).toBeNull();
     const tile = room.state.players[0].hand[0];
     room.state = discard(room.state, 0, tile.id);
     expect(viewFor(room, "tok-0", t0 + 100).hurry).toBeNull();
   });
 
+  it("leaves every turn its first three seconds, and says how long is left", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    const t0 = Date.now();
+    drain(room, t0);
+    expect(room.acting?.since).toBe(t0);
+    for (const token of ["tok-0", "tok-2", "tok-table", null]) {
+      expect(viewFor(room, token, t0 + 1_000).hurryGraceLeft).toBe(HURRY_GRACE_MS - 1_000);
+    }
+    expect(hurryUp(room, 2, t0)).toMatch(/only just started/);
+    expect(hurryUp(room, 2, t0 + HURRY_GRACE_MS - 1)).toMatch(/only just started/);
+    // A refused nudge does not rest the table: the first one that is allowed goes through.
+    expect(viewFor(room, "tok-2", t0 + HURRY_GRACE_MS).hurryGraceLeft).toBe(0);
+    expect(hurryUp(room, 2, t0 + HURRY_GRACE_MS)).toBeNull();
+  });
+
+  it("starts the count again for each new turn, and only once the deal has been shown", () => {
+    const room = dealt("TEST", 5, [0, 1, 2]);
+    // The table is still showing the deal: the dealer's turn has not begun.
+    room.lastStepAt = Date.now() + 5_000;
+    const shown = room.lastStepAt;
+    drain(room, shown - 5_000);
+    expect(hurryUp(room, 2, shown + HURRY_GRACE_MS - 1)).toMatch(/only just started/);
+    expect(hurryUp(room, 2, shown + HURRY_GRACE_MS)).toBeNull();
+
+    // The dealer throws and nobody claims: the next seat's wait counts from its draw.
+    const t1 = shown + 60_000;
+    room.state = discard(room.state, 0, room.state.players[0].hand[0].id);
+    room.lastStepAt = t1;
+    drain(room, t1);
+    expect(room.state.turn).toBe(1);
+    expect(viewFor(room, "tok-2", t1).hurryGraceLeft).toBe(HURRY_GRACE_MS);
+    expect(hurryUp(room, 2, t1 + 1_000)).toMatch(/only just started/);
+    expect(hurryUp(room, 2, t1 + HURRY_GRACE_MS)).toBeNull();
+  });
+
+  it("forgets the last game's turns on the way back to the lobby", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    underway(room);
+    returnToLobby(room, newRoom("TEST", undefined, 5).state);
+    expect(room.acting).toBeNull();
+  });
+
   it("is filled in on a room stored before it existed", () => {
     const room = newRoom("TEST", undefined, 1) as Partial<Room>;
     delete room.hurry;
-    expect(normalizeRoom(room as Room).hurry).toBeNull();
+    delete room.acting;
+    const normal = normalizeRoom(room as Room);
+    expect(normal.hurry).toBeNull();
+    expect(normal.acting).toBeNull();
   });
 });
 
