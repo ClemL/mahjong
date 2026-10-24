@@ -61,7 +61,7 @@ src/game/          Rules engine — no React, no DOM, no browser APIs
   rules.ts         House ruleset — every tunable number lives here
   engine.ts        State machine: deal, draw, discard, claims, settlement, history
   shanten.ts       Distance-to-ready; drives the computer opponents
-  ai.ts            AiStrategy interface + the random and skilled opponents
+  ai.ts            AiStrategy interface + the random, easy, normal and hard opponents
   controller.ts    Steps the table one beat at a time
   sound.ts         Web Audio cues, synthesised at runtime
   room.ts          Multiplayer room: seating, draining, redaction (pure)

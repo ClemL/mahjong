@@ -117,10 +117,10 @@ export function PhoneSettings({
             <>
               <Segmented label="Button size" options={SIZE} value={display.size} onChange={display.setSize} />
               <SwitchRow
-                label="Set hints"
-                hint="A line under tiles that already make a set: dashed for a run, solid for three of a kind, +1 or +2 where it scores"
-                checked={display.setHints === "on"}
-                onChange={(on) => display.setSetHints(on ? "on" : "off")}
+                label="Stretch to the edges"
+                hint="The hand runs to the edges of the screen and its tiles grow to fill it — the fewer in hand, the larger"
+                checked={display.stretch === "on"}
+                onChange={(on) => display.setStretch(on ? "on" : "off")}
               />
               <SwitchRow
                 label="Play log"
@@ -135,6 +135,12 @@ export function PhoneSettings({
 
       {display ? (
         <Group title="Assists">
+          <SwitchRow
+            label="Set hints"
+            hint="A line under tiles that already make a set: dashed for a run, solid for three of a kind, +1 or +2 where it scores"
+            checked={display.setHints === "on"}
+            onChange={(on) => display.setSetHints(on ? "on" : "off")}
+          />
           <SwitchRow
             label="Helper"
             hint="A wheelchair button that shows what finishes each set you've started"

@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useCountdown } from "@/hooks/useCountdown";
 import type { ClaimOption } from "@/game/engine";
-import { CLAIM_WINDOW_MS } from "@/game/room";
+import { CLAIM_MORE_TIME_MS, CLAIM_WINDOW_MS } from "@/game/room";
 import { type TileCode, tileName } from "@/game/tiles";
 import { TileFace } from "./TileView";
 
@@ -39,20 +39,26 @@ export function ClaimChoices({
   options,
   discard,
   deadlineIn,
+  allowance = CLAIM_WINDOW_MS,
   busy,
   onClaim,
   onPreview,
+  onMoreTime,
 }: {
   options: ClaimOption[];
   discard: TileCode;
   deadlineIn: number;
+  /** The whole window, extra time included. */
+  allowance?: number;
   busy: boolean;
   onClaim: (optionId: string | null) => void;
   onPreview?: (option: ClaimOption | null) => void;
+  /** Ask for more time; offered only with several sets to choose between. */
+  onMoreTime?: () => void;
 }) {
   const left = useCountdown(deadlineIn) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
-    "--left": Math.min(1, left / CLAIM_WINDOW_MS),
+    "--left": Math.min(1, left / allowance),
   };
 
   return (
@@ -104,6 +110,17 @@ export function ClaimChoices({
           {Math.ceil(left / 1000)}s
         </span>
       </button>
+      {onMoreTime ? (
+        <button
+          type="button"
+          className="btn btn--ghost claims__more"
+          disabled={busy}
+          aria-label={`More time to choose: add ${CLAIM_MORE_TIME_MS / 1000} seconds, once for this tile`}
+          onClick={onMoreTime}
+        >
+          +{CLAIM_MORE_TIME_MS / 1000}s
+        </button>
+      ) : null}
     </div>
   );
 }

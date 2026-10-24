@@ -1041,6 +1041,23 @@ export function setRounds(previous: GameState, rounds: number): GameState {
   return state;
 }
 
+/**
+ * End the game where it stands. A settled hand keeps its result; a hand still
+ * being played is abandoned unscored, so the scores so far are the final ones.
+ */
+export function endGame(previous: GameState): GameState {
+  if (previous.phase === "gameOver") return previous;
+  const state = clone(previous);
+  if (state.phase !== "handOver") {
+    state.result = null;
+    state.pendingClaims = [];
+    state.robbingKongTile = null;
+  }
+  state.phase = "gameOver";
+  log(state, null, "The game was ended early.");
+  return state;
+}
+
 /** Move to the next hand, rotating the dealership and the round wind when required. */
 export function nextHand(previous: GameState): GameState {
   let state = clone(previous);

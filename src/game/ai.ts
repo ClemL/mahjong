@@ -12,6 +12,7 @@ import { isFlower, isTerminalOrHonor } from "./tiles";
 import type { Seat, TileCode } from "./tiles";
 import type { ClaimOption, GameState, KongOption } from "./engine";
 import { kongOptions, selfDrawScore } from "./engine";
+import { faanValue } from "./scoring";
 import { CODE_INDEX, type CountVector, countsFromCodes } from "./winning";
 import type { Meld } from "./melds";
 import { type RoutePlan, type Seating, bestPlan, comparePlans, routes } from "./plan";
@@ -299,9 +300,103 @@ export function bestImprovingClaim(
   return best;
 }
 
+// ---------------------------------------------------------------------------
+// Difficulty levels
+// ---------------------------------------------------------------------------
+
+export const DIFFICULTIES = ["easy", "normal", "hard"] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
+/** How often the easy opponent lets go of a tile it should have kept. */
+const EASY_SLIP = 0.2;
+
+/**
+ * A beginner: the greedy hand, but every so often it throws a tile it should
+ * have kept, and it claims any set that brings the hand closer without asking
+ * whether the hand will still be worth declaring. It never misses a win.
+ */
+export const easyAi: AiStrategy = {
+  name: "Easy",
+
+  chooseTurnAction(state, seat, rng) {
+    const choice = greedyAi.chooseTurnAction(state, seat, rng);
+    if (choice.type !== "discard" || rng.next() >= EASY_SLIP) return choice;
+    const hand = state.players[seat].hand.filter((t) => !isFlower(t.code));
+    return hand.length > 0 ? { type: "discard", tileId: rng.pick(hand).id } : choice;
+  },
+
+  chooseClaim(state, seat, options) {
+    const win = options.find((o) => o.type === "win");
+    return win ?? bestImprovingClaim(state, seat, options);
+  },
+};
+
+/** The chance of taking each step a hand still needs, with the wall full and with it nearly empty. */
+const REACH_EARLY = 0.6;
+const REACH_LATE = 0.25;
+
+/** What a route is worth playing for now: what it would pay, discounted for each step still to take. */
+function planWorth(plan: RoutePlan, state: GameState): number {
+  if (plan.faan < state.config.minFaan) return 0;
+  // The emptier the wall, the less likely each step is taken before someone else goes out.
+  const reach = REACH_LATE + (REACH_EARLY - REACH_LATE) * Math.min(1, state.wall.length / 100);
+  return faanValue(plan.faan, state.config) * reach ** (plan.shanten + 1);
+}
+
+/**
+ * Plays for what a hand is worth, not only for how soon it is done: every
+ * route still open — a flush, all pungs — is weighed by what it would pay and
+ * how far it has to go, and the richest is played for.
+ *
+ * Reading the discards for danger was tried and measured, and left out:
+ * folding against a hand that looked ready slowed this opponent down enough
+ * to hand the table to everyone else, people included.
+ */
+export const hardAi: AiStrategy = {
+  name: "Hard",
+
+  chooseTurnAction(state, seat, rng) {
+    const choice = greedyAi.chooseTurnAction(state, seat, rng);
+    if (choice.type !== "discard") return choice;
+    const player = state.players[seat];
+    const chosen = player.hand.find((t) => t.id === choice.tileId);
+    if (!chosen) return choice;
+
+    const counts = countsFromCodes(concealedCodes(state, seat));
+    const seating = seatingOf(state, seat);
+    let richest: { id: string; worth: number } | null = null;
+    let greedyWorth = 0;
+    const tried = new Set<TileCode>();
+    for (const tile of player.hand) {
+      if (isFlower(tile.code) || tried.has(tile.code)) continue;
+      tried.add(tile.code);
+      const index = CODE_INDEX.get(tile.code)!;
+      counts[index] -= 1;
+      const worth = Math.max(...routes(counts, player.melds, seating).map((plan) => planWorth(plan, state)));
+      counts[index] += 1;
+      if (tile.code === chosen.code) greedyWorth = worth;
+      if (richest === null || worth > richest.worth) richest = { id: tile.id, worth };
+    }
+    // The greedy discard, unless another leaves a route worth more.
+    return richest && richest.worth > greedyWorth ? { type: "discard", tileId: richest.id } : choice;
+  },
+
+  chooseClaim(state, seat, options) {
+    const win = options.find((o) => o.type === "win");
+    return win ?? plannedClaim(state, seat, options);
+  },
+};
+
+/** The opponent the table has chosen for its computer-played seats. */
+export function strategyFor(difficulty: Difficulty | undefined): AiStrategy {
+  return difficulty === "easy" ? easyAi : difficulty === "hard" ? hardAi : greedyAi;
+}
+
 export const STRATEGIES = {
   greedy: greedyAi,
   random: randomAi,
+  easy: easyAi,
+  hard: hardAi,
 } as const;
 
 export type StrategyName = keyof typeof STRATEGIES;

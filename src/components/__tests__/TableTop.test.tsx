@@ -247,6 +247,47 @@ describe("TableTop", () => {
     expect(api.control).toHaveBeenLastCalledWith({ type: "restart" });
   });
 
+  it("ends the game early after asking, saying when a hand in play goes unscored", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const api = fakeApi(view);
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    render(<TableTop api={api} view={view} sound={sound} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "End game" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringMatching(/final scores\? The hand being played is not scored/));
+    expect(api.control).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "End game" }));
+    expect(api.control).toHaveBeenLastCalledWith({ type: "endGame" });
+  });
+
+  it("shows a seat's draw arriving on its rack, but not a new deal", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const { container, rerender } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    expect(container.querySelector(".rack__count--drew")).toBeNull();
+
+    const drew = {
+      ...view,
+      players: view.players.map((p) => (p.seat === 1 ? { ...p, handCount: p.handCount + 1 } : p)),
+    };
+    rerender(<TableTop api={fakeApi(drew)} view={drew} sound={sound} />);
+    expect(container.querySelectorAll(".rack__count--drew")).toHaveLength(1);
+    expect(container.querySelector('section.rack[data-seat="1"] .rack__count--drew')).not.toBeNull();
+
+    // The next hand's thirteen tiles are the deal, not a draw.
+    const dealtAgain = {
+      ...drew,
+      handNumber: drew.handNumber + 1,
+      players: drew.players.map((p) => (p.seat === 2 ? { ...p, handCount: p.handCount + 1 } : p)),
+    };
+    rerender(<TableTop api={fakeApi(dealtAgain)} view={dealtAgain} sound={sound} />);
+    expect(container.querySelector('section.rack[data-seat="2"] .rack__count--drew')).toBeNull();
+  });
+
   it("shows the result in the middle once a hand is over", () => {
     feltSize();
     // With its only player gone quiet, the computer plays the hand to its end.

@@ -32,9 +32,12 @@
   100% { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-/* The tile just drawn from the wall. */
+/* The tile just drawn from the wall: it comes down into the hand from above
+   and settles, so a draw reads as one even out of the corner of an eye. */
 @keyframes draw-in {
-  0%   { transform: translateY(-22px) scale(0.85); opacity: 0; }
+  0%   { transform: translateY(calc(var(--tile-w, 34px) * -1.2)) scale(0.8); opacity: 0; }
+  45%  { opacity: 1; }
+  80%  { transform: translateY(calc(var(--tile-w, 34px) * 0.06)) scale(1.03); opacity: 1; }
   100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 

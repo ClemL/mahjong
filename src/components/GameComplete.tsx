@@ -9,6 +9,14 @@ import { tableName } from "@/game/tables";
 import { ChipsChart, ChipsTable, LineKey } from "./ChipsChart";
 import { signed } from "./TableResult";
 
+/**
+ * Whether the table ended the game before its last hand. A game that runs its
+ * course ends as the fourth dealership of its last round passes on.
+ */
+export function endedEarly(view: RoomView): boolean {
+  return view.phase === "gameOver" && view.dealership < 4;
+}
+
 function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
@@ -61,13 +69,16 @@ export function GameComplete({
         <header className="result-sheet__head">
           <div className="result-sheet__heading-block">
             <span className="result-sheet__kicker">
-              Game complete · {describeRounds(roundsInGame(view.config))} · {summary.hands} hands ·{" "}
+              {endedEarly(view) ? "Game ended early" : "Game complete"} ·{" "}
+              {describeRounds(roundsInGame(view.config))} · {summary.hands} {summary.hands === 1 ? "hand" : "hands"} ·{" "}
               {tableName(view.roomId)}
             </span>
             <h2 className="result-sheet__title">
               {top.length === 1
                 ? `${name(top[0])} takes the table`
-                : `${joinNames(top.map(name))} share the top`}
+                : top.length === 4
+                  ? "All four finish level"
+                  : `${joinNames(top.map(name))} share the top`}
             </h2>
           </div>
           <div className="result-sheet__head-actions">
@@ -132,7 +143,13 @@ export function GameComplete({
               <Stat
                 label="Threw the most winners"
                 value={most > 0 ? `${most}${throwers.length > 1 ? " each" : ""}` : "0"}
-                note={most > 0 ? joinNames(throwers.map(name)) : "Every win was self-drawn"}
+                note={
+                  most > 0
+                    ? joinNames(throwers.map(name))
+                    : summary.hands > summary.washouts
+                      ? "Every win was self-drawn"
+                      : "Nobody won a hand"
+                }
               />
               <Stat label="Washouts" value={String(summary.washouts)} note={`of ${summary.hands} hands · 流局`} />
             </div>
@@ -143,31 +160,37 @@ export function GameComplete({
               <h3 id="game-chart" className="result-sheet__heading">
                 Chips after each hand
               </h3>
-              <div
-                className="seg seg--inline"
-                role="group"
-                aria-label="View"
-                style={{ "--seg-count": 2 } as CSSProperties}
-              >
-                {(
-                  [
-                    ["chart", "Chart"],
-                    ["table", "Hand by hand"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`seg__btn${mode === value ? " seg__btn--on" : ""}`}
-                    aria-pressed={mode === value}
-                    onClick={() => setMode(value)}
-                  >
-                    <span className="seg__label">{label}</span>
-                  </button>
-                ))}
-              </div>
+              {summary.hands === 0 ? null : (
+                <div
+                  className="seg seg--inline"
+                  role="group"
+                  aria-label="View"
+                  style={{ "--seg-count": 2 } as CSSProperties}
+                >
+                  {(
+                    [
+                      ["chart", "Chart"],
+                      ["table", "Hand by hand"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      className={`seg__btn${mode === value ? " seg__btn--on" : ""}`}
+                      aria-pressed={mode === value}
+                      onClick={() => setMode(value)}
+                    >
+                      <span className="seg__label">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-            {mode === "chart" ? (
+            {summary.hands === 0 ? (
+              <p className="game-over__empty">
+                The game ended before a hand was finished, so everyone keeps the chips they sat down with.
+              </p>
+            ) : mode === "chart" ? (
               <ChipsChart history={view.history} chips={chips} name={name} />
             ) : (
               <ChipsTable history={view.history} chips={chips} name={name} />

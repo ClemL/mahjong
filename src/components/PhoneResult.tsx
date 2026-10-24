@@ -5,6 +5,7 @@ import { summarizeGame } from "@/game/summary";
 import { type Seat, tileName } from "@/game/tiles";
 import { chipsOf } from "./TableEffects";
 import { WinningHand, isLastHand, signed, winningTile } from "./TableResult";
+import { endedEarly } from "./GameComplete";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -53,7 +54,6 @@ export function PhoneResult({
   onHide: () => void;
 }) {
   const result = view.result;
-  if (!result) return null;
   const hide = (
     <button type="button" className="btn btn--sm btn--ghost phone-result__hide" onClick={onHide}>
       Hide
@@ -66,7 +66,9 @@ export function PhoneResult({
     return (
       <section className="phone-result phone-result--game" aria-label="Game complete">
         <div className="phone-result__you">
-          <span className="phone-result__kicker">Game complete · your place</span>
+          <span className="phone-result__kicker">
+            {endedEarly(view) ? "Game ended early" : "Game complete"} · your place
+          </span>
           <span className="phone-result__big">{ordinal(place[seat])}</span>
           <span className="phone-result__chips">
             {chipsOf(view.scores[seat])} chips · {signed(view.scores[seat])}
@@ -98,6 +100,7 @@ export function PhoneResult({
     );
   }
 
+  if (!result) return null;
   const won = result.type === "win" && result.winner !== null ? result : null;
   const delta = result.payments[seat] ?? 0;
   const code = won ? winningTile(view) : null;

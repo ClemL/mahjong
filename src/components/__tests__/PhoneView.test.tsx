@@ -81,7 +81,7 @@ describe("PhoneView", () => {
     expect(container.querySelector(".phone__zoom")).toBeNull();
   });
 
-  it("underlines sets already in the hand, and can be told not to", () => {
+  it("underlines sets already in the hand only with the assist turned on", () => {
     const { seat, view } = onTurn();
     // A run, three of a kind, a dragon triplet (1 faan) and the seat's own
     // wind (1 faan, or 2 when it is the round's wind as well).
@@ -95,7 +95,15 @@ describe("PhoneView", () => {
     } as typeof view;
     const windFaan = wind === view.roundWind ? 2 : 1;
 
-    const { container, unmount } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+    // An assist, so off unless this phone turns it on.
+    const plain = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
+    handButtons(plain.container);
+    expect(plain.container.querySelectorAll(".tile__set, .tile__set-faan")).toHaveLength(0);
+    plain.unmount();
+
+    window.localStorage.setItem("hk-mahjong.set-hints", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.set-hints"));
+    const { container } = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
     handButtons(container);
     expect(container.querySelectorAll(".tile__set--run")).toHaveLength(3);
     expect(container.querySelectorAll(".tile__set--set")).toHaveLength(3);
@@ -109,16 +117,6 @@ describe("PhoneView", () => {
     const nine = screen.getAllByRole("button", { name: /^Discard 9 Bamboo/ });
     expect(nine.every((b) => b.querySelector(".tile__set") === null)).toBe(true);
     expect(screen.getAllByRole("button", { name: "Discard 1 Characters, part of a run" })).toHaveLength(1);
-    unmount();
-
-    window.localStorage.setItem("hk-mahjong.set-hints", "off");
-    try {
-      const off = render(<PhoneView api={fakeApi(seated)} view={seated} sound={sound} />);
-      handButtons(off.container);
-      expect(off.container.querySelectorAll(".tile__set, .tile__set-faan")).toHaveLength(0);
-    } finally {
-      window.localStorage.removeItem("hk-mahjong.set-hints");
-    }
   });
 
   it("discards on a double-click with a mouse, never a single one", () => {
@@ -273,6 +271,35 @@ describe("PhoneView", () => {
 
     fireEvent.click(within(group).getAllByRole("button")[0]);
     expect(api.act).toHaveBeenCalledWith({ type: "claim", optionId: option.id });
+  });
+
+  it("offers more time on a claim only when there are sets to choose between", () => {
+    const { room, claimer } = claimable();
+    const view = playerView(room, claimer);
+    const one = { ...view, claim: { ...view.claim!, canExtend: false } };
+    const first = render(<PhoneView api={fakeApi(one)} view={one} sound={sound} />);
+    expect(within(first.container).queryByRole("button", { name: /^More time to choose/ })).toBeNull();
+    first.unmount();
+
+    const several = { ...view, claim: { ...view.claim!, canExtend: true } };
+    const api = fakeApi(several);
+    const { container } = render(<PhoneView api={api} view={several} sound={sound} />);
+    fireEvent.click(within(container).getByRole("button", { name: "More time to choose: add 20 seconds, once for this tile" }));
+    expect(api.act).toHaveBeenCalledWith({ type: "moreTime" });
+  });
+
+  it("stretches the hand to the edges when the phone asks, sized by the tiles it holds", () => {
+    const { seat, view } = onTurn();
+    const plain = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(plain.container.querySelector(".phone--stretch")).toBeNull();
+    plain.unmount();
+
+    window.localStorage.setItem("hk-mahjong.hand-stretch", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hand-stretch"));
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(container.querySelector(".phone--stretch")).not.toBeNull();
+    const hand = container.querySelector<HTMLElement>(".phone__hand")!;
+    expect(hand.style.getPropertyValue("--hand-count")).toBe(String(view.players[seat].hand.length));
   });
 
   it("shows the newest discard and a play log on the controller", () => {

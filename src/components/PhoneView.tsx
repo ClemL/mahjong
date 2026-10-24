@@ -24,7 +24,6 @@ import { useHandOrder } from "@/hooks/useHandOrder";
 import { useFlip } from "@/hooks/useFlip";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useDealIn } from "@/hooks/useDealIn";
-import { useWakeLock } from "@/hooks/useWakeLock";
 import { useHurryFlash } from "@/hooks/useHurry";
 import { HelperButton, HelperPanel } from "./HelperPanel";
 import { TileBack, TileButton, TileFace } from "./TileView";
@@ -46,33 +45,16 @@ const FLICK_REACH = 0.9;
 /** Or one let go moving up at least this fast, in pixels a millisecond: a quick flick travels less. */
 const FLICK_SPEED = 0.45;
 
-const KEEP_AWAKE_KEY = "hk-mahjong.keepAwake";
+/**
+ * How many tiles the hand row holds, and whether the drawn one stands apart,
+ * so a stretched hand can size its tiles to fill the width exactly.
+ */
+function handFill(tiles: number, apart: boolean): CSSProperties {
+  return { "--hand-count": Math.max(1, tiles), "--hand-apart": apart ? 1 : 0 } as CSSProperties;
+}
 
 /** Open tiles compact fits on its header line beside everything else. */
 const COMPACT_HEADER_TILES = 5;
-
-/** Keep-awake is remembered per device: whoever wanted it once wants it every game. */
-function useKeepAwake() {
-  const [on, setOn] = useState(false);
-  useEffect(() => {
-    try {
-      setOn(window.localStorage.getItem(KEEP_AWAKE_KEY) === "1");
-    } catch {
-      // Storage can be blocked; the toggle still works for this visit.
-    }
-  }, []);
-  const state = useWakeLock(on);
-  const toggle = () => {
-    const next = !on;
-    setOn(next);
-    try {
-      window.localStorage.setItem(KEEP_AWAKE_KEY, next ? "1" : "0");
-    } catch {
-      // As above.
-    }
-  };
-  return { on, state, toggle };
-}
 
 /**
  * A claim drawn where its meld would land — among your own open sets — but
@@ -191,7 +173,6 @@ export function PhoneView({
   useEffect(() => {
     setHidden(true);
   }, [view.handNumber]);
-  const keepAwake = useKeepAwake();
   const rootRef = useRef<HTMLDivElement>(null);
   const dealIn = useDealIn(view, seat, rootRef, hidden);
   const [sent, setSent] = useState<Sent | null>(null);
@@ -505,7 +486,7 @@ export function PhoneView({
   // is waiting on the person being asked about it.
   const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
-  if (view.phase === "gameOver") prompt = `${winText} That is the game.`;
+  if (view.phase === "gameOver") prompt = result ? `${winText} That is the game.` : "The table ended the game.";
   else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
   else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;
@@ -603,11 +584,12 @@ export function PhoneView({
     ) : null;
 
   const resultKey = `${view.handNumber}-${view.phase}`;
-  const showResult = over && result !== null && resultAside !== resultKey;
+  // The end of the game has its standings to show even when it was ended mid-hand.
+  const showResult = over && (result !== null || view.phase === "gameOver") && resultAside !== resultKey;
   const promptLine = (
     <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
       {prompt}
-      {over && result && !showResult ? (
+      {over && (result || view.phase === "gameOver") && !showResult ? (
         <button type="button" className="btn btn--sm phone__result-open" onClick={() => setResultAside(null)}>
           Result
         </button>
@@ -712,6 +694,7 @@ export function PhoneView({
         yourTurn || view.claim ? "phone--acting" : "",
         hurriedBy !== null ? "phone--hurried" : "",
         showResult ? "phone--result" : "",
+        display.stretch === "on" ? "phone--stretch" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -782,26 +765,6 @@ export function PhoneView({
           {hidden ? "Show" : "Hide"}
           {compact ? null : " hand"}
         </button>
-        <button
-          type="button"
-          className="btn btn--sm btn--ghost phone__toggle"
-          aria-pressed={keepAwake.on}
-          aria-label="Keep screen awake"
-          disabled={keepAwake.state === "unsupported"}
-          title={
-            keepAwake.state === "unsupported"
-              ? "This browser cannot keep the screen on"
-              : keepAwake.state === "denied"
-                ? "The browser refused; low battery mode can block it"
-                : keepAwake.on
-                  ? "The screen stays on while this page is open"
-                  : "Let the screen sleep as usual"
-          }
-          onClick={keepAwake.toggle}
-        >
-          {compact ? "Awake" : "Keep awake"}
-          {keepAwake.on && keepAwake.state === "held" ? " ✓" : null}
-        </button>
         {sound ? (
           <SettingsMenu>
             <PhoneSettings
@@ -860,6 +823,8 @@ export function PhoneView({
                 options={view.claim.options}
                 discard={view.lastDiscard.tile.code}
                 deadlineIn={view.claim.deadlineIn}
+                allowance={view.claim.allowance}
+                onMoreTime={view.claim.canExtend ? () => void api.act({ type: "moreTime" }) : undefined}
                 busy={api.busy}
                 onClaim={(optionId) => {
                   setPreview(null);
@@ -913,6 +878,7 @@ export function PhoneView({
           <button
             type="button"
             className="phone__hand phone__hand--hidden"
+            style={handFill(me.hand.length, false)}
             aria-label={`Hand hidden, ${me.hand.length} tiles. Show hand`}
             onClick={() => setHidden(false)}
           >
@@ -933,6 +899,7 @@ export function PhoneView({
             ]
               .filter(Boolean)
               .join(" ")}
+            style={handFill(order.tiles.length + (order.drawn ? 1 : 0), order.drawn !== undefined)}
             onPointerDown={onHandPointerDown}
             onPointerMove={onHandPointerMove}
             onPointerUp={endDrag}

@@ -546,6 +546,15 @@
   border-radius: 999px;
 }
 
+.game-over__empty {
+  margin: 0;
+  padding: 24px 16px;
+  border-radius: 12px;
+  background: var(--chart-surface);
+  color: var(--ink-dim);
+  text-align: center;
+}
+
 .game-over__chart {
   min-height: 0;
 }

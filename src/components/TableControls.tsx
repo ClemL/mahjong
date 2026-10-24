@@ -83,6 +83,21 @@ export function TableActions({
       >
         Redeal
       </button>
+      {view.phase !== "gameOver" ? (
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost"
+          disabled={api.busy}
+          onClick={() => {
+            const unscored = view.phase === "handOver" ? "" : " The hand being played is not scored.";
+            if (confirm(`End the game now and show the final scores?${unscored}`)) {
+              void api.control({ type: "endGame" });
+            }
+          }}
+        >
+          End game
+        </button>
+      ) : null}
       <button
         type="button"
         className="btn btn--sm btn--ghost"
