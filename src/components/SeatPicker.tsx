@@ -8,9 +8,10 @@ import { tableName } from "@/game/tables";
 
 interface Props {
   view: RoomView;
-  /** The chair a scanned code asked for, if it is still free to sit in. */
-  picked?: Seat | null;
-  onClaim: (seat: Seat | "table", name: string) => Promise<void>;
+  /** The chair a scanned code asked for, if it is still free to sit in, or the table a tablet came to open. */
+  picked?: Seat | "table" | null;
+  /** `replace` takes over a table already open on another device. */
+  onClaim: (seat: Seat | "table", name: string, replace?: boolean) => Promise<void>;
   /** Empty the room, table included. */
   onReset: () => void;
   busy: boolean;
@@ -21,8 +22,9 @@ interface Props {
 export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error }: Props) {
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
   // Somebody may have sat down there between the code being shown and scanned.
-  const arrived = picked !== null && !taken(picked) ? picked : null;
-  const [choice, setChoice] = useState<Seat | "table" | null>(arrived);
+  const arrived = picked !== null && picked !== "table" && !taken(picked) ? picked : null;
+  const [choice, setChoice] = useState<Seat | "table" | null>(picked === "table" ? "table" : arrived);
+  const takingOver = choice === "table" && view.tablePresent;
 
   // Arriving from a chair's code, naming yourself is all that is left to do.
   // Focused without scrolling, so the line saying whose chair it is stays in view.
@@ -48,6 +50,12 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
     <div className="lobby">
       <h1 className="lobby__title">Take a seat at {tableName(view.roomId)}</h1>
       {/* Dropping back here without a word reads as the app losing the seat. */}
+      {view.tableTakenOver ? (
+        <p className="lobby__warn" role="status">
+          Another device took over the table, with the game as it stands. Choose Table to take it back, or pick a
+          seat.
+        </p>
+      ) : null}
       {view.displacedFrom !== null ? (
         <p className="lobby__warn" role="status">
           {view.displacedByTable
@@ -97,14 +105,17 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
         <button
           type="button"
           className={`seat-card seat-card--table${choice === "table" ? " seat-card--on" : ""}`}
-          disabled={view.tablePresent}
           aria-pressed={choice === "table"}
           onClick={() => setChoice("table")}
         >
           <span className="seat-card__wind">🀄</span>
           <span className="seat-card__name">Table</span>
           <span className="seat-card__state">
-            {view.tablePresent ? "In use" : "For the shared tablet"}
+            {view.tablePresent
+              ? view.tableAway
+                ? "Not seen lately · take over"
+                : "Open elsewhere · take over"
+              : "For the shared tablet"}
           </span>
         </button>
       </div>
@@ -113,9 +124,18 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
         className="lobby__form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (choice !== null) void onClaim(choice, name);
+          if (choice !== null) void onClaim(choice, name, takingOver);
         }}
       >
+        {takingOver ? (
+          <p className="lobby__warn" role="status">
+            {view.tableAway
+              ? "The table is held by a device that has not been seen for over a minute."
+              : "The table is open on another device right now."}{" "}
+            Taking it over moves it here with the game as it stands — hands, scores and house rules — and that
+            device goes back to choosing a seat.
+          </p>
+        ) : null}
         {choice !== null && choice !== "table" ? (
           <label className="field">
             <span className="field__label">Your name</span>
@@ -141,20 +161,16 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
           </label>
         ) : null}
         <button type="submit" className="btn btn--primary" disabled={choice === null || busy}>
-          {choice === "table" ? "Open the table" : "Sit down"}
+          {takingOver ? "Take over the table" : choice === "table" ? "Open the table" : "Sit down"}
         </button>
       </form>
 
-      {/* The way back in when the table is marked in use by a device that has
-          gone — a cleared browser, a borrowed tablet — or when a new group is
-          sitting down to what is left of the last one's game. */}
+      {/* For a new group sitting down to what is left of the last one's game.
+          A table stuck on a device that has gone is taken over above instead,
+          which keeps the game. */}
       {view.tablePresent || view.seatedCount > 0 || view.started ? (
         <div className="lobby__reset">
-          <span className="seat__meta">
-            {view.tablePresent
-              ? "Table stuck on a device that is not here, or starting over?"
-              : "Starting over with new people?"}
-          </span>
+          <span className="seat__meta">Starting over with new people?</span>
           <button
             type="button"
             className="btn btn--ghost btn--reset"

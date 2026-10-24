@@ -198,12 +198,12 @@ export interface Room {
   /** The claim given more time: whose, and on which discard, so it lapses with that tile. */
   claimExtension: { seat: Seat; discard: string } | null;
   /**
-   * Seat tokens taken over — by somebody scanning that chair's code, or by
-   * the table handing the chair to the computer — newest last, so the phone
-   * that lost its chair can be told why rather than just dropping back to the
-   * seat picker.
+   * Seat tokens taken over — by somebody scanning that chair's code, by the
+   * table handing the chair to the computer, or by another device taking the
+   * table itself over — newest last, so the device that lost its place can be
+   * told why rather than just dropping back to the seat picker.
    */
-  displaced: { token: string; seat: Seat; byTable?: boolean }[];
+  displaced: { token: string; seat: Seat | "table"; byTable?: boolean }[];
   /** The last hurry-up: who it was aimed at, who sent it, and when. */
   hurry: { seat: Seat; by: Seat; at: number } | null;
   /**
@@ -277,7 +277,11 @@ export interface RoomView {
   displacedFrom: Seat | null;
   /** That chair was handed to the computer by the table, rather than scanned by somebody. */
   displacedByTable: boolean;
+  /** This viewer was the table until another device took it over. */
+  tableTakenOver: boolean;
   tablePresent: boolean;
+  /** The table is held by a device that has not looked in for a while. */
+  tableAway: boolean;
   /** Seats still waiting to answer the discard on the table. */
   awaitingClaimSeats: Seat[];
   claim: {
@@ -583,6 +587,29 @@ export function seatName(name: string | undefined, seat: Seat): string {
 
 /** How many taken-over tokens a room remembers; older ones just see the seat picker. */
 const DISPLACED_KEPT = 8;
+
+/**
+ * How long the table device can go without a heartbeat before it is shown as
+ * not seen lately. Its heartbeat is written every `HEARTBEAT_WRITE_MS` at most,
+ * so this leaves room for two of them.
+ */
+export const TABLE_IDLE_MS = 60_000;
+
+/**
+ * Make a device the table. A table already open elsewhere is refused unless
+ * `replace` is set: then this device takes it over, game and all, and the one
+ * that had it is told so the next time it looks. That is how a tablet gets
+ * back to its own game after losing its claim — another browser, cleared
+ * storage, a different tablet — without resetting the table.
+ */
+export function openTable(room: Room, token: string, { replace = false } = {}, now = Date.now()): string | null {
+  if (room.table) {
+    if (!replace) return "The table is already in use";
+    room.displaced = [...room.displaced, { token: room.table.token, seat: "table" as const }].slice(-DISPLACED_KEPT);
+  }
+  room.table = { token, lastSeen: now };
+  return null;
+}
 
 /**
  * Put a person in a chair. An occupied chair is refused unless `replace` is
@@ -1016,9 +1043,11 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     log: state.log,
     config: state.config,
     you,
-    displacedFrom: displaced?.seat ?? null,
+    displacedFrom: displaced && displaced.seat !== "table" ? displaced.seat : null,
     displacedByTable: displaced?.byTable === true,
+    tableTakenOver: displaced?.seat === "table",
     tablePresent: room.table !== null,
+    tableAway: room.table !== null && now - room.table.lastSeen > TABLE_IDLE_MS,
     awaitingClaimSeats: pendingHumanClaimants(room, now),
     claim,
     actions,

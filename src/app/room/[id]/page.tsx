@@ -31,7 +31,7 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
   // A computer chair's code from the table's side panel opens the picker on
   // that chair, with a box for the newcomer's name, rather than sitting them
   // down unnamed. Read once and stripped, like a seat code.
-  const [picked, setPicked] = useState<Seat | null>(null);
+  const [picked, setPicked] = useState<Seat | "table" | null>(null);
   useEffect(() => {
     const url = new URL(window.location.href);
     const asked = url.searchParams.get("pick");
@@ -89,10 +89,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     if (asked === "table") {
       url.searchParams.delete("seat");
       window.history.replaceState(null, "", url.pathname + url.search);
+      // Open on another device: offer to take it over here, game and all,
+      // rather than taking it from whoever has it without asking.
       if (view.tablePresent) {
-        setJoinError(
-          "The table is already open on another device. Reset the table below if that device has gone.",
-        );
+        setPicked("table");
         return;
       }
       setJoiningTable(true);
@@ -166,14 +166,17 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
     return (
       <main className="app">
         <SeatPicker
+          // The table's own link can find it open elsewhere only once the room
+          // has loaded, after the picker has drawn: start it again on the table.
+          key={picked === "table" ? "table" : "seats"}
           view={view}
           picked={picked}
           busy={api.busy}
           onReset={() => void api.resetTable()}
           error={joinError ?? api.error}
-          onClaim={async (seat, name) => {
+          onClaim={async (seat, name, replace) => {
             try {
-              await claim(seat, name);
+              await claim(seat, name, replace);
             } catch (error) {
               // Surfaced by the picker through the hook's error channel.
               console.error(error);

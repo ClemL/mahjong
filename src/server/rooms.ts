@@ -23,6 +23,7 @@ import {
   notePlayed,
   noteDiscard,
   openClaimWindow,
+  openTable,
   resetRoom,
   returnToLobby,
   beginHand,
@@ -166,8 +167,8 @@ export async function claimSeat(
   const token = randomUUID();
   const room = await mutate(id, (r, now) => {
     if (input.seat === "table") {
-      if (r.table) throw new RoomError("The table is already in use", 409);
-      r.table = { token, lastSeen: now };
+      const refused = openTable(r, token, { replace: input.replace }, now);
+      if (refused) throw new RoomError(refused, 409);
       return;
     }
     const refused = sitDown(r, input.seat, { token, name: input.name, replace: input.replace }, now);
