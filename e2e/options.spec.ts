@@ -1,0 +1,70 @@
+import { type Browser, expect, test } from "@playwright/test";
+import { PHONE_LANDSCAPE, TABLET, expectNoSidewaysScroll, presetPreferences, watchErrors } from "./helpers";
+
+/** Shared with the room spec; specs run one at a time and each resets it first. */
+const ROOM = "TABLE2";
+
+/**
+ * Seats and resets are rate-limited per address, and every other spec spends
+ * the same local allowance, so each device here has an address of its own.
+ */
+let address = 0;
+const nextAddress = () => `10.0.4.${++address}`;
+
+async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean, stored = {}) {
+  const context = await browser.newContext({
+    viewport,
+    hasTouch: touch,
+    isMobile: touch,
+    extraHTTPHeaders: { "x-forwarded-for": nextAddress() },
+  });
+  const page = await context.newPage();
+  await presetPreferences(page, {});
+  await page.addInitScript((settings: Record<string, string>) => {
+    for (const [key, value] of Object.entries(settings)) window.localStorage.setItem(key, value);
+  }, stored);
+  return { context, page, errors: watchErrors(page) };
+}
+
+test("a phone stretches its hand to the edges, and the table can end the game early", async ({ browser, request }) => {
+  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": nextAddress() } });
+  expect(reset.ok()).toBe(true);
+
+  const kris = await open(browser, PHONE_LANDSCAPE, true, { "hk-mahjong.hand-stretch": "on" });
+  await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
+  const table = await open(browser, TABLET, false);
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  await expect(table.page.getByText("Kris").first()).toBeVisible();
+  await table.page.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
+  await table.page.getByRole("button", { name: "Skip the deal" }).click();
+  await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
+
+  // Stretched, the hand runs from one edge of the screen to the other.
+  await kris.page.getByRole("button", { name: /Hand hidden/ }).tap();
+  const tiles = kris.page.locator(".phone__hand .tile");
+  await expect(tiles).toHaveCount(14);
+  // Measured once the tile just drawn has settled into the hand.
+  const right = async () => {
+    const box = (await tiles.last().boundingBox())!;
+    return box.x + box.width;
+  };
+  await expect.poll(right).toBeGreaterThanOrEqual(PHONE_LANDSCAPE.width - 6);
+  expect((await tiles.first().boundingBox())!.x).toBeLessThanOrEqual(6);
+  await expectNoSidewaysScroll(kris.page);
+  // Keeping the screen awake is the table's job, not a phone's.
+  await expect(kris.page.getByRole("button", { name: /awake/i })).toHaveCount(0);
+
+  // The table ends the game mid-hand: straight to the final scores, everywhere.
+  table.page.once("dialog", (dialog) => void dialog.accept());
+  await table.page.getByRole("button", { name: "End game" }).first().click();
+  const sheet = table.page.getByRole("dialog", { name: "Game complete" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByText(/^Game ended early/)).toBeVisible();
+  await expect(table.page.getByRole("button", { name: "End game" })).toHaveCount(0);
+  await expect(kris.page.getByRole("region", { name: "Game complete" })).toBeVisible();
+
+  expect(kris.errors).toEqual([]);
+  expect(table.errors).toEqual([]);
+  await kris.context.close();
+  await table.context.close();
+});

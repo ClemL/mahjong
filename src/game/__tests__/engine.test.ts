@@ -5,6 +5,7 @@ import {
   createGame,
   setRounds,
   discard,
+  endGame,
   nextHand,
   resolveClaims,
   setFlowers,
@@ -248,6 +249,31 @@ describe("playing without flowers", () => {
     expectTileConservation(after, 144);
     const next = nextHand({ ...after, phase: "handOver", result: { type: "washout", winner: null, from: null, score: null, payments: [0, 0, 0, 0], dealerKeeps: true } });
     expectTileConservation(next, 136);
+  });
+});
+
+describe("ending the game early", () => {
+  it("abandons a hand in play unscored, and leaves the scores so far as the final ones", () => {
+    const played = autoPlayHand(allAiGame(3), createRng(3)).state;
+    const next = nextHand(played);
+    expect(next.phase).not.toBe("handOver");
+    const ended = endGame(next);
+    expect(ended.phase).toBe("gameOver");
+    expect(ended.result).toBeNull();
+    expect(ended.pendingClaims).toEqual([]);
+    expect(ended.scores).toEqual(played.scores);
+    expect(ended.history).toEqual(played.history);
+    // The engine refuses to play on.
+    expect(nextHand(ended).phase).toBe("gameOver");
+  });
+
+  it("keeps a settled hand's result, which is already in the scores", () => {
+    const played = autoPlayHand(allAiGame(4), createRng(4)).state;
+    expect(played.phase).toBe("handOver");
+    const ended = endGame(played);
+    expect(ended.phase).toBe("gameOver");
+    expect(ended.result).toEqual(played.result);
+    expect(endGame(ended)).toBe(ended);
   });
 });
 

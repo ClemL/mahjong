@@ -4,6 +4,7 @@ import { type KeyboardEvent, type ReactNode, useId, useRef, useState } from "rea
 import { type RoomView, SPEED_LEVELS, type SpeedLevel, TURN_LIMITS, robotVersion } from "@/game/room";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
+import type { Difficulty } from "@/game/ai";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
@@ -29,6 +30,20 @@ export const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => 
   label: s.label,
   hint: `About ${s.turnMs / 1000} seconds per computer turn, with the animations paced to match`,
 }));
+
+export const DIFFICULTY_OPTIONS: SegmentOption<Difficulty>[] = [
+  {
+    value: "easy",
+    label: "Easy",
+    hint: "A beginner: now and then it throws a tile it should have kept, and it claims sets without minding the faan",
+  },
+  { value: "normal", label: "Normal", hint: "Plays its own hand well, towards a hand worth declaring" },
+  {
+    value: "hard",
+    label: "Hard",
+    hint: "Plays for what a hand is worth as well as for speed: a flush or all pungs when they pay for the wait",
+  },
+];
 
 const limitLabel = (seconds: number) =>
   seconds === 0 ? "Off" : seconds < 60 ? `${seconds}s` : `${seconds / 60} min`;
@@ -248,6 +263,8 @@ export function TableSettings({
   const handLive = view.started && view.phase !== "handOver" && view.phase !== "gameOver";
   const rounds = roundsInGame(config);
   const speedLabel = SPEED_LEVELS.find((s) => s.level === view.settings.speed)?.label ?? "Normal";
+  const difficultyLabel =
+    DIFFICULTY_OPTIONS.find((d) => d.value === view.settings.difficulty)?.label ?? "Normal";
   const themeLabel = THEMES.find((t) => t.value === appearance.appearance.theme)?.label ?? "";
   const facesLabel = TILE_STYLES.find((t) => t.value === appearance.appearance.tiles)?.label ?? "";
 
@@ -265,7 +282,7 @@ export function TableSettings({
     {
       key: "pace",
       name: "Pace & turns",
-      summary: `${speedLabel} computers · ${view.settings.turnLimit === 0 ? "no turn limit" : `${limitLabel(view.settings.turnLimit)} turns`}`,
+      summary: `${difficultyLabel}, ${speedLabel.toLowerCase()} computers · ${view.settings.turnLimit === 0 ? "no turn limit" : `${limitLabel(view.settings.turnLimit)} turns`}`,
     },
     {
       key: "tablet",
@@ -440,6 +457,12 @@ export function TableSettings({
         {section === "pace" ? (
           <div className="tset__grid tset__grid--one">
             <Card title="Computer players">
+              <Segmented
+                label="Difficulty"
+                options={DIFFICULTY_OPTIONS}
+                value={view.settings.difficulty ?? "normal"}
+                onChange={(value) => void api.control({ type: "difficulty", value })}
+              />
               <Segmented
                 label="Speed"
                 options={SPEEDS}

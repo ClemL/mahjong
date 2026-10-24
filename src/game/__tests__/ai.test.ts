@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { type GameState, createGame } from "../engine";
 import { autoPlayHand } from "../controller";
-import { bestImprovingClaim, greedyAi, plannedClaim, randomAi } from "../ai";
+import { type AiStrategy, bestImprovingClaim, easyAi, greedyAi, hardAi, plannedClaim, randomAi, strategyFor } from "../ai";
 import { createRng } from "../rng";
 import { DEFAULT_RULES } from "../rules";
 import { shantenOfCodes } from "../shanten";
@@ -177,5 +177,50 @@ describe("greedy play holds the engine's invariants", () => {
     }
     // Over 300 of these seeds there were none; at 3 faan, 44.
     expect(washouts).toBeLessThanOrEqual(2);
+  }, 120000);
+});
+
+describe("difficulty levels", () => {
+  it("maps each level the table can choose to its opponent, normal by default", () => {
+    expect(strategyFor("easy")).toBe(easyAi);
+    expect(strategyFor("normal")).toBe(greedyAi);
+    expect(strategyFor("hard")).toBe(hardAi);
+    expect(strategyFor(undefined)).toBe(greedyAi);
+  });
+
+  it("plays hands to completion at every level without breaking a rule", () => {
+    for (const strategy of [easyAi, hardAi]) {
+      for (let seed = 0; seed < 8; seed++) {
+        const { state } = autoPlayHand(seatedGame(seed * 31 + 7), createRng(seed + 3), strategy);
+        expect(state.phase, `${strategy.name} seed ${seed}`).toBe("handOver");
+        expect(state.scores.reduce((a, b) => a + b, 0)).toBe(0);
+        for (const p of state.players) {
+          const target = 13 - 3 * p.melds.length;
+          expect([target, target + 1]).toContain(p.hand.length);
+        }
+      }
+    }
+  }, 120000);
+
+  it("lets a player win more hands against easy computer seats than against normal ones", () => {
+    // One normal seat stands in for the person, with the computer in the other three.
+    const playerWins = (level: AiStrategy) => {
+      let won = 0;
+      for (let i = 0; i < 60; i++) {
+        const player = i % 4;
+        const bySeat = [level, level, level, level];
+        bySeat[player] = greedyAi;
+        const table: AiStrategy = {
+          name: "table",
+          chooseTurnAction: (state, seat, rng) => bySeat[seat].chooseTurnAction(state, seat, rng),
+          chooseClaim: (state, seat, options, rng) => bySeat[seat].chooseClaim(state, seat, options, rng),
+        };
+        const { state } = autoPlayHand(seatedGame(i * 7919 + 3), createRng(i + 101), table);
+        if (state.result?.type === "win" && state.result.winner === player) won += 1;
+      }
+      return won;
+    };
+    // Over 1,000 hands: 42.4% against easy seats, 27.0% against normal ones.
+    expect(playerWins(easyAi)).toBeGreaterThan(playerWins(greedyAi) + 4);
   }, 120000);
 });

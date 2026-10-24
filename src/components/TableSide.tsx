@@ -14,7 +14,7 @@ import type { WakeLockState } from "@/hooks/useWakeLock";
 import { QrCode } from "./QrCode";
 import { Segmented, SwitchRow } from "./SettingControls";
 import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
-import { LIMITS, SPEEDS, rulesInForce } from "./TableSettings";
+import { DIFFICULTY_OPTIONS, LIMITS, SPEEDS, rulesInForce } from "./TableSettings";
 import { chipsOf } from "./TableEffects";
 import { positionOf } from "./tableLayout";
 
@@ -342,6 +342,12 @@ function SettingsCard({
         hint="The discard area of whoever is to play is lit a little"
         checked={display.turnGlow === "on"}
         onChange={(on) => display.setTurnGlow(on ? "on" : "off")}
+      />
+      <Segmented
+        label="Computer difficulty"
+        options={DIFFICULTY_OPTIONS}
+        value={view.settings.difficulty ?? "normal"}
+        onChange={(value) => void api.control({ type: "difficulty", value })}
       />
       <Segmented
         label="Computer speed"

@@ -59,10 +59,11 @@ house-rules affair, so every number is in one file and is easy to change.
 
 ## The computer opponents
 
-Computer seats play the skilled strategy. A random one is kept as the measured
-baseline.
+Computer seats play at the table's **Difficulty**, set on the tablet with the
+pace: Easy, Normal (the default) or Hard. A random player is kept as the
+measured baseline.
 
-**Skilled (default).** Counts *shanten* — how many tile changes a hand is from
+**Normal.** Counts *shanten* — how many tile changes a hand is from
 completion — and discards whatever leaves the hand closest to ready, breaking
 ties on how many useful tiles are still unseen, then on letting go of terminals
 and honors first. It plays for the faan minimum: each candidate discard or claim
@@ -70,25 +71,50 @@ is judged against routes to a hand worth enough to win (a flush, all triplets,
 staying concealed, honor sets already held — see
 [`src/game/plan.ts`](src/game/plan.ts)), so it keeps a hand concealed or chases
 a flush rather than finishing a hand it could not declare. It always declares a
-win it is entitled to. It does **not** read the discards for danger — a
-competent beginner, not a strong player.
+win it is entitled to.
 
-**Random.** Draws and discards uniformly at random, claiming at random too.
-Kept because it is the honest baseline, and because it makes the difference
-visible.
+**Easy.** Normal's hand, but one discard in five is a tile it should have
+kept, and it claims any set that brings the hand closer without asking whether
+the hand will still be worth declaring. It never misses a win.
 
-Over 300 simulated all-AI hands per row (October 2026):
+**Hard.** Normal's hand, played for what it is worth as well as for speed:
+every route still open is weighed by what it would pay, discounted for each
+step still to take (more steeply as the wall empties), and the richest is
+played for. Reading the discards for danger — throwing the safest tile once
+another hand looks ready, folding a poor hand — was built and measured, and
+left out: it cut this seat's deal-ins from 20% to 17%, but slowed it down
+enough that the people at the table won *more* (33% of hands against three
+such seats), not less.
+
+How a person fares against each level, measured with one Normal seat standing
+in for the person against three computer seats, over 1,000 hands per row at the
+default 1-faan minimum (October 2026):
+
+| Computer seats | Person wins | Person's points a hand | Washed out (four computers) |
+| --- | --- | --- | --- |
+| Easy | 42.4% | +2.92 | 2.5% |
+| Normal | 27.0% | +0.01 | 0.0% |
+| Hard | 26.2% | −0.13 | 0.0% |
+
+Easy is a clear step down. Hard is only a small step up — at the 3-faan Hong
+Kong standard too (21.4% against 22.1%, −0.15 points a hand against +0.45, over
+800 hands) — because at this table's rules the quickest hand is usually the
+richest one as well. A clearly stronger Hard needs a deeper search, which this
+does not have yet.
+
+Normal against the random baseline, over 300 simulated all-AI hands per row
+(October 2026):
 
 | Opponents | Table minimum | Hands won | Washed out | Avg. faan |
 | --- | --- | --- | --- | --- |
 | Random | 0 faan | 3.0% | 97.0% | 2.33 |
 | Random | 3 faan | 1.0% | 99.0% | 4.33 |
 | Random | 5 faan | 0.3% | 99.7% | 6.00 |
-| **Skilled** | **0 faan** | **100%** | **0%** | 1.58 |
-| **Skilled** | **3 faan** | **82.7%** | **17.3%** | 3.40 |
-| **Skilled** | **5 faan** | **22.0%** | **78.0%** | 5.59 |
+| **Normal** | **0 faan** | **100%** | **0%** | 1.58 |
+| **Normal** | **3 faan** | **82.7%** | **17.3%** | 3.40 |
+| **Normal** | **5 faan** | **22.0%** | **78.0%** | 5.59 |
 
-At the default 3-faan minimum about one hand in six washes out. At 5 faan most
+At a 3-faan minimum about one hand in six washes out. At 5 faan most
 do: the route planner does not yet aim high enough, so 5 is better played
 against people than against the computer.
 
@@ -144,15 +170,18 @@ it holds, and whether it is still deciding on a claim. It also prints the
 seating — *Seat 1 East · bottom edge · Kris* — so people know where to sit. It
 never receives anyone's concealed tiles.
 
-It also drives the game: next hand, redeal, restart and reset scores, change the
-faan minimum, free a seat, and skip a player who is not answering a claim.
+It also drives the game: next hand, redeal, restart and reset scores, end the
+game early (the hand being played goes unscored, and everyone goes to the final
+scores), change the faan minimum, free a seat, and skip a player who is not
+answering a claim.
 
 ### On the devices themselves
 
 - **The table keeps the screen awake.** A tablet acting as the table would
   otherwise sleep mid-hand. The lock is re-taken whenever the page becomes
   visible again, since browsers drop it on hide, and the table says so when the
-  browser cannot hold one (Safari only gained it in 16.4).
+  browser cannot hold one (Safari only gained it in 16.4). Only the table does:
+  a phone sleeps as it normally would.
 - **Discarding takes two taps on touch.** The first arms the tile and offers
   *Discard* / *Keep*; the second throws it. With a mouse a click still discards
   directly — a mis-click is cheap, a stray touch on a phone you are holding is
@@ -307,7 +336,7 @@ src/game/          Rules engine — no React, no DOM
   engine.ts        The state machine: deal, draw, discard, claims, settlement
   shanten.ts       Distance-to-ready, hand acceptance, visible-tile counting
   plan.ts          Routes to a hand worth the faan minimum, for the opponents
-  ai.ts            AiStrategy interface + the random and skilled opponents
+  ai.ts            AiStrategy interface + the random, easy, normal and hard opponents
   controller.ts    Steps the table one beat at a time
   sets.ts, waits.ts, helper.ts   Hints: finished sets, waits, sets started
   patternTiles.ts  The tiles behind each faan pattern, for the result
@@ -338,11 +367,16 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 - On your phone, **tap a tile to arm it and tap again to throw it**, or flick it
   up off the hand. Drag a tile sideways to put it where you want it.
 - When you can use a discard, Chow / Pung / Kong / Win buttons appear with the
-  meld they would make; **Pass** declines.
+  meld they would make; **Pass** declines. With two or more sets to choose
+  between, **+20s** adds twenty seconds to the claim, once a discard.
 - **Hide hand** turns your tiles face down for when the phone is put down; every
   hand arrives face down until you turn it up.
-- **Set hints**, the **helper** and **hurry up** are each phone's own choice,
-  under the phone's settings.
+- **Set hints** (the line under tiles that already make a set), the **helper**
+  and **hurry up** are the assists: each phone's own choice, off unless that
+  phone turns them on — or on from the start for the players who get them.
+- **Stretch to the edges**, under the phone's settings, runs the hand out to
+  the edges of the screen and scales its tiles up to fill it; the fewer tiles
+  in hand, the larger they get.
 - **Hurry up** flashes the screen of whoever the table is waiting on. Nobody can
   be hurried in the first three seconds of their turn (or of their call on a
   discard); the button counts those seconds down. After a hurry-up, every button
@@ -352,6 +386,8 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   settings at any point. Game length runs the East round alone, East and South,
   or all four winds (the default) — four dealerships each. The dealer keeps the
   deal after winning (連莊); a loss or a washout passes it on.
+- **Difficulty** — Easy, Normal or Hard — is how well the computer plays the
+  seats nobody has taken; the table sets it with the pace.
 - **Sound** is each device's own.
 
 ### Table and tiles

@@ -488,6 +488,35 @@ describe("table control", () => {
     expect((await control(id, table, { type: "reset" })).settings).toEqual(DEFAULT_ROOM_SETTINGS);
   });
 
+  it("lets the table choose how well the computer plays, from the levels it offers", async () => {
+    const { id, table, tokens } = await dealtRoom([0]);
+    expect((await readRoom(id, table)).settings.difficulty).toBe("normal");
+    expect((await control(id, table, { type: "difficulty", value: "hard" })).settings.difficulty).toBe("hard");
+    await expect(control(id, table, { type: "difficulty", value: "expert" })).rejects.toMatchObject({ status: 400 });
+    await expect(control(id, tokens[0], { type: "difficulty", value: "easy" })).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("ends the game early from the table, the hand in play unscored", async () => {
+    const { id, table, tokens } = await dealtRoom([0, 1]);
+    const before = await readRoom(id, table);
+    await expect(control(id, tokens[0], { type: "endGame" })).rejects.toMatchObject({ status: 403 });
+
+    const over = await control(id, table, { type: "endGame" });
+    expect(over.phase).toBe("gameOver");
+    expect(over.result).toBeNull();
+    expect(over.scores).toEqual(before.scores);
+    expect(over.history).toEqual(before.history);
+    // A phone sees the same end.
+    expect((await readRoom(id, tokens[1])).phase).toBe("gameOver");
+    await expect(control(id, table, { type: "endGame" })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("has no game to end in the lobby", async () => {
+    const id = await room();
+    const table = (await claimSeat(id, { seat: "table" })).token;
+    await expect(control(id, table, { type: "endGame" })).rejects.toMatchObject({ status: 409 });
+  });
+
   it("only lets the table reset", async () => {
     const { id, tokens } = await dealtRoom([0]);
     await expect(control(id, tokens[0], { type: "reset" })).rejects.toMatchObject({ status: 403 });

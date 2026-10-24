@@ -136,10 +136,13 @@ export interface PhoneDisplay {
   setPlayLog: (value: OnOff) => void;
   size: PhoneSize;
   setSize: (value: PhoneSize) => void;
+  /** The hand run out to the edges of the screen, its tiles scaled up to fill it. */
+  stretch: OnOff;
+  setStretch: (value: OnOff) => void;
   /** A buzz when it is your turn, a claim is offered, or you win. */
   vibrate: OnOff;
   setVibrate: (value: OnOff) => void;
-  /** A line under three tiles in the hand that already make a set. */
+  /** A line under three tiles in the hand that already make a set — one of the assists. */
   setHints: OnOff;
   setSetHints: (value: OnOff) => void;
   /** The hurry-up button, and this screen flashing when someone presses theirs. */
@@ -154,8 +157,8 @@ export interface PhoneDisplay {
 const ASSISTED = new Set(["zaid", "lucy"]);
 
 /**
- * Hurry up and the helper start off for everyone but the players in
- * `ASSISTED`. A choice made in settings always wins.
+ * The assists — set hints, hurry up and the helper — start off for everyone
+ * but the players in `ASSISTED`. A choice made in settings always wins.
  */
 export function assistsDefault(name: string | null | undefined): OnOff {
   return ASSISTED.has(name?.trim().toLowerCase() ?? "") ? "on" : "off";
@@ -170,9 +173,11 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     "comfy",
   ]);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
-  const [setHints, setSetHints] = useLocalSetting<OnOff>("hk-mahjong.set-hints", "on", ON_OFF);
+  const [stretch, setStretch] = useLocalSetting<OnOff>("hk-mahjong.hand-stretch", "off", ON_OFF);
+  const [setHintsChoice, setSetHints] = useStoredChoice<OnOff>("hk-mahjong.set-hints", ON_OFF);
   const [hurryChoice, setHurry] = useStoredChoice<OnOff>("hk-mahjong.hurry", ON_OFF);
   const [helperChoice, setHelper] = useStoredChoice<OnOff>("hk-mahjong.helper", ON_OFF);
+  const setHints = setHintsChoice ?? assistsDefault(name);
   const hurry = hurryChoice ?? assistsDefault(name);
   const helper = helperChoice ?? assistsDefault(name);
   return {
@@ -180,6 +185,8 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     setPlayLog,
     size,
     setSize,
+    stretch,
+    setStretch,
     vibrate,
     setVibrate,
     setHints,

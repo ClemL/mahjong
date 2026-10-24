@@ -24,7 +24,7 @@ import {
   turnActions,
 } from "./engine";
 import { needsTurnAdvance, stepAiTurn } from "./controller";
-import { greedyAi } from "./ai";
+import { type Difficulty, greedyAi, strategyFor } from "./ai";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, isFlower } from "./tiles";
 import type { Meld } from "./melds";
 import type { RuleConfig } from "./rules";
@@ -33,6 +33,8 @@ import { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS } from "./presence";
 
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
+/** What asking for more time adds to a claim with several sets to choose between. Once a discard. */
+export const CLAIM_MORE_TIME_MS = 20_000;
 /** The least a claimed set is left on show before its owner plays on. */
 export const CLAIM_BEAT_MS = 2_500;
 
@@ -111,9 +113,11 @@ export interface RoomSettings {
   turnLimit: number;
   /** Quarter turns clockwise the table screen is drawn at. */
   rotation: 0 | 1 | 2 | 3;
+  /** How well the computer plays the seats nobody has taken. */
+  difficulty: Difficulty;
 }
 
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 2, turnLimit: 30, rotation: 0 };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 2, turnLimit: 30, rotation: 0, difficulty: "normal" };
 
 export function turnMs(speed: SpeedLevel): number {
   return SPEED_LEVELS.find((s) => s.level === speed)?.turnMs ?? 1500;
@@ -178,6 +182,8 @@ export interface Room {
    * when the turn ends and nothing has to remember to clear it.
    */
   moreTime: { seat: Seat; from: number } | null;
+  /** The claim given more time: whose, and on which discard, so it lapses with that tile. */
+  claimExtension: { seat: Seat; discard: string } | null;
   /**
    * Seat tokens taken over — by somebody scanning that chair's code, or by
    * the table handing the chair to the computer — newest last, so the phone
@@ -243,7 +249,14 @@ export interface RoomView {
   tablePresent: boolean;
   /** Seats still waiting to answer the discard on the table. */
   awaitingClaimSeats: Seat[];
-  claim: { options: ClaimOption[]; deadlineIn: number } | null;
+  claim: {
+    options: ClaimOption[];
+    deadlineIn: number;
+    /** The whole window, extra time included, for drawing how much is left. */
+    allowance: number;
+    /** Several sets to choose between and no extra time asked for yet. */
+    canExtend: boolean;
+  } | null;
   actions: TurnActions | null;
   settings: RoomSettings;
   /** The newest discard this hand, still shown after the next player draws. */
@@ -307,6 +320,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     lastStepAt: Date.now(),
     lastPlayed: null,
     moreTime: null,
+    claimExtension: null,
     displaced: [],
     hurry: null,
     acting: null,
@@ -319,6 +333,7 @@ export function normalizeRoom(room: Room): Room {
   room.lastStepAt ??= room.updatedAt ?? Date.now();
   room.lastPlayed ??= null;
   room.moreTime ??= null;
+  room.claimExtension ??= null;
   room.displaced ??= [];
   room.hurry ??= null;
   room.acting ??= null;
@@ -431,6 +446,33 @@ export function grantMoreTime(room: Room, seat: Seat): string | null {
   if (room.settings.turnLimit <= 0) return "This table has no turn limit";
   if (turnExtended(room)) return "You already have extra time this turn";
   room.moreTime = { seat, from: room.lastStepAt };
+  return null;
+}
+
+/** Two or more sets to make from one discard: more than a glance to choose between. */
+function choosingBetweenSets(options: ClaimOption[]): boolean {
+  return options.filter((o) => o.type !== "win").length >= 2;
+}
+
+/** Whether `seat` has had its extra time on the discard it is deciding on now. */
+function claimExtended(room: Room, seat: Seat): boolean {
+  const grant = room.claimExtension;
+  return grant !== null && grant.seat === seat && grant.discard === room.state.lastDiscard?.tile.id;
+}
+
+/**
+ * More time to answer a discard, or why not: only for the seat being asked,
+ * only when it has several sets to choose between, and once a discard.
+ */
+export function extendClaim(room: Room, seat: Seat, now = Date.now()): string | null {
+  const turn = claimTurn(room.state);
+  if (room.state.phase !== "claiming" || turn?.seat !== seat || String(seat) in room.claimResponses) {
+    return "There is nothing for you to decide";
+  }
+  if (!choosingBetweenSets(turn.options)) return "More time is for choosing between sets";
+  if (claimExtended(room, seat)) return "You already have extra time on this tile";
+  room.claimDeadline = (room.claimDeadline ?? now + CLAIM_WINDOW_MS) + CLAIM_MORE_TIME_MS;
+  room.claimExtension = { seat, discard: room.state.lastDiscard!.tile.id };
   return null;
 }
 
@@ -698,6 +740,7 @@ export function drain(room: Room, now = Date.now()): boolean {
     }
   };
   const pace = turnMs(room.settings.speed);
+  const strategy = strategyFor(room.settings.difficulty);
 
   for (let guard = 0; guard < 400; guard += 1) {
     const state = room.state;
@@ -720,7 +763,7 @@ export function drain(room: Room, now = Date.now()): boolean {
           }
           if (now < room.claimDeadline) break;
         } else {
-          optionId = greedyAi.chooseClaim(state, turn.seat, turn.options, rng)?.id ?? null;
+          optionId = strategy.chooseClaim(state, turn.seat, turn.options, rng)?.id ?? null;
         }
       }
       // People were being waited on: the computer's next move is paced from
@@ -767,7 +810,7 @@ export function drain(room: Room, now = Date.now()): boolean {
     // The computer's turn, at the table's pace.
     const due = room.lastStepAt + pace;
     if (now < due) break;
-    const next = stepAiTurn(state, rng, greedyAi);
+    const next = stepAiTurn(state, rng, strategy);
     if (next === state) break;
     move(next);
     room.lastStepAt = due;
@@ -862,9 +905,12 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
   if (you.role === "player" && asked && asked.seat === you.seat) {
     const answered = String(you.seat) in room.claimResponses;
     if (!answered) {
+      const extended = claimExtended(room, asked.seat);
       claim = {
         options: asked.options,
         deadlineIn: Math.max(0, (room.claimDeadline ?? now + CLAIM_WINDOW_MS) - now),
+        allowance: CLAIM_WINDOW_MS + (extended ? CLAIM_MORE_TIME_MS : 0),
+        canExtend: !extended && choosingBetweenSets(asked.options),
       };
     }
   }

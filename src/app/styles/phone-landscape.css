@@ -3,6 +3,9 @@
 /* The game is only played sideways. A phone is a controller beside the tablet:
    the hand along the bottom, the choices above it, nothing to scroll. */
 .app--handset {
+  /* The page's own left and right edges, which the safe areas may pull in. */
+  --edge-l: env(safe-area-inset-left, 0px);
+  --edge-r: env(safe-area-inset-right, 0px);
   max-width: none;
   width: 100%;
   height: 100vh;
@@ -24,6 +27,8 @@ body:has(.app--handset) {
    controller with it; the safe-area insets turn too. */
 @media (orientation: portrait) {
   .screen > .app--handset {
+    --edge-l: env(safe-area-inset-top, 0px);
+    --edge-r: env(safe-area-inset-bottom, 0px);
     overflow: hidden;
     padding: max(6px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
       max(6px, env(safe-area-inset-left)) max(10px, env(safe-area-inset-top));
@@ -103,7 +108,8 @@ body:has(.app--handset) {
   position: absolute;
   z-index: 50;
   pointer-events: none;
-  animation: send-to-table var(--anim-toss) cubic-bezier(0.5, 0, 0.75, 0.4) both;
+  /* A little slower than a toss onto the felt: it is your own tile leaving. */
+  animation: send-to-table calc(var(--anim-toss) * 1.35) cubic-bezier(0.5, 0, 0.75, 0.4) both;
 }
 
 .phone__sent .tile {
@@ -121,7 +127,7 @@ body:has(.app--handset) {
   font-size: 12px;
   font-weight: 600;
   color: var(--gold);
-  animation: sent-label var(--anim-toss) ease both;
+  animation: sent-label calc(var(--anim-toss) * 1.35) ease both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -282,6 +288,12 @@ body:has(.app--handset) {
   font-variant-numeric: tabular-nums;
 }
 
+/* More time, beside Pass, when there are several sets to choose between. */
+.claims__more {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Time left on the claim, as a draining bar under the count. */
 .claims__timer::after {
   content: "";
@@ -307,6 +319,8 @@ body:has(.app--handset) {
    prompt and the open melds, claims laid out sideways, and the hand without
    its tray — so the tiles take the width the chrome gave back. */
 .app--handset:has(.phone--compact) {
+  /* The side margin a stretched hand runs out over. */
+  --side-pad: 4px;
   padding-left: max(4px, env(safe-area-inset-left));
   padding-right: max(4px, env(safe-area-inset-right));
 }
@@ -430,6 +444,37 @@ body:has(.app--handset) {
 
 .phone--compact .hand__gap {
   width: 8px;
+}
+
+/* Stretched: the rack runs out past the controller's margins to the edges of
+   the screen — never into a safe area — and each tile is the width shared out
+   by how many the hand holds, so a hand with sets laid down grows larger. The
+   height cap keeps room above it for the choices. */
+.phone--stretch .phone__hand {
+  --bleed-l: calc(max(var(--side-pad, 10px), var(--edge-l)) - var(--edge-l));
+  --bleed-r: calc(max(var(--side-pad, 10px), var(--edge-r)) - var(--edge-r));
+  --apart: calc(var(--hand-apart, 0) * 9px);
+  margin-left: calc(var(--bleed-l) * -1);
+  margin-right: calc(var(--bleed-r) * -1);
+  padding-inline: 3px;
+  gap: 3px;
+  border-radius: 0;
+  border-inline: none;
+  --tile-lg: clamp(
+    24px,
+    min(
+      calc(
+        (100cqw + var(--bleed-l) + var(--bleed-r) - 6px - (var(--hand-count, 14) - 1) * 3px - var(--apart)) /
+          var(--hand-count, 14)
+      ),
+      30cqh
+    ),
+    160px
+  );
+}
+
+.phone--stretch .hand__gap {
+  width: 6px;
 }
 
 /* ------------------------------------------- phone: status, ghosts, sorting */

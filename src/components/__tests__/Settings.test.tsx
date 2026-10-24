@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_APPEARANCE } from "@/game/appearance";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import type { PhoneDisplay, TabletDisplay } from "@/hooks/useLocalSetting";
+import { type PhoneDisplay, type TabletDisplay, usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { TableSettings } from "../TableSettings";
 import { PhoneSettings } from "../PhoneSettings";
 import { NAMES, dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
@@ -20,6 +20,8 @@ function phoneDisplay(): PhoneDisplay {
     setPlayLog: vi.fn(),
     size: "standard",
     setSize: vi.fn(),
+    stretch: "off",
+    setStretch: vi.fn(),
     vibrate: "on",
     setVibrate: vi.fn(),
     setHints: "on",
@@ -106,6 +108,8 @@ describe("the table's settings", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Pace & turns/ }));
     fireEvent.click(within(screen.getByRole("group", { name: "Turn time limit" })).getByRole("button", { name: "1 min" }));
     expect(api.control).toHaveBeenCalledWith({ type: "turnLimit", value: 60 });
+    fireEvent.click(within(screen.getByRole("group", { name: "Difficulty" })).getByRole("button", { name: "Hard" }));
+    expect(api.control).toHaveBeenCalledWith({ type: "difficulty", value: "hard" });
 
     const pace = screen.getByRole("tab", { name: /Pace & turns/ });
     fireEvent.keyDown(pace, { key: "ArrowDown" });
@@ -138,6 +142,24 @@ describe("a phone's settings", () => {
     expect(display.setHurry).toHaveBeenCalledWith("on");
     fireEvent.click(within(screen.getByRole("group", { name: "Button size" })).getByRole("button", { name: "Comfy" }));
     expect(display.setSize).toHaveBeenCalledWith("comfy");
+    fireEvent.click(screen.getByRole("switch", { name: "Stretch to the edges" }));
+    expect(display.setStretch).toHaveBeenCalledWith("on");
+    // Set hints are one of the assists now.
+    const assists = screen.getByRole("heading", { name: "Assists" }).parentElement!;
+    expect(within(assists).getByRole("switch", { name: "Set hints" })).toBeTruthy();
+  });
+
+  it("starts every assist off, but on for the players who get them, until a choice is made", () => {
+    const plain = renderHook(() => usePhoneDisplay("Kris")).result.current;
+    expect([plain.setHints, plain.helper, plain.hurry]).toEqual(["off", "off", "off"]);
+    const lucy = renderHook(() => usePhoneDisplay(" lucy ")).result.current;
+    expect([lucy.setHints, lucy.helper, lucy.hurry]).toEqual(["on", "on", "on"]);
+    window.localStorage.setItem("hk-mahjong.set-hints", "on");
+    try {
+      expect(renderHook(() => usePhoneDisplay("Kris")).result.current.setHints).toBe("on");
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.set-hints");
+    }
   });
 
   it("says so when the browser cannot vibrate, rather than offering a switch that does nothing", () => {

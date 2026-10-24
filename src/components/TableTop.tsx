@@ -100,6 +100,21 @@ function useOpening(view: RoomView): {
  * that chair: who is sitting there, how many tiles they hold, and everything
  * they have laid open.
  */
+/**
+ * How many tiles a seat has drawn since this screen started watching the
+ * hand: its count only ever rises on a draw. The deal is the next hand's own.
+ */
+function useDrawCount(count: number, hand: number): number {
+  const seen = useRef({ count, hand });
+  const [draws, setDraws] = useState(0);
+  useEffect(() => {
+    const before = seen.current;
+    seen.current = { count, hand };
+    if (before.hand === hand && count > before.count) setDraws((n) => n + 1);
+  }, [count, hand]);
+  return draws;
+}
+
 function Rack({
   player,
   view,
@@ -114,6 +129,7 @@ function Rack({
   flowerOrder: Map<string, number>;
 }) {
   const seat = player.seat;
+  const draws = useDrawCount(player.handCount, view.handNumber);
   const active = view.turn === seat && view.phase === "action";
   // The hand is only ever sent face up once it is over.
   const shown = player.hand.some((t) => t.code !== "back");
@@ -164,7 +180,11 @@ function Rack({
       </span>
       {/* A tile back with the count on it: how close this seat is to going
           out is the thing people glance at most. */}
-      <span className="rack__count" title={`${player.handCount} tiles in hand`}>
+      <span
+        key={draws}
+        className={draws > 0 ? "rack__count rack__count--drew" : "rack__count"}
+        title={`${player.handCount} tiles in hand`}
+      >
         {player.handCount}
       </span>
       <div className="rack__open">
@@ -503,7 +523,9 @@ function Console({
         // The full account is laid over the felt; the middle keeps the gist
         // for when that is put aside.
         <div className="console__result" role="status" hidden={sheetOpen}>
-          {view.result?.type === "win" && view.result.winner !== null ? (
+          {view.phase === "gameOver" ? (
+            <strong className="console__headline">Game over</strong>
+          ) : view.result?.type === "win" && view.result.winner !== null ? (
             <>
               <strong className="console__headline">
                 {occupantName(view.players[view.result.winner])} wins
@@ -563,7 +585,8 @@ function Console({
  */
 export function useResultSheet(view: RoomView) {
   const [aside, setAside] = useState<string | null>(null);
-  const settled = (view.phase === "handOver" || view.phase === "gameOver") && view.result !== null;
+  // A game ended mid-hand has no hand result, but still has its final scores.
+  const settled = (view.phase === "handOver" && view.result !== null) || view.phase === "gameOver";
   // The game's end comes up over the last hand's result even if that was put aside.
   const key = `${view.handNumber}-${view.phase}`;
   return {

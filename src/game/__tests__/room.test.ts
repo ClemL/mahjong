@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   CLAIM_BEAT_MS,
+  CLAIM_MORE_TIME_MS,
   CLAIM_WINDOW_MS,
   DEAL_MS,
   DEFAULT_ROOM_SETTINGS,
@@ -14,6 +15,7 @@ import {
   SEAT_IDLE_MS,
   type Room,
   drain,
+  extendClaim,
   grantMoreTime,
   hurryUp,
   identify,
@@ -654,6 +656,50 @@ describe("turn limit", () => {
   });
 });
 
+describe("more time on a claim", () => {
+  /** Kris has thrown 4 Characters and Srini, holding 2, 3, 5 and 6, can chow it two ways — or one. */
+  function asked(ways: 1 | 2): Room {
+    const room = dealt("TEST", 5, [0, 1]);
+    const chow = (id: string, codes: string[]) => ({ id, type: "chow" as const, tileIds: [], codes });
+    const options = [chow("low", ["m2", "m3", "m4"]), chow("high", ["m4", "m5", "m6"])].slice(0, ways);
+    room.state = {
+      ...room.state,
+      phase: "claiming",
+      lastDiscard: { tile: { id: "thrown-m4", code: "m4" }, from: 0 },
+      pendingClaims: [{ seat: 1, options }],
+    };
+    room.claimDeadline = Date.now() + CLAIM_WINDOW_MS;
+    return room;
+  }
+
+  it("is offered with two sets to choose between, and adds to the window once", () => {
+    const room = asked(2);
+    const deadline = room.claimDeadline!;
+    expect(viewFor(room, "tok-1").claim).toMatchObject({ allowance: CLAIM_WINDOW_MS, canExtend: true });
+    expect(extendClaim(room, 1)).toBeNull();
+    expect(room.claimDeadline).toBe(deadline + CLAIM_MORE_TIME_MS);
+    expect(viewFor(room, "tok-1").claim).toMatchObject({
+      allowance: CLAIM_WINDOW_MS + CLAIM_MORE_TIME_MS,
+      canExtend: false,
+    });
+    expect(extendClaim(room, 1)).toMatch(/already have extra time/);
+  });
+
+  it("is not offered with only one way to claim, nor to anyone not being asked", () => {
+    const room = asked(1);
+    expect(viewFor(room, "tok-1").claim?.canExtend).toBe(false);
+    expect(extendClaim(room, 1)).toMatch(/choosing between sets/);
+    expect(extendClaim(asked(2), 0)).toMatch(/nothing for you to decide/);
+  });
+
+  it("lapses with the tile: the next discard can be given more time again", () => {
+    const room = asked(2);
+    expect(extendClaim(room, 1)).toBeNull();
+    room.state = { ...room.state, lastDiscard: { tile: { id: "next-m4", code: "m4" }, from: 0 } };
+    expect(viewFor(room, "tok-1").claim?.canExtend).toBe(true);
+  });
+});
+
 describe("hurry up", () => {
   it("flashes only the person the table is waiting on, once, and briefly", () => {
     const room = dealt("TEST", 5, [0, 2]);
@@ -753,7 +799,11 @@ describe("hurry up", () => {
     const room = newRoom("TEST", undefined, 1) as Partial<Room>;
     delete room.hurry;
     delete room.acting;
+    delete room.claimExtension;
+    room.settings = { speed: 2, turnLimit: 30, rotation: 0 } as Room["settings"];
     const normal = normalizeRoom(room as Room);
+    expect(normal.claimExtension).toBeNull();
+    expect(normal.settings.difficulty).toBe("normal");
     expect(normal.hurry).toBeNull();
     expect(normal.acting).toBeNull();
   });

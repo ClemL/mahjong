@@ -5,6 +5,7 @@ import {
   type Room,
   type RoomView,
   drain,
+  extendClaim,
   grantMoreTime,
   hurryUp,
   hasAnyPlayer,
@@ -37,6 +38,7 @@ import {
   declareConcealedKong,
   declareSelfDraw,
   discard,
+  endGame,
   nextHand,
   setFlowers,
   setLiability,
@@ -46,6 +48,7 @@ import {
   startHand,
 } from "@/game/engine";
 import { ROUND_CHOICES } from "@/game/rules";
+import { DIFFICULTIES, type Difficulty } from "@/game/ai";
 import type { Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
 import { RoomError } from "./errors";
@@ -215,7 +218,8 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     // Returns before the clock is restarted below: the extra time is added to
     // the turn already running, not a fresh one.
     if (action.type === "moreTime") {
-      const refused = grantMoreTime(r, seat);
+      // Asked while a discard is up, it is time to choose between the sets it would make.
+      const refused = r.state.phase === "claiming" ? extendClaim(r, seat, now) : grantMoreTime(r, seat);
       if (refused) throw new RoomError(refused, 409);
       return;
     }
@@ -269,6 +273,7 @@ export type TableCommand =
   | { type: "regroup" }
   | { type: "nextHand" }
   | { type: "restart" }
+  | { type: "endGame" }
   | { type: "reset" }
   | { type: "redeal" }
   | { type: "minFaan"; value: number }
@@ -278,6 +283,7 @@ export type TableCommand =
   | { type: "liability"; value: boolean }
   | { type: "othersPayHalf"; value: boolean }
   | { type: "speed"; value: number }
+  | { type: "difficulty"; value: string }
   | { type: "turnLimit"; value: number }
   | { type: "rotate" }
   | { type: "freeSeat"; seat: Seat }
@@ -327,6 +333,14 @@ export async function control(
       case "redeal":
         r.state = startHand({ ...r.state, phase: "handOver" });
         beginHand(r, now);
+        break;
+      // The final scores now, the hand in play if any left unscored.
+      case "endGame":
+        if (!r.started) throw new RoomError("No game is being played", 409);
+        if (r.state.phase === "gameOver") throw new RoomError("The game is already over", 409);
+        r.state = endGame(r.state);
+        r.claimResponses = {};
+        r.claimDeadline = null;
         break;
       case "restart": {
         // Everyone keeps their chair and the scores go back to zero, but the
@@ -378,6 +392,12 @@ export async function control(
           throw new RoomError("No such speed", 400);
         }
         r.settings.speed = command.value as SpeedLevel;
+        break;
+      case "difficulty":
+        if (!(DIFFICULTIES as readonly string[]).includes(command.value)) {
+          throw new RoomError("No such difficulty", 400);
+        }
+        r.settings.difficulty = command.value as Difficulty;
         break;
       case "turnLimit":
         if (!(TURN_LIMITS as readonly number[]).includes(command.value)) {

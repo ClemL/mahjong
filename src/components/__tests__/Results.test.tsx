@@ -190,3 +190,26 @@ describe("a phone's hand result", () => {
     expect(screen.getByText(new RegExp(`${NAMES[1]} takes the table`))).toBeTruthy();
   });
 });
+
+describe("a game ended early", () => {
+  it("shows the final scores on the tablet with no hand result, and says it ended early", () => {
+    feltSize();
+    const over: RoomView = { ...gameOver(tableView(dealt())), result: null };
+    const { container } = render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
+    const sheet = screen.getByRole("dialog", { name: "Game complete" });
+    expect(sheet.querySelector(".result-sheet__kicker")!.textContent).toMatch(/^Game ended early · /);
+    expect(within(sheet).getByRole("heading", { level: 2 }).textContent).toBe(`${NAMES[1]} takes the table`);
+    expect(container.querySelector(".console__headline")!.textContent).toBe("Game over");
+    // Nothing left to end.
+    expect(screen.queryByRole("button", { name: "End game" })).toBeNull();
+  });
+
+  it("gives every phone its place, and says the table ended it", () => {
+    const over: RoomView = { ...gameOver(playerView(dealt(), 3)), result: null };
+    render(<PhoneView api={fakeApi(over)} view={over} sound={sound} />);
+    const standings = screen.getByRole("region", { name: "Game complete" });
+    expect(within(standings).getByText(/^Game ended early/)).toBeTruthy();
+    expect(within(standings).getByText("2nd")).toBeTruthy();
+    expect(screen.getByText("The table ended the game.")).toBeTruthy();
+  });
+});
