@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useCountdown } from "@/hooks/useCountdown";
 import type { ClaimOption } from "@/game/engine";
 import { CLAIM_MORE_TIME_MS, CLAIM_WINDOW_MS } from "@/game/room";
@@ -44,6 +44,7 @@ export function ClaimChoices({
   onClaim,
   onPreview,
   onMoreTime,
+  faan,
 }: {
   options: ClaimOption[];
   discard: TileCode;
@@ -55,6 +56,8 @@ export function ClaimChoices({
   onPreview?: (option: ClaimOption | null) => void;
   /** Ask for more time; offered only with several sets to choose between. */
   onMoreTime?: () => void;
+  /** Shown after a win, to open what it would score. */
+  faan?: ReactNode;
 }) {
   const left = useCountdown(deadlineIn) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
@@ -99,6 +102,7 @@ export function ClaimChoices({
           </button>
         );
       })}
+      {faan}
       <button
         type="button"
         className="btn btn--ghost claims__pass"

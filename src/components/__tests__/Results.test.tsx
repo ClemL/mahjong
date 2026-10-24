@@ -7,6 +7,7 @@ import { TableTop } from "../TableTop";
 import { PhoneResult } from "../PhoneResult";
 import { PhoneView } from "../PhoneView";
 import { NAMES, dealt, fakeApi, playerView, sound, tableView } from "./fixtures";
+import { cardFileName, scoreCard } from "../scoreCard";
 
 /** A felt measured at a landscape tablet's size, as soon as it is observed. */
 function feltSize(width = 1264, height = 700) {
@@ -40,6 +41,25 @@ function discardWin(view: RoomView): RoomView {
     ...view,
     phase: "handOver",
     result: { type: "win", winner: 2, from: 0, score, payments: [-8, -4, 16, -4], dealerKeeps: false },
+  };
+}
+
+/** Kris threw a tile Srini and Steven both went out on, at a table that pays every winner. */
+function twoWinners(view: RoomView): RoomView {
+  const steven = { ...score, faan: 4, scoredFaan: 4, value: 16 };
+  return {
+    ...view,
+    phase: "handOver",
+    config: { ...view.config, multipleWinners: true },
+    result: {
+      type: "win",
+      winner: 1,
+      from: 0,
+      score,
+      others: [{ winner: 2, score: steven }],
+      payments: [-24, 12, 24, -12],
+      dealerKeeps: false,
+    },
   };
 }
 
@@ -88,6 +108,28 @@ describe("the table's hand result", () => {
     ]);
     expect(within(sheet).getByText("Others pay half · house rule")).toBeTruthy();
     expect(within(sheet).getByText(`The deal moves on · ${NAMES[1]} deals hand ${over.handNumber + 1}`)).toBeTruthy();
+  });
+
+  it("names every winner on one discard, shows each hand, and says who paid each", () => {
+    feltSize();
+    const over = twoWinners(tableView(dealt()));
+    render(<TableTop api={fakeApi(over)} view={over} sound={sound} />);
+    const sheet = screen.getByRole("dialog", { name: "Hand result" });
+    expect(within(sheet).getByRole("heading", { name: `${NAMES[1]} and ${NAMES[2]} win 食糊` })).toBeTruthy();
+    expect(within(sheet).getByText(/two winners 雙響/)).toBeTruthy();
+    expect(within(sheet).getByRole("heading", { name: `${NAMES[2]} won on it too · 4 faan` })).toBeTruthy();
+    expect(within(sheet).getByRole("heading", { name: `Faan · ${NAMES[2]}` })).toBeTruthy();
+    const rows = Array.from(sheet.querySelectorAll(".who-pays__row"));
+    const roles = Object.fromEntries(
+      rows.map((r) => [r.querySelector(".who-pays__name")!.textContent, r.querySelector(".who-pays__role")!.textContent]),
+    );
+    expect(roles).toEqual({
+      [NAMES[0]]: "threw the tile",
+      [NAMES[1]]: "winner",
+      [NAMES[2]]: "winner",
+      [NAMES[3]]: "half of each",
+    });
+    expect(within(sheet).getByText("Every winner paid 雙響 · Others pay half · house rule")).toBeTruthy();
   });
 
   it("offers the final scores, not another hand, after the game's last hand", () => {
@@ -158,6 +200,39 @@ describe("the end of the game", () => {
   });
 });
 
+describe("the final scores as a picture", () => {
+  it("says what the end-of-game sheet says, so the picture and the screen agree", () => {
+    const view = gameOver(tableView(dealt()));
+    const card = scoreCard(view, (s) => NAMES[s]);
+    expect(card.title).toBe(`${NAMES[1]} takes the table`);
+    expect(card.rows.map((r) => [r.place, r.name, r.delta])).toEqual([
+      [1, NAMES[1], 84],
+      [2, NAMES[3], -4],
+      [3, NAMES[2], -24],
+      [4, NAMES[0], -56],
+    ]);
+    expect(card.facts.map((f) => f.label)).toEqual([
+      "Biggest hand",
+      "Self-draws",
+      "Threw the most winners",
+      "Washouts",
+    ]);
+    expect(card.facts[0]).toMatchObject({ value: "6 faan", note: `${NAMES[1]}, hand 3 · Half Flush 混一色` });
+
+    feltSize();
+    render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const sheet = screen.getByRole("dialog", { name: "Game complete" });
+    expect(within(sheet).getByRole("heading", { name: card.title })).toBeTruthy();
+    expect(within(sheet).getByText(card.facts[0].note)).toBeTruthy();
+    expect(within(sheet).getByRole("button", { name: "Share scores" })).toBeTruthy();
+  });
+
+  it("names the file after the table and the minute it was made", () => {
+    const view = gameOver(tableView(dealt()));
+    expect(cardFileName(view, new Date(2026, 9, 24, 19, 5))).toMatch(/^mahjong-[a-z0-9-]+-20261024_1905\.png$/);
+  });
+});
+
 describe("a phone's hand result", () => {
   it("says what the hand cost this phone and why, beside the whole table's chips", () => {
     const view = discardWin(playerView(dealt(), 0));
@@ -167,6 +242,24 @@ describe("a phone's hand result", () => {
     expect(screen.getByRole("heading", { name: `${NAMES[2]} wins 食糊` })).toBeTruthy();
     const rows = Array.from(document.querySelectorAll(".phone-result__row"));
     expect(rows.map((r) => r.querySelector(".phone-result__delta")!.textContent)).toEqual(["+16", "−4", "−4", "−8"]);
+  });
+
+  it("tells the one who threw it that they pay every winner, and a winner that another won too", () => {
+    const thrower = twoWinners(playerView(dealt(), 0));
+    const { unmount } = render(<PhoneResult view={thrower} seat={0} nameOf={(s) => NAMES[s]} onHide={() => {}} />);
+    expect(
+      screen.getByText(`You threw the tile ${NAMES[1]} and ${NAMES[2]} both won on, so you pay each of them.`),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: `${NAMES[1]} and ${NAMES[2]} win 食糊` })).toBeTruthy();
+    unmount();
+
+    const steven = twoWinners(playerView(dealt(), 2));
+    render(<PhoneResult view={steven} seat={2} nameOf={(s) => NAMES[s]} onHide={() => {}} />);
+    expect(screen.getByRole("heading", { name: `You and ${NAMES[1]} win 食糊` })).toBeTruthy();
+    expect(screen.getByText(`Off ${NAMES[0]}'s discard, which ${NAMES[1]} won on too.`)).toBeTruthy();
+    // Steven's own hand and faan, not the first winner's.
+    expect(screen.getByText("Yours: 4 faan")).toBeTruthy();
+    expect(screen.getByText(`${NAMES[1]} won on it too · 3 faan`)).toBeTruthy();
   });
 
   it("sits above the hand, and can be put aside and brought back", () => {

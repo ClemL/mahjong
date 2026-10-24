@@ -30,6 +30,22 @@ export function winningTile(view: RoomView): TileCode | null {
   return view.players[won.winner].hand.find((t) => t.id === view.drawnTileId)?.code ?? null;
 }
 
+/** Everyone a hand was won by: the first after the discarder, then any others on the same tile. */
+export function winnersOf(result: HandResult | null): { winner: Seat; score: ScoreResult | null }[] {
+  if (result?.type !== "win" || result.winner === null) return [];
+  return [{ winner: result.winner, score: result.score }, ...(result.others ?? [])];
+}
+
+/** The winners with yours first, so a sentence can start "You and Lucy". */
+export function youFirst<T extends { winner: Seat }>(winners: T[], seat: Seat): T[] {
+  return [...winners].sort((a, b) => Number(b.winner === seat) - Number(a.winner === seat));
+}
+
+/** "Lucy", "Lucy and Zaid", "Lucy, Zaid and Kris". */
+export function joinNames(names: string[]): string {
+  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
 /** Whether the next hand would be past the end of the game. */
 export function isLastHand(view: RoomView): boolean {
   if (view.phase !== "handOver" || !view.result || view.result.dealerKeeps) return false;
@@ -46,8 +62,10 @@ function Group({ label, order, children }: { label: ReactNode; order: number; ch
   );
 }
 
-function laidOut(player: PublicPlayer, score: ScoreResult | null) {
+/** `extra` is the tile a second or third winner won on, which went to the first. */
+function laidOut(player: PublicPlayer, score: ScoreResult | null, extra?: TileCode | null) {
   const concealed = player.hand.map((t) => t.code).filter((code) => code !== "back" && !isFlower(code));
+  if (extra) concealed.push(extra);
   const preferChows = score?.patterns.some((p) => p.key === "allChows") ?? false;
   return arrangeWinningHand(concealed, player.melds, preferChows);
 }
@@ -62,6 +80,7 @@ export function WinningHand({
   score,
   winning,
   labels = true,
+  shared = false,
 }: {
   player: PublicPlayer;
   score: ScoreResult | null;
@@ -69,8 +88,10 @@ export function WinningHand({
   winning?: { code: TileCode; note: string } | null;
   /** Name each set under it; a phone has no room, and says the winning tile once instead. */
   labels?: boolean;
+  /** The winning tile went to someone else who won on it first: add it to this hand to show it. */
+  shared?: boolean;
 }) {
-  const layout = laidOut(player, score);
+  const layout = laidOut(player, score, shared ? winning?.code : null);
   // Ring one copy, in the first concealed group that holds it: the open melds
   // were whole before the winning tile arrived.
   const groups: TileCode[][] = [...layout.sets.map((s) => s.codes)];
@@ -155,10 +176,19 @@ export function WinningHand({
  * Each pattern the hand scored, with the few tiles that earned it where there
  * are few enough to show, then the total and what it is worth.
  */
-export function FaanLedger({ view, score }: { view: RoomView; score: ScoreResult }) {
-  const won = view.result!;
-  const player = view.players[won.winner!];
-  const layout = laidOut(player, score);
+export function FaanLedger({
+  view,
+  score,
+  winner = view.result!.winner!,
+}: {
+  view: RoomView;
+  score: ScoreResult;
+  /** Whose win, when the tile was won on by more than one. */
+  winner?: Seat;
+}) {
+  const player = view.players[winner];
+  const shared = winner !== view.result!.winner;
+  const layout = laidOut(player, score, shared ? winningTile(view) : null);
   const shown = patternTiles(score.patterns, {
     sets: [
       ...player.melds.map((m) => ({ type: m.type, codes: m.tiles.map((t) => t.code) })),
@@ -166,7 +196,7 @@ export function FaanLedger({ view, score }: { view: RoomView; score: ScoreResult
     ],
     flowers: player.flowers.map((t) => t.code),
     winningTile: winningTile(view),
-    seat: won.winner!,
+    seat: winner,
     roundWind: view.roundWind,
   });
   const capped = score.limitReached && score.scoredFaan < score.faan;
@@ -209,20 +239,22 @@ export function FaanLedger({ view, score }: { view: RoomView; score: ScoreResult
 /** Why each seat paid what it did. */
 function roleOf(result: HandResult, seat: Seat): string {
   if (result.type !== "win" || result.winner === null) return "";
-  if (seat === result.winner) return "winner";
+  if (winnersOf(result).some((w) => w.winner === seat)) return "winner";
   const paid = -(result.payments[seat] ?? 0);
   if (result.liable != null) return seat === result.liable ? "pays it all 包" : "pays nothing";
   if (result.from === null) return "full share";
   if (seat === result.from) return "threw the tile";
-  return paid > 0 ? "half share" : "pays nothing";
+  return paid > 0 ? (result.others ? "half of each" : "half share") : "pays nothing";
 }
 
 /** How the table settled up, said once above the bars. */
 function payingRule(result: HandResult): string {
   if (result.liable != null) return "包 Liability: one seat pays for all";
   if (result.from === null) return "Self-drawn: everyone pays";
-  const others = SEATS.some((s) => s !== result.winner && s !== result.from && (result.payments[s] ?? 0) < 0);
-  return others ? "Others pay half · house rule" : "The discarder pays alone";
+  const winners = winnersOf(result).map((w) => w.winner);
+  const others = SEATS.some((s) => !winners.includes(s) && s !== result.from && (result.payments[s] ?? 0) < 0);
+  const every = winners.length > 1 ? "Every winner paid 雙響 · " : "";
+  return `${every}${others ? "Others pay half · house rule" : "The discarder pays alone"}`;
 }
 
 /**
@@ -234,11 +266,13 @@ export function WhoPays({ view, name }: { view: RoomView; name: (seat: Seat) => 
   const result = view.result!;
   const won = result.type === "win" && result.winner !== null;
   const first = won ? (result.liable ?? result.from) : null;
+  const winners = winnersOf(result).map((w) => w.winner);
+  // Who paid most first, the winners last.
   const order = won
     ? [
         ...(first !== null && first !== undefined ? [first] : []),
-        ...SEATS.filter((s) => s !== first && s !== result.winner),
-        result.winner!,
+        ...SEATS.filter((s) => s !== first && !winners.includes(s)),
+        ...winners,
       ]
     : SEATS;
   const most = Math.max(1, ...result.payments.map((p) => Math.abs(p)));
@@ -270,7 +304,7 @@ export function WhoPays({ view, name }: { view: RoomView; name: (seat: Seat) => 
           const paid = result.payments[seat] ?? 0;
           const bar = { "--share": Math.abs(paid) / most } as CSSProperties;
           return (
-            <li key={seat} className={`who-pays__row${seat === result.winner ? " who-pays__row--winner" : ""}`}>
+            <li key={seat} className={`who-pays__row${winners.includes(seat) ? " who-pays__row--winner" : ""}`}>
               <span className="who-pays__who">
                 <span className="who-pays__name">{name(seat)}</span>
                 <span className="who-pays__role">{roleOf(result, seat)}</span>
@@ -333,6 +367,9 @@ export function TableResult({
   const code = won ? winningTile(view) : null;
   const winner = won ? won.winner! : null;
   const gain = winner !== null ? (won!.payments[winner] ?? 0) : 0;
+  const winners = winnersOf(result);
+  const others = winners.slice(1);
+  const wonOn = (from: Seat | null) => (from === null ? "drawn" : `won on ${name(from)}'s tile`);
   const last = isLastHand(view);
   const nextDealer = ((view.dealer + 1) % 4) as Seat;
 
@@ -345,16 +382,17 @@ export function TableResult({
               Hand {view.handNumber} · {roundName(view.roundWind)} round · {tableName(view.roomId)}
             </span>
             <h2 className="result-sheet__title">
-              {won ? `${name(winner!)} wins ` : "Washed-out hand "}
+              {won ? `${joinNames(winners.map((w) => name(w.winner)))} ${others.length > 0 ? "win" : "wins"} ` : "Washed-out hand "}
               <span className="result-sheet__zh">{won ? "食糊" : "流局"}</span>
             </h2>
             <p className="result-sheet__subtitle">
               {won
                 ? [
                     won.from === null ? "Self-drawn 自摸" : `Off ${name(won.from)}'s discard`,
+                    others.length === 1 ? "two winners 雙響" : others.length === 2 ? "three winners 三響" : null,
                     won.liable != null ? `${name(won.liable)} pays it all 包` : null,
-                    score ? `${score.scoredFaan} faan` : null,
-                    score ? `${score.value} points a share` : null,
+                    score && others.length === 0 ? `${score.scoredFaan} faan` : null,
+                    score && others.length === 0 ? `${score.value} points a share` : null,
                   ]
                     .filter(Boolean)
                     .join(" · ")
@@ -367,34 +405,49 @@ export function TableResult({
               <span className="result-sheet__gain-note">
                 {name(winner)}&rsquo;s chips {chipsOf(view.scores[winner] - gain)} → {chipsOf(view.scores[winner])}
               </span>
+              {others.map((o) => (
+                <span key={o.winner} className="result-sheet__gain-note">
+                  {name(o.winner)} {signed(won!.payments[o.winner] ?? 0)}
+                </span>
+              ))}
             </div>
           ) : null}
         </header>
 
         {won ? (
           <section className="result-sheet__panel">
-            <WinningHand
-              player={view.players[winner!]}
-              score={score}
-              winning={
-                code
-                  ? {
-                      code,
-                      note: won.from === null ? "drawn" : `won on ${name(won.from)}'s tile`,
-                    }
-                  : null
-              }
-            />
+            <WinningHand player={view.players[winner!]} score={score} winning={code ? { code, note: wonOn(won.from) } : null} />
           </section>
         ) : null}
+        {others.map((o) => (
+          <section key={o.winner} className="result-sheet__panel" aria-label={`${name(o.winner)}'s hand`}>
+            <h3 className="result-sheet__heading">
+              {name(o.winner)} won on it too{o.score ? ` · ${o.score.scoredFaan} faan` : ""}
+            </h3>
+            <WinningHand
+              player={view.players[o.winner]}
+              score={o.score}
+              winning={code ? { code, note: wonOn(won!.from) } : null}
+              shared
+            />
+          </section>
+        ))}
 
         <div className={score ? "result-sheet__columns" : "result-sheet__columns result-sheet__columns--one"}>
           {score ? (
             <section className="result-sheet__panel" aria-labelledby="result-faan">
               <h3 id="result-faan" className="result-sheet__heading">
-                Faan
+                Faan{others.length > 0 ? ` · ${name(winner!)}` : ""}
               </h3>
               <FaanLedger view={view} score={score} />
+              {others.map((o) =>
+                o.score ? (
+                  <div key={o.winner} className="faan-ledger__also">
+                    <h4 className="result-sheet__heading">Faan · {name(o.winner)}</h4>
+                    <FaanLedger view={view} score={o.score} winner={o.winner} />
+                  </div>
+                ) : null,
+              )}
             </section>
           ) : null}
           <section className="result-sheet__panel" aria-labelledby="result-pays">

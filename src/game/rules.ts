@@ -56,6 +56,12 @@ export interface RuleConfig {
    * Off, the discarder alone pays (出銃全包).
    */
   othersPayHalf: boolean;
+  /**
+   * When two or three players can win on the same discard, every one who
+   * declares is paid (雙響, 三響). Off, only the first after the discarder
+   * wins (截糊).
+   */
+  multipleWinners: boolean;
   /** When true a washed-out hand keeps the dealership in place (流局連莊). */
   dealerKeepsOnWashout: boolean;
   /**
@@ -121,6 +127,7 @@ export const DEFAULT_RULES: RuleConfig = {
   limitFaan: 10,
   payoutTable: DEFAULT_PAYOUT_TABLE,
   othersPayHalf: true,
+  multipleWinners: false,
   dealerKeepsOnWashout: false,
   flowers: true,
   rounds: 4,
@@ -156,6 +163,14 @@ export function liabilityInPlay(config: Pick<RuleConfig, "liability">): boolean 
  */
 export function othersPayHalfInPlay(config: Pick<RuleConfig, "othersPayHalf">): boolean {
   return config.othersPayHalf !== false;
+}
+
+/**
+ * Whether every player who can win on a discard is paid, not just the first
+ * after the discarder. A table saved before the option existed did the latter.
+ */
+export function multipleWinnersInPlay(config: Pick<RuleConfig, "multipleWinners">): boolean {
+  return config.multipleWinners === true;
 }
 
 /** What each of the others pays on a discard win worth `value`: half, rounded up to a whole point. */
@@ -239,6 +254,11 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
             "pay half of it each, rounded up. House rules vary; the table can switch this off so the discarder " +
             "alone pays (出銃全包). "
           : "Win on a discard: the discarder alone pays (出銃全包). ") +
+        (multipleWinnersInPlay(config)
+          ? "When more than one player can win on the same discard, every one who declares is paid " +
+            "(雙響, 三響): the discarder pays each of them. "
+          : "When more than one player can win on the same discard, only the first after the discarder " +
+            "wins (截糊). ") +
         "A washed-out wall (流局) pays nothing.",
     },
     {

@@ -40,7 +40,7 @@ describe("the table's settings", () => {
     render(<TableSettings api={api} view={view} sound={sound} appearance={appearance} display={tabletDisplay()} />);
 
     expect(screen.getByRole("tab", { name: /^House rules/ }).getAttribute("aria-selected")).toBe("true");
-    for (const rule of ["Min 1 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half"]) {
+    for (const rule of ["Min 1 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half", "截糊 First winner only"]) {
       expect(screen.getAllByText(rule).length).toBeGreaterThan(0);
     }
 
@@ -48,6 +48,8 @@ describe("the table's settings", () => {
     expect(api.control).toHaveBeenCalledWith({ type: "minFaan", value: 5 });
     fireEvent.click(screen.getByRole("button", { name: /Discarder only/ }));
     expect(api.control).toHaveBeenCalledWith({ type: "othersPayHalf", value: false });
+    fireEvent.click(within(screen.getByRole("group", { name: "Two can win on one discard" })).getByRole("button", { name: /Everyone/ }));
+    expect(api.control).toHaveBeenCalledWith({ type: "multipleWinners", value: true });
     fireEvent.click(screen.getByRole("switch", { name: "包 Liability" }));
     expect(api.control).toHaveBeenCalledWith({ type: "liability", value: false });
   });
@@ -108,6 +110,8 @@ describe("the table's settings", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Pace & turns/ }));
     fireEvent.click(within(screen.getByRole("group", { name: "Turn time limit" })).getByRole("button", { name: "1 min" }));
     expect(api.control).toHaveBeenCalledWith({ type: "turnLimit", value: 60 });
+    fireEvent.click(screen.getByRole("switch", { name: "Take back a discard" }));
+    expect(api.control).toHaveBeenCalledWith({ type: "takeBack", value: false });
     fireEvent.click(within(screen.getByRole("group", { name: "Difficulty" })).getByRole("button", { name: "Hard" }));
     expect(api.control).toHaveBeenCalledWith({ type: "difficulty", value: "hard" });
 

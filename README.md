@@ -24,8 +24,9 @@ table runs on a few API routes backed by Upstash Redis.
 - Chow (上), Pung (碰), exposed Kong (明槓), concealed Kong (暗槓) and added
   Kong (加槓), each with the correct replacement draw.
 - Claim priority Win > Kong > Pung > Chow; a chow is only offered to the player
-  to the discarder's right; ties between winners go to the seat nearest the
-  discarder.
+  to the discarder's right. When two or three players can win on the same
+  discard, the seat nearest the discarder takes it by default (截糊); a table can
+  pay every one of them instead (雙響 / 三響).
 - Robbing the kong (搶槓) — an added kong is exposed to a claim before it
   completes.
 - Washed-out wall (流局).
@@ -48,6 +49,10 @@ table runs on a few API routes backed by Upstash Redis.
 - Self-draw: all three opponents pay. Win on a discard: the discarder pays the
   hand's value and the other two pay half of it each, rounded up. A
   multiplayer table can switch that off so the discarder alone pays (出銃全包).
+- More than one winner on a discard, where the table plays it: the discarder
+  pays each winner in full, and anyone who neither threw it nor won pays half of
+  each when the others pay half. The first winner after the discarder takes the
+  tile.
 - Liability (包): whoever discards the tile that gives a player their third
   dragon set, or their fourth set of any kind (十二張落地), pays that player's
   whole self-drawn win alone. House rules vary, so a multiplayer table can
@@ -236,7 +241,15 @@ view so the pond is visible somewhere.
   change to everyone else. After five minutes of silence a seat is marked *away*
   on the table and the computer plays it; the seat is kept, so acting or even
   just reopening the page takes it straight back. A phone that slept through the
-  threshold asks to be tapped back in rather than quietly catching up.
+  threshold asks to be tapped back in rather than quietly catching up, and then
+  says how many turns the computer played for it while it was gone. The same
+  count covers a turn the table threw for someone whose time ran out.
+- **Taking a discard back.** For two seconds after a person throws a tile, the
+  server keeps the table as it was before the throw and holds the next draw and
+  any claim; **Take back** on the phone restores it, with the turn clock where it
+  stood. Once someone has claimed the tile, or the two seconds are up, it is
+  final. That snapshot never leaves the server, and the table can switch the
+  whole thing off under **Pace & turns**.
 - **Rate limiting.** Seat claims are throttled per IP through Upstash, shared
   across serverless instances: 20 claim attempts per 10 minutes, and 120 actions
   a minute. The table is open to anyone holding the link, so that limit is what
@@ -369,6 +382,10 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 - When you can use a discard, Chow / Pung / Kong / Win buttons appear with the
   meld they would make; **Pass** declines. With two or more sets to choose
   between, **+20s** adds twenty seconds to the claim, once a discard.
+- Whenever you can win, off a discard or self-drawn, the faan it would score
+  sits beside **Win**; tap it to see the patterns behind it before you take it.
+- **Take back** appears for two seconds after you throw a tile, unless the table
+  has turned it off.
 - **Hide hand** turns your tiles face down for when the phone is put down; every
   hand arrives face down until you turn it up.
 - **Set hints** (the line under tiles that already make a set), the **helper**
@@ -381,8 +398,8 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   be hurried in the first three seconds of their turn (or of their call on a
   discard); the button counts those seconds down. After a hurry-up, every button
   at the table rests for ten seconds.
-- **Min faan**, **Game length**, **Flowers**, **Liability** and who pays on a
-  discard win are the table's, set from the tablet: in the lobby, or in its
+- **Min faan**, **Game length**, **Flowers**, **Liability**, who pays on a
+  discard win and whether two can win on one discard are the table's, set from the tablet: in the lobby, or in its
   settings at any point. Game length runs the East round alone, East and South,
   or all four winds (the default) — four dealerships each. The dealer keeps the
   deal after winning (連莊); a loss or a washout passes it on.
@@ -465,7 +482,13 @@ tablet shows the final chips in order, four facts about the game (the biggest
 hand, self-draws, who threw the most winning tiles, washouts) and everyone's
 chips after each hand, as a line chart or, under **Hand by hand**, as a table.
 **New game** goes back to the lobby with everyone still seated; each phone shows
-its place.
+its place. **Share scores**, on the tablet and on every phone, draws the final
+chips and the four facts as a square picture and hands it to the device's share
+sheet, or saves it where there is none.
+
+When two or three players win on one discard, the result names them all, shows
+each winning hand and its faan, and **Who pays** marks the seats that paid half
+of each.
 
 The chart's four series use categorical slots 1–4 of a reference palette,
 validated against each theme's chart surface: on the dark themes, worst adjacent
@@ -481,6 +504,3 @@ final chips, and repeated in the table.
   do bar winning on a tile you have discarded.
 - Seven Pairs (七對子) is deliberately not scored: it is not part of the Hong
   Kong old-style set.
-- Multiple simultaneous winners settle to the seat nearest the discarder rather
-  than paying out to all of them.
-- You always sit East. The engine supports any `humanSeat`; only the UI hard-codes it.

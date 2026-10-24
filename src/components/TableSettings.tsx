@@ -16,6 +16,7 @@ import {
   flowersInPlay,
   halfShare,
   liabilityInPlay,
+  multipleWinnersInPlay,
   othersPayHalfInPlay,
   roundsInGame,
 } from "@/game/rules";
@@ -82,6 +83,21 @@ const OTHERS_PAY_HALF: SegmentOption<OnOff>[] = [
   { value: "off", label: "Discarder only", sub: "出銃全包", hint: "The thrower alone pays a win off their discard" },
 ];
 
+const MULTIPLE_WINNERS: SegmentOption<OnOff>[] = [
+  {
+    value: "off",
+    label: "First only",
+    sub: "截糊",
+    hint: "When two can win on the same tile, only the first after the thrower wins",
+  },
+  {
+    value: "on",
+    label: "Everyone",
+    sub: "雙響 三響",
+    hint: "When two or three can win on the same tile, each one who declares is paid by the thrower",
+  },
+];
+
 const EDGES = ["bottom", "right", "top", "left"];
 
 /** A game length as the table chooses it: "East round", "All four winds". */
@@ -98,6 +114,7 @@ export function rulesInForce(config: RuleConfig): string[] {
     flowersInPlay(config) ? "Flowers in" : "No flowers",
     liabilityInPlay(config) ? "包 Liability" : "No liability",
     othersPayHalfInPlay(config) ? "Others pay half" : "Discarder pays alone",
+    multipleWinnersInPlay(config) ? "雙響 Every winner paid" : "截糊 First winner only",
   ];
 }
 
@@ -416,6 +433,13 @@ export function TableSettings({
                   disabled={api.busy}
                   onChange={(value) => void api.control({ type: "othersPayHalf", value: value === "on" })}
                 />
+                <Segmented
+                  label="Two can win on one discard"
+                  options={MULTIPLE_WINNERS}
+                  value={multipleWinnersInPlay(config) ? "on" : "off"}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "multipleWinners", value: value === "on" })}
+                />
                 <PayoutExample config={config} />
                 <span className="tset__foot">Paying rules can change mid-hand; they count from the next hand settled.</span>
               </Card>
@@ -476,6 +500,13 @@ export function TableSettings({
                 options={LIMITS}
                 value={String(view.settings.turnLimit)}
                 onChange={(value) => void api.control({ type: "turnLimit", value: Number(value) })}
+              />
+              <SwitchRow
+                label="Take back a discard"
+                hint="For two seconds after a throw, until someone claims it; the table waits that long before the next draw"
+                checked={view.settings.takeBack !== false}
+                disabled={api.busy}
+                onChange={(value) => void api.control({ type: "takeBack", value })}
               />
             </Card>
           </div>

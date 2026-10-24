@@ -6,7 +6,13 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
-import { MIN_FAAN_CHOICES, flowersInPlay, liabilityInPlay, othersPayHalfInPlay } from "@/game/rules";
+import {
+  MIN_FAAN_CHOICES,
+  flowersInPlay,
+  liabilityInPlay,
+  multipleWinnersInPlay,
+  othersPayHalfInPlay,
+} from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { QrCode } from "./QrCode";
@@ -314,6 +320,18 @@ export function TableLobby({
               >
                 <option value="on">Half each</option>
                 <option value="off">Discarder only</option>
+              </select>
+            </label>
+            <label className="field">
+              <span className="field__label">Two winners on one discard</span>
+              <select
+                className="field__select"
+                value={multipleWinnersInPlay(view.config) ? "on" : "off"}
+                disabled={api.busy}
+                onChange={(e) => void api.control({ type: "multipleWinners", value: e.target.value === "on" })}
+              >
+                <option value="off">First only 截糊</option>
+                <option value="on">Both paid 雙響</option>
               </select>
             </label>
           </>
