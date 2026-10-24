@@ -81,6 +81,22 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await expect(sheet.getByRole("button", { name: "Image saved" })).toBeVisible();
   if (process.env.SCORE_CARD_OUT) await picture.saveAs(process.env.SCORE_CARD_OUT);
 
+  // On a screen too short for it, the final scores scroll, and the card's
+  // see-through colour runs the full length of it rather than one screenful.
+  await table.page.setViewportSize({ width: TABLET.width, height: 480 });
+  const covered = await sheet.evaluate((card) => {
+    const scroller = card.scrollHeight > card.clientHeight ? card : card.parentElement!;
+    const overflowing = scroller.scrollHeight > scroller.clientHeight;
+    scroller.scrollTop = scroller.scrollHeight;
+    return {
+      overflowing,
+      content: card.scrollHeight,
+      backing: parseFloat(getComputedStyle(card, "::before").height),
+    };
+  });
+  expect(covered.overflowing).toBe(true);
+  expect(covered.backing).toBeGreaterThanOrEqual(covered.content - 1);
+
   expect(kris.errors).toEqual([]);
   expect(table.errors).toEqual([]);
   await kris.context.close();
