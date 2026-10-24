@@ -291,6 +291,44 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+describe("standing in", () => {
+  it("forgets what the computer played for someone once they move again", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    await control(id, table, { type: "skipOpening" });
+    const stored = (await roomStore().get(id))!;
+    stored.stoodIn[0] = 2;
+    expect(await roomStore().compareAndSet(stored, stored.version)).toBe(true);
+    const view = await readRoom(id, tokens[0]);
+    expect(view.stoodIn).toBe(2);
+    const after = await act(id, tokens[0], { type: "discard", tileId: view.players[0].hand[0].id });
+    expect(after.stoodIn).toBe(0);
+  });
+});
+
+describe("taking back a discard", () => {
+  it("returns the tile to the hand once, and the table can switch it off", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    await control(id, table, { type: "skipOpening" });
+    const view = await readRoom(id, tokens[0]);
+    const tile = view.players[0].hand.find((t) => !t.code.startsWith("f"))!;
+    const thrown = await act(id, tokens[0], { type: "discard", tileId: tile.id });
+    expect(thrown.takeBackIn).toBeGreaterThan(0);
+
+    const back = await act(id, tokens[0], { type: "takeBack" });
+    expect(back.players[0].hand.some((t) => t.id === tile.id)).toBe(true);
+    expect(back.turn).toBe(0);
+    expect(back.phase).toBe("action");
+    expect(back.takeBackIn).toBe(0);
+    await expect(act(id, tokens[0], { type: "takeBack" })).rejects.toMatchObject({ status: 409 });
+
+    expect((await control(id, table, { type: "takeBack", value: false })).settings.takeBack).toBe(false);
+    const again = await act(id, tokens[0], { type: "discard", tileId: tile.id });
+    expect(again.takeBackIn).toBe(0);
+    await expect(act(id, tokens[0], { type: "takeBack" })).rejects.toMatchObject({ status: 409 });
+    await expect(control(id, tokens[0], { type: "takeBack", value: true })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
 describe("table control", () => {
   it("refuses commands from a player", async () => {
     const id = await room();
@@ -350,6 +388,15 @@ describe("table control", () => {
     expect((await control(id, table, { type: "othersPayHalf", value: false })).config.othersPayHalf).toBe(false);
     expect((await control(id, table, { type: "othersPayHalf", value: true })).config.othersPayHalf).toBe(true);
     await expect(control(id, tokens[0], { type: "othersPayHalf", value: false })).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+
+  it("switches whether every winner on a discard is paid, at any point, from the table only", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    expect((await control(id, table, { type: "multipleWinners", value: true })).config.multipleWinners).toBe(true);
+    expect((await control(id, table, { type: "multipleWinners", value: false })).config.multipleWinners).toBe(false);
+    await expect(control(id, tokens[0], { type: "multipleWinners", value: true })).rejects.toMatchObject({
       status: 403,
     });
   });

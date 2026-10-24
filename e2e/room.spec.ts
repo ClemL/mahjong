@@ -122,10 +122,19 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   await tile.tap();
 
   await expect(phoneTiles(phone.page)).toHaveCount(13);
-  await expect(tableDiscards(table.page, 0)).toHaveCount(1);
+  // It lands once: in East's pond, or, when a computer seat claims it, in that
+  // seat's new set instead. The deal is seeded from the clock, so either can happen.
+  const landed = async () => {
+    const view = (await (await request.get(`/api/rooms/${ROOM}`)).json()) as {
+      players: { melds: { claimedFrom?: number }[] }[];
+    };
+    const claimed = view.players.some((p) => p.melds.some((m) => m.claimedFrom === 0));
+    return (await tableDiscards(table.page, 0).count()) + (claimed ? 1 : 0);
+  };
+  await expect.poll(landed).toBe(1);
   // Still one after the next poll: a second throw on the way would land now.
   await table.page.waitForTimeout(2500);
-  await expect(tableDiscards(table.page, 0)).toHaveCount(1);
+  expect(await landed()).toBe(1);
   await expect(phoneTiles(phone.page)).toHaveCount(13);
 
   expect(table.errors).toEqual([]);

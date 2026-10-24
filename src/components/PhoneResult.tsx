@@ -4,8 +4,9 @@ import type { RoomView } from "@/game/room";
 import { summarizeGame } from "@/game/summary";
 import { type Seat, tileName } from "@/game/tiles";
 import { chipsOf } from "./TableEffects";
-import { WinningHand, isLastHand, signed, winningTile } from "./TableResult";
-import { endedEarly } from "./GameComplete";
+import { WinningHand, isLastHand, joinNames, signed, winnersOf, winningTile, youFirst } from "./TableResult";
+import { endedEarly } from "./scoreCard";
+import { ShareScores } from "./ShareScores";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -17,6 +18,17 @@ function yourShare(view: RoomView, seat: Seat, nameOf: (s: Seat) => string): str
   }
   const { winner, from, liable } = result;
   const paid = -(result.payments[seat] ?? 0);
+  const winners = winnersOf(result).map((w) => w.winner);
+  if (winners.length > 1 && from !== null) {
+    const both = winners.length === 2 ? "both" : "all";
+    if (winners.includes(seat)) {
+      return `Off ${nameOf(from)}'s discard, which ${joinNames(winners.filter((w) => w !== seat).map(nameOf))} won on too.`;
+    }
+    if (from === seat) return `You threw the tile ${joinNames(winners.map(nameOf))} ${both} won on, so you pay each of them.`;
+    return paid > 0
+      ? `${nameOf(from)} threw it; you pay half to each winner at this table.`
+      : `${nameOf(from)} threw it and pays them ${both}.`;
+  }
   if (winner === seat) {
     if (liable != null) return `${nameOf(liable)} fed the set that made it, so they pay it all 包.`;
     if (from === null) return "You drew it yourself, so everyone pays you.";
@@ -81,6 +93,7 @@ export function PhoneResult({
         <div className="phone-result__table">
           <div className="phone-result__head">
             <h2 className="phone-result__title">Final chips</h2>
+            <ShareScores view={view} name={nameOf} className="btn btn--sm btn--ghost phone-result__share" />
             {hide}
           </div>
           <ol className="phone-result__rows">
@@ -102,13 +115,16 @@ export function PhoneResult({
 
   if (!result) return null;
   const won = result.type === "win" && result.winner !== null ? result : null;
+  const winners = winnersOf(result);
+  // Your own hand, if it was one of several that won on the tile; else the first.
+  const shown = winners.find((w) => w.winner === seat) ?? winners[0];
   const delta = result.payments[seat] ?? 0;
   const code = won ? winningTile(view) : null;
   const nextDealer = (result.dealerKeeps ? view.dealer : (view.dealer + 1) % 4) as Seat;
   const ringNote =
     won && code
       ? won.from === null
-        ? `The ringed tile is the ${tileName(code)} ${won.winner === seat ? "you" : nameOf(won.winner!)} drew.`
+        ? `The ringed tile is the ${tileName(code)} ${shown.winner === seat ? "you" : nameOf(shown.winner)} drew.`
         : `The ringed tile is the ${tileName(code)} ${won.from === seat ? "you" : nameOf(won.from)} threw.`
       : null;
   return (
@@ -128,21 +144,39 @@ export function PhoneResult({
         <div className="phone-result__winner">
           <div className="phone-result__head">
             <h2 className="phone-result__title">
-              {won.winner === seat ? "You win" : `${nameOf(won.winner!)} wins`}{" "}
+              {winners.length > 1
+                ? `${joinNames(youFirst(winners, seat).map((w) => (w.winner === seat ? "You" : nameOf(w.winner))))} win`
+                : won.winner === seat
+                  ? "You win"
+                  : `${nameOf(won.winner!)} wins`}{" "}
               <span className="phone-result__zh">食糊</span>
             </h2>
-            {won.score ? <span className="phone-result__faan">{won.score.scoredFaan} faan</span> : null}
+            {shown.score ? (
+              <span className="phone-result__faan">
+                {winners.length > 1 ? `${shown.winner === seat ? "Yours" : nameOf(shown.winner)}: ` : ""}
+                {shown.score.scoredFaan} faan
+              </span>
+            ) : null}
           </div>
           <WinningHand
-            player={view.players[won.winner!]}
-            score={won.score}
+            player={view.players[shown.winner]}
+            score={shown.score}
             winning={code ? { code, note: "" } : null}
             labels={false}
+            shared={shown.winner !== won.winner}
           />
           {ringNote ? <span className="phone-result__note">{ringNote}</span> : null}
-          {won.score ? (
+          {winners
+            .filter((w) => w.winner !== shown.winner)
+            .map((w) => (
+              <span key={w.winner} className="phone-result__note">
+                {w.winner === seat ? "You" : nameOf(w.winner)} won on it too
+                {w.score ? ` · ${w.score.scoredFaan} faan` : ""}
+              </span>
+            ))}
+          {shown.score ? (
             <ul className="phone-result__patterns" aria-label="Faan breakdown">
-              {won.score.patterns.map((p, i) => (
+              {shown.score.patterns.map((p, i) => (
                 <li key={i} className="phone-result__pattern">
                   {p.name} <strong>{p.faan}</strong>
                 </li>

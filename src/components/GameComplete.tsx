@@ -2,24 +2,13 @@
 
 import { type CSSProperties, useState } from "react";
 import type { RoomView } from "@/game/room";
-import { STARTING_CHIPS, describeRounds, roundsInGame } from "@/game/rules";
+import { STARTING_CHIPS } from "@/game/rules";
 import { summarizeGame } from "@/game/summary";
 import { SEAT_NAMES, type Seat } from "@/game/tiles";
-import { tableName } from "@/game/tables";
 import { ChipsChart, ChipsTable, LineKey } from "./ChipsChart";
 import { signed } from "./TableResult";
-
-/**
- * Whether the table ended the game before its last hand. A game that runs its
- * course ends as the fourth dealership of its last round passes on.
- */
-export function endedEarly(view: RoomView): boolean {
-  return view.phase === "gameOver" && view.dealership < 4;
-}
-
-function joinNames(names: string[]): string {
-  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
+import { scoreCard } from "./scoreCard";
+import { ShareScores } from "./ShareScores";
 
 function Stat({ label, value, note }: { label: string; value: string; note: string }) {
   return (
@@ -53,10 +42,7 @@ export function GameComplete({
   const summary = summarizeGame(view.history);
   const { standings, place, chips, wins } = summary;
   const final = (seat: Seat) => chips[seat][chips[seat].length - 1];
-  const top = standings.filter((seat) => place[seat] === 1);
-  const most = Math.max(...summary.thrown);
-  const throwers = ([0, 1, 2, 3] as Seat[]).filter((seat) => most > 0 && summary.thrown[seat] === most);
-  const biggest = summary.biggest;
+  const card = scoreCard(view, name);
 
   return (
     <div className="result-sheet">
@@ -68,23 +54,14 @@ export function GameComplete({
       >
         <header className="result-sheet__head">
           <div className="result-sheet__heading-block">
-            <span className="result-sheet__kicker">
-              {endedEarly(view) ? "Game ended early" : "Game complete"} ·{" "}
-              {describeRounds(roundsInGame(view.config))} · {summary.hands} {summary.hands === 1 ? "hand" : "hands"} ·{" "}
-              {tableName(view.roomId)}
-            </span>
-            <h2 className="result-sheet__title">
-              {top.length === 1
-                ? `${name(top[0])} takes the table`
-                : top.length === 4
-                  ? "All four finish level"
-                  : `${joinNames(top.map(name))} share the top`}
-            </h2>
+            <span className="result-sheet__kicker">{card.kicker}</span>
+            <h2 className="result-sheet__title">{card.title}</h2>
           </div>
           <div className="result-sheet__head-actions">
             <button type="button" className="btn btn--ghost" onClick={onHide}>
               See the table
             </button>
+            <ShareScores view={view} name={name} className="btn btn--ghost" />
             <button
               type="button"
               className="btn btn--primary"
@@ -124,34 +101,9 @@ export function GameComplete({
             </section>
 
             <div className="game-over__stats">
-              <Stat
-                label="Biggest hand"
-                value={biggest ? `${biggest.faan} faan` : "—"}
-                note={
-                  biggest
-                    ? `${name(biggest.winner!)}, hand ${view.history.indexOf(biggest) + 1}${
-                        biggest.pattern ? ` · ${biggest.pattern.name} ${biggest.pattern.chinese}` : ""
-                      }`
-                    : "Nobody won a hand"
-                }
-              />
-              <Stat
-                label="Self-draws"
-                value={String(summary.selfDraws)}
-                note={`of ${summary.hands - summary.washouts} wins · 自摸`}
-              />
-              <Stat
-                label="Threw the most winners"
-                value={most > 0 ? `${most}${throwers.length > 1 ? " each" : ""}` : "0"}
-                note={
-                  most > 0
-                    ? joinNames(throwers.map(name))
-                    : summary.hands > summary.washouts
-                      ? "Every win was self-drawn"
-                      : "Nobody won a hand"
-                }
-              />
-              <Stat label="Washouts" value={String(summary.washouts)} note={`of ${summary.hands} hands · 流局`} />
+              {card.facts.map((fact) => (
+                <Stat key={fact.label} {...fact} />
+              ))}
             </div>
           </div>
 

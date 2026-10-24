@@ -17,7 +17,13 @@ export interface GameSummary {
   thrown: number[];
   washouts: number;
   /** The highest-scoring win, the earlier on a tie; null if nobody won a hand. */
-  biggest: HandRecord | null;
+  biggest: {
+    /** Which hand of the game, from 1. */
+    hand: number;
+    winner: Seat;
+    faan: number;
+    pattern: { name: string; chinese: string } | null;
+  } | null;
   /** Chips by seat, from the chips everyone sat down with to the end of each hand. */
   chips: number[][];
   /** Seats from the most chips to the fewest; a tie keeps seat order. */
@@ -31,16 +37,23 @@ export function summarizeGame(history: readonly HandRecord[]): GameSummary {
   const thrown = [0, 0, 0, 0];
   let selfDraws = 0;
   let washouts = 0;
-  let biggest: HandRecord | null = null;
-  for (const hand of history) {
+  let biggest: GameSummary["biggest"] = null;
+  for (const [index, hand] of history.entries()) {
     if (hand.type === "washout" || hand.winner === null) {
       washouts += 1;
       continue;
     }
-    wins[hand.winner] += 1;
-    if (hand.from === null) selfDraws += 1;
-    else thrown[hand.from] += 1;
-    if ((hand.faan ?? 0) > (biggest?.faan ?? -1)) biggest = hand;
+    // A discard more than one player won on counts as a win for each, and a winner thrown for each.
+    const won = [
+      { winner: hand.winner, faan: hand.faan ?? 0, pattern: hand.pattern ?? null },
+      ...(hand.alsoWon ?? []).map((o) => ({ winner: o.winner, faan: o.faan, pattern: null })),
+    ];
+    for (const { winner, faan, pattern } of won) {
+      wins[winner] += 1;
+      if (hand.from === null) selfDraws += 1;
+      else thrown[hand.from] += 1;
+      if (faan > (biggest?.faan ?? -1)) biggest = { hand: index + 1, winner, faan, pattern };
+    }
   }
 
   const chips = SEATS.map((seat) => [

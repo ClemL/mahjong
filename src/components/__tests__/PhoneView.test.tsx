@@ -3,7 +3,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
-import { hurryUp } from "@/game/room";
+import { hurryUp, noteDiscard } from "@/game/room";
+import { discard } from "@/game/engine";
 import { PhoneView } from "../PhoneView";
 import { NAMES, claimable, dealt, fakeApi, playerView, sound, underway } from "./fixtures";
 
@@ -273,6 +274,41 @@ describe("PhoneView", () => {
     expect(api.act).toHaveBeenCalledWith({ type: "claim", optionId: option.id });
   });
 
+  it("opens the patterns a win would score from the faan beside it, off a discard or self-drawn", () => {
+    const score = {
+      faan: 4,
+      scoredFaan: 4,
+      value: 16,
+      limitReached: false,
+      patterns: [
+        { key: "allPungs", chinese: "對對糊", name: "All Triplets", faan: 3 },
+        { key: "seatFlower", chinese: "正花", name: "Seat flower", faan: 1 },
+      ],
+    };
+    const { room, claimer } = claimable();
+    const view = playerView(room, claimer);
+    const win = { id: "win", type: "win" as const, tileIds: [], codes: [view.lastDiscard!.tile.code], score };
+    const offered = { ...view, claim: { ...view.claim!, options: [...view.claim!.options, win] } };
+    const first = render(<PhoneView api={fakeApi(offered)} view={offered} sound={sound} />);
+    expect(screen.queryByRole("region", { name: "What this win scores" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "4 faan: show what it is made of" }));
+    const panel = screen.getByRole("region", { name: "What this win scores" });
+    expect(within(panel).getByText("All Triplets")).toBeTruthy();
+    expect(within(panel).getByText("對對糊")).toBeTruthy();
+    expect(within(panel).getByText("4 faan · 16 points a share")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "4 faan: hide what it is made of" }));
+    expect(screen.queryByRole("region", { name: "What this win scores" })).toBeNull();
+    first.unmount();
+
+    const { seat, view: turn } = onTurn();
+    const selfDrawn = { ...turn, actions: { ...turn.actions!, canWin: true, winScore: score } };
+    render(<PhoneView api={fakeApi(selfDrawn)} view={selfDrawn} sound={sound} />);
+    expect(seat).toBe(selfDrawn.turn);
+    expect(screen.getByText("You can win for 4 faan.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "4 faan: show what it is made of" }));
+    expect(within(screen.getByRole("region", { name: "What this win scores" })).getByText("Seat flower")).toBeTruthy();
+  });
+
   it("offers more time on a claim only when there are sets to choose between", () => {
     const { room, claimer } = claimable();
     const view = playerView(room, claimer);
@@ -313,6 +349,42 @@ describe("PhoneView", () => {
     expect(rows.at(-1)!.getAttribute("title")).toBe(
       `${view.players[discard.from].occupant.name} discarded ${tileName(discard.tile.code)}`,
     );
+  });
+
+  it("tells a player coming back how many turns the computer played for them, until they say OK", () => {
+    const room = dealt();
+    room.stoodIn[0] = 3;
+    const view = playerView(room, 0);
+    const { rerender } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(screen.getByText("The computer played 3 turns for you.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "OK" }));
+    expect(screen.queryByText(/The computer played/)).toBeNull();
+
+    // Another turn played for them while they still have not moved brings it back.
+    room.stoodIn[0] = 4;
+    const later = playerView(room, 0);
+    rerender(<PhoneView api={fakeApi(later)} view={later} sound={sound} />);
+    expect(screen.getByText("The computer played 4 turns for you.")).toBeTruthy();
+  });
+
+  it("offers to take back the tile just thrown, only to whoever threw it", () => {
+    const { room, seat } = onTurn();
+    const before = room.state;
+    const tile = before.players[seat].hand.find((t) => !t.code.startsWith("f"))!;
+    room.state = discard(before, seat, tile.id);
+    noteDiscard(room, seat, before);
+    const view = playerView(room, seat);
+    const api = fakeApi(view);
+    const { unmount } = render(<PhoneView api={api} view={view} sound={sound} />);
+    expect(screen.getByText(`You threw ${tileName(tile.code)}.`)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: `Take back ${tileName(tile.code)}` }));
+    expect(api.act).toHaveBeenCalledWith({ type: "takeBack" });
+    unmount();
+
+    const other = ((seat + 1) % 4) as Seat;
+    const theirs = playerView(room, other);
+    render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+    expect(screen.queryByRole("button", { name: /^Take back/ })).toBeNull();
   });
 
   it("hides the play log when the phone's settings say so", () => {

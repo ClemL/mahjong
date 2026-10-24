@@ -85,6 +85,62 @@
   font-weight: 700;
 }
 
+/* ---- what a win on offer would score, opened from the faan beside Win ---- */
+
+.faan-toggle {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.faan-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--shade-2);
+  border: 1px solid var(--line);
+}
+
+.faan-preview__rows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.faan-preview__row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.faan-preview__zh {
+  color: var(--ink-dim);
+}
+
+.faan-preview__faan {
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+}
+
+.faan-preview__total {
+  margin-left: auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* News rather than a question: quieter than a move waiting to be confirmed. */
+.confirm-bar--note {
+  justify-content: space-between;
+  background: var(--shade-2);
+  border-color: var(--line);
+}
+
 .tableview__wake {
   font-size: 11px;
   padding: 3px 8px;

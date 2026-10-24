@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ClaimOption } from "@/game/engine";
-import { HURRY_COOLDOWN_MS, HURRY_GRACE_MS, MORE_TIME_MS, type RoomView } from "@/game/room";
+import { HURRY_COOLDOWN_MS, HURRY_GRACE_MS, MORE_TIME_MS, TAKE_BACK_MS, type RoomView } from "@/game/room";
 import { findSets } from "@/game/sets";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
@@ -34,6 +34,8 @@ import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
 import { PlayLog } from "./PlayLog";
 import { PhoneResult } from "./PhoneResult";
+import { FaanPreview, FaanToggle } from "./FaanPreview";
+import { joinNames, winnersOf, youFirst } from "./TableResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 import { intoFrame, screenAngle } from "./screenFrame";
@@ -153,6 +155,7 @@ export function PhoneView({
   const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null);
   // Nor is anybody hurried in the first moments of their turn.
   const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null);
+  const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   const compact = layout.compact;
   // A tile is armed by the first tap or click and thrown by the second, so a
@@ -182,11 +185,21 @@ export function PhoneView({
   const [zoomed, setZoomed] = useState(false);
   // The hand's result, put aside to look at the table, by the hand and phase it was for.
   const [resultAside, setResultAside] = useState<string | null>(null);
+  // How many of the computer's turns for you have been acknowledged. The room
+  // starts counting from nothing again once you move, and so does this.
+  const [standInSeen, setStandInSeen] = useState(0);
+  useEffect(() => {
+    if (view.stoodIn === 0) setStandInSeen(0);
+  }, [view.stoodIn]);
+  const standIn = view.stoodIn > standInSeen ? view.stoodIn : 0;
+  // The patterns behind a win on offer, opened from the faan beside Win.
+  const [faanOpen, setFaanOpen] = useState(false);
   useEffect(() => {
     // Never leave a tile armed, or a claim previewed, across a turn or a deal.
     setArmed(null);
     setPreview(null);
     setFlung(null);
+    setFaanOpen(false);
     // A move to make should not open under the enlarged sets.
     setZoomed(false);
   }, [view.turn, view.handNumber, view.phase]);
@@ -476,23 +489,30 @@ export function PhoneView({
   const over = view.phase === "handOver" || view.phase === "gameOver";
   // What this hand paid or cost you, shown beside the chips once it is settled.
   const settled = over && result ? (result.payments[seat] ?? 0) : null;
-  const youWon = over && result?.type === "win" && result.winner === seat && result.score;
+  const winners = winnersOf(result);
+  const yourWin = over ? (winners.find((w) => w.winner === seat && w.score)?.score ?? null) : null;
   const nameOf = (s: Seat) => view.players[s].occupant.name ?? SEAT_NAMES[s];
   const winText =
-    result?.type === "win" && result.winner !== null && result.score
-      ? `${result.winner === seat ? "You win" : `${nameOf(result.winner)} wins`} with ${result.score.scoredFaan} faan.`
-      : "Washed-out hand.";
+    winners.length > 1
+      ? `${joinNames(youFirst(winners, seat).map((w) => (w.winner === seat ? "You" : nameOf(w.winner))))} win on the same tile.`
+      : result?.type === "win" && result.winner !== null && result.score
+        ? `${result.winner === seat ? "You win" : `${nameOf(result.winner)} wins`} with ${result.score.scoredFaan} faan.`
+        : "Washed-out hand.";
   // During a claim the turn still belongs to whoever discarded, but the table
   // is waiting on the person being asked about it.
   const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
   if (view.phase === "gameOver") prompt = result ? `${winText} That is the game.` : "The table ended the game.";
   else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
+  else if (view.claim && view.claim.declared.length > 0)
+    prompt = `${joinNames(view.claim.declared.map(nameOf))} won on ${tileName(view.lastDiscard!.tile.code)} — you can win on it too`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
-  else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.faan} faan.`;
+  else if (view.actions?.canWin) prompt = `You can win for ${view.actions.winScore?.scoredFaan} faan.`;
   else if (yourTurn) prompt = "Your turn — discard a tile.";
   else if (view.phase === "claiming" && deciding !== undefined && view.lastDiscard)
     prompt = `Waiting for ${nameOf(deciding)} to decide on ${tileName(view.lastDiscard.tile.code)}…`;
+  // The beat after your own throw, while it can still be taken back.
+  else if (view.turn === seat && view.lastDiscard?.from === seat) prompt = `You threw ${tileName(view.lastDiscard.tile.code)}.`;
   else prompt = `Waiting for ${nameOf(view.turn)}…`;
 
   // The newest discard at the table, with the wind of whoever threw it — just
@@ -550,6 +570,27 @@ export function PhoneView({
             moved on, the button is only resting. */}
         {cooldown?.seat === waitingOn ? "Hurried" : compact ? "Hurry" : "Hurry up"}
         {cooldown ? ` ${cooldownSeconds}s` : settling ? ` ${graceSeconds}s` : null}
+      </button>
+    ) : null;
+
+  // A win on offer, off the discard or self-drawn, with what it would score.
+  const winOnOffer = view.claim?.options.find((o) => o.type === "win")?.score ?? view.actions?.winScore ?? null;
+  const faanToggle = winOnOffer ? (
+    <FaanToggle score={winOnOffer} open={faanOpen} onToggle={() => setFaanOpen((o) => !o)} />
+  ) : null;
+
+  // Gone once the moment has passed, without waiting for the next poll to say so.
+  const takeBackButton =
+    takeBackLeft !== null && takeBackLeft > 0 ? (
+      <button
+        type="button"
+        className="btn btn--sm phone__hurry-btn phone__hurry-btn--resting phone__take-back"
+        style={{ "--left": Math.min(1, takeBackLeft / TAKE_BACK_MS) } as CSSProperties}
+        disabled={api.busy}
+        aria-label={`Take back ${view.lastDiscard ? tileName(view.lastDiscard.tile.code) : "your discard"}`}
+        onClick={() => void api.act({ type: "takeBack" })}
+      >
+        Take back
       </button>
     ) : null;
 
@@ -733,6 +774,7 @@ export function PhoneView({
         {compact ? lastPlayed : null}
         {compact ? promptLine : null}
         {compact ? turnTimer : null}
+        {compact ? takeBackButton : null}
         {compact ? hurryButton : null}
         {exposedInHeader ? exposed : null}
         {fullscreen.supported && !fullscreen.active ? (
@@ -787,6 +829,7 @@ export function PhoneView({
           {lastPlayed}
           {promptLine}
           {turnTimer}
+          {takeBackButton}
           {hurryButton}
         </div>
       )}
@@ -799,6 +842,17 @@ export function PhoneView({
         <div className="phone__controls">
           {display.playLog === "on" ? (
             <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
+          ) : null}
+          {faanOpen && winOnOffer ? <FaanPreview score={winOnOffer} /> : null}
+          {standIn > 0 ? (
+            <div className="confirm-bar confirm-bar--note" role="status">
+              <span className="confirm-bar__text">
+                The computer played {standIn} {standIn === 1 ? "turn" : "turns"} for you.
+              </span>
+              <button type="button" className="btn btn--sm btn--ghost" onClick={() => setStandInSeen(standIn)}>
+                OK
+              </button>
+            </div>
           ) : null}
           {armedTile && yourTurn ? (
             <div className="confirm-bar" role="status">
@@ -831,6 +885,7 @@ export function PhoneView({
                   void api.act({ type: "claim", optionId });
                 }}
                 onPreview={setPreview}
+                faan={faanToggle}
               />
             ) : (
               <>
@@ -844,6 +899,7 @@ export function PhoneView({
                     Win 自摸
                   </button>
                 ) : null}
+                {faanToggle}
                 {(view.actions?.kongs ?? []).map((kong) => (
                   <button
                     key={`${kong.kind}-${kong.code}`}
@@ -936,10 +992,10 @@ export function PhoneView({
           ) : null}
         </button>
       ) : null}
-      {youWon && result?.score ? (
+      {yourWin ? (
         <Confetti
           key={`confetti-${view.handNumber}`}
-          count={confettiCount(result.score.scoredFaan)}
+          count={confettiCount(yourWin.scoredFaan)}
           seed={view.handNumber * 7919 + seat}
           spread={260}
           style={{ left: "50%", top: "45%" }}

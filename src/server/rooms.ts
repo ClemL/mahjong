@@ -14,12 +14,14 @@ import {
   seatName,
   sitDown,
   moveSeat,
+  takeBackDiscard,
   replaceWithComputer,
   isHumanSeat,
   pendingHumanClaimants,
   newRoom,
   normalizeRoom,
   notePlayed,
+  noteDiscard,
   openClaimWindow,
   resetRoom,
   returnToLobby,
@@ -42,6 +44,7 @@ import {
   nextHand,
   setFlowers,
   setLiability,
+  setMultipleWinners,
   setOthersPayHalf,
   setMinFaan,
   setRounds,
@@ -180,6 +183,7 @@ export type PlayerAction =
   | { type: "claim"; optionId: string | null }
   | { type: "moreTime" }
   | { type: "hurry" }
+  | { type: "takeBack" }
   | { type: "leave" };
 
 export async function act(id: string, token: string, action: PlayerAction): Promise<RoomView> {
@@ -189,6 +193,8 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     const seat = who.seat;
     const occupant = r.seats[seat];
     if (occupant.kind === "human") occupant.lastSeen = now;
+    // They are back and moving for themselves, so whatever the computer did meanwhile is old news.
+    r.stoodIn[seat] = 0;
     syncSeats(r);
 
     // Getting up mid-hand hands the chair to the computer, which carries on
@@ -230,14 +236,23 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
       return;
     }
 
+    if (action.type === "takeBack") {
+      const refused = takeBackDiscard(r, seat, now);
+      if (refused) throw new RoomError(refused, 409);
+      return;
+    }
+
     if (r.state.turn !== seat || r.state.phase !== "action") {
       throw new RoomError("It is not your turn", 409);
     }
     switch (action.type) {
-      case "discard":
+      case "discard": {
+        const before = r.state;
         r.state = discard(r.state, seat, action.tileId);
+        noteDiscard(r, seat, before, now);
         openClaimWindow(r, now);
         break;
+      }
       case "kong":
         r.state =
           action.kind === "concealed"
@@ -282,6 +297,8 @@ export type TableCommand =
   | { type: "flowers"; value: boolean }
   | { type: "liability"; value: boolean }
   | { type: "othersPayHalf"; value: boolean }
+  | { type: "multipleWinners"; value: boolean }
+  | { type: "takeBack"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "difficulty"; value: string }
   | { type: "turnLimit"; value: number }
@@ -387,6 +404,9 @@ export async function control(
       case "othersPayHalf":
         r.state = setOthersPayHalf(r.state, command.value === true);
         break;
+      case "multipleWinners":
+        r.state = setMultipleWinners(r.state, command.value === true);
+        break;
       case "speed":
         if (!SPEED_LEVELS.some((s) => s.level === command.value)) {
           throw new RoomError("No such speed", 400);
@@ -398,6 +418,10 @@ export async function control(
           throw new RoomError("No such difficulty", 400);
         }
         r.settings.difficulty = command.value as Difficulty;
+        break;
+      case "takeBack":
+        r.settings.takeBack = command.value === true;
+        if (!r.settings.takeBack) r.takeBack = null;
         break;
       case "turnLimit":
         if (!(TURN_LIMITS as readonly number[]).includes(command.value)) {

@@ -34,6 +34,10 @@ import {
   shouldRegroup,
   sitDown,
   startPlay,
+  TAKE_BACK_MS,
+  noteDiscard,
+  takeBackDiscard,
+  takeBackRefusal,
   syncSeats,
   touch,
   viewFor,
@@ -501,6 +505,28 @@ describe("presence", () => {
     expect(["handOver", "gameOver"]).toContain(room.state.phase);
   });
 
+  it("counts the turns the computer plays for someone away, and tells only them", () => {
+    const room = dealt("TEST", 12, [0, 1]);
+    const later = Date.now() + SEAT_IDLE_MS + 1;
+    // South is still here; East, the dealer, has wandered off.
+    touch(room, "tok-1", later);
+    drain(room, later);
+    expect(room.state.turn === 1 || room.state.phase !== "action").toBe(true);
+    expect(room.stoodIn[0]).toBeGreaterThan(0);
+    expect(viewFor(room, "tok-0", later).stoodIn).toBe(room.stoodIn[0]);
+    expect(viewFor(room, "tok-1", later).stoodIn).toBe(room.stoodIn[1]);
+    expect(viewFor(room, "table", later).stoodIn).toBe(0);
+    expect(viewFor(room, null, later).stoodIn).toBe(0);
+  });
+
+  it("starts the count again for whoever sits in the chair next", () => {
+    const room = dealt("TEST", 12, [0, 1]);
+    room.stoodIn[0] = 3;
+    room.seats[0] = { kind: "open" };
+    sitDown(room, 0, { token: "tok-new", name: "Thanh" });
+    expect(viewFor(room, "tok-new").stoodIn).toBe(0);
+  });
+
   it("does not wait on an absent seat's claim", () => {
     const room = dealt("TEST", 21, [0, 1, 2, 3]);
     drain(room);
@@ -887,6 +913,43 @@ describe("claim order at the table", () => {
     expect(viewFor(room, "tok-1").claim?.options.map((o) => o.type)).toEqual(["chow"]);
   });
 
+  it("tells the next who can win that someone already has, at a table that pays every winner", () => {
+    const room = dealt("TEST", 5, [0, 1, 2]);
+    const tiles = (prefix: string, spec: string) => spec.split(" ").map((code, i) => ({ id: `${prefix}${i}`, code }));
+    const state = room.state;
+    state.config = { ...state.config, multipleWinners: true };
+    for (const p of state.players) {
+      p.melds = [];
+      p.flowers = [];
+    }
+    state.players[0].hand = tiles("e", "m5 p9 s9");
+    state.players[1].hand = tiles("s", "m1 m2 m3 m4 m6 p1 p2 p3 s1 s2 s3 dr dr");
+    state.players[2].hand = tiles("w", "m3 m4 p4 p5 p6 s4 s5 s6 wn wn wn dg dg");
+    state.players[3].hand = tiles("n", "p1 p9 s1 s9 we ws ww dr dg dw m1 m9 p5");
+    state.turn = 0;
+    state.phase = "action";
+    state.lastDiscard = null;
+    state.drawnTileId = "e0";
+    room.state = discard(state, 0, "e0");
+    drain(room);
+    expect(viewFor(room, "tok-1").claim?.declared).toEqual([]);
+    // What the win would score goes to the one who could take it, and nobody else.
+    expect(viewFor(room, "tok-1").claim?.options.find((o) => o.type === "win")?.score?.faan).toBeGreaterThan(0);
+    expect(viewFor(room, "table").claim).toBeNull();
+    expect(viewFor(room, "tok-0").claim).toBeNull();
+
+    room.claimResponses["1"] = "win";
+    drain(room);
+    const west = viewFor(room, "tok-2").claim;
+    expect(west?.declared).toEqual([1]);
+    expect(west?.options.map((o) => o.type)).toEqual(["win"]);
+
+    room.claimResponses["2"] = "win";
+    drain(room);
+    expect(room.state.phase).toBe("handOver");
+    expect(viewFor(room, "table").result?.others?.map((o) => o.winner)).toEqual([2]);
+  });
+
   it("never asks about the chow once the pung is taken", () => {
     const room = chowAgainstPung();
     room.claimResponses["2"] = "pung:p5";
@@ -894,5 +957,73 @@ describe("claim order at the table", () => {
     expect(room.state.phase).toBe("action");
     expect(room.state.turn).toBe(2);
     expect(room.state.players[2].melds.map((m) => m.type)).toEqual(["pung"]);
+  });
+});
+
+describe("taking back a discard", () => {
+  /** East, a person, throws their first tile; South, also a person, could claim it. */
+  function thrown(now = Date.now()) {
+    const room = dealt("TEST", 9, [0, 1]);
+    room.lastStepAt = now - 5_000;
+    const before = room.state;
+    const tile = before.players[0].hand.find((t) => !t.code.startsWith("f"))!;
+    room.state = discard(before, 0, tile.id);
+    noteDiscard(room, 0, before, now);
+    return { room, before, tile, now };
+  }
+
+  it("puts the tile back in the hand and the table back as it was", () => {
+    const { room, before, tile, now } = thrown();
+    expect(viewFor(room, "tok-0", now).takeBackIn).toBe(TAKE_BACK_MS);
+    expect(viewFor(room, "tok-1", now).takeBackIn).toBe(0);
+    expect(viewFor(room, "table", now).takeBackIn).toBe(0);
+    // The table as it was is the server's alone: no view carries it.
+    expect(JSON.stringify(viewFor(room, "tok-0", now))).not.toContain('"before"');
+
+    expect(takeBackDiscard(room, 0, now + 1_000)).toBeNull();
+    expect(room.state).toBe(before);
+    expect(room.state.players[0].hand.some((t) => t.id === tile.id)).toBe(true);
+    expect(room.state.phase).toBe("action");
+    expect(room.state.turn).toBe(0);
+    // The turn clock carries on from when the turn began, not from the take-back.
+    expect(room.lastStepAt).toBe(now - 5_000);
+    expect(room.takeBack).toBeNull();
+  });
+
+  it("holds the next draw and any claim until the moment has passed, then moves on from there", () => {
+    const { room, tile, now } = thrown();
+    room.seats[1] = { kind: "open" };
+    syncSeats(room, now);
+    drain(room, now + 500);
+    expect(room.state.lastDiscard?.tile.id).toBe(tile.id);
+
+    drain(room, now + TAKE_BACK_MS);
+    expect(room.takeBack).toBeNull();
+    expect(room.lastStepAt).toBeGreaterThanOrEqual(now + TAKE_BACK_MS);
+    expect(takeBackRefusal(room, 0, now + TAKE_BACK_MS)).not.toBeNull();
+  });
+
+  it("is refused once the moment has passed, to anyone else, or once somebody has claimed it", () => {
+    const late = thrown();
+    expect(takeBackDiscard(late.room, 0, late.now + TAKE_BACK_MS)).toBe("Too late to take it back");
+    const other = thrown();
+    expect(takeBackDiscard(other.room, 1, other.now)).toBe("There is no discard of yours to take back");
+    const claimed = thrown();
+    claimed.room.claimResponses["1"] = "pung";
+    expect(takeBackDiscard(claimed.room, 0, claimed.now)).toBe("Somebody has claimed it");
+    // Passing on it is not a claim.
+    const passed = thrown();
+    passed.room.claimResponses["1"] = null;
+    expect(takeBackDiscard(passed.room, 0, passed.now)).toBeNull();
+  });
+
+  it("is never offered at a table that has it switched off", () => {
+    const room = dealt("TEST", 9, [0, 1]);
+    room.settings.takeBack = false;
+    const before = room.state;
+    room.state = discard(before, 0, before.players[0].hand[0].id);
+    noteDiscard(room, 0, before);
+    expect(room.takeBack).toBeNull();
+    expect(viewFor(room, "tok-0").takeBackIn).toBe(0);
   });
 });

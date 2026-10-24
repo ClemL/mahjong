@@ -41,7 +41,9 @@ function niceStep(span: number): number {
 /** What happened in a hand, in a few words. */
 export function describeHand(hand: HandRecord, name: (seat: Seat) => string): string {
   if (hand.type === "washout" || hand.winner === null) return "Washed out 流局";
-  const how = hand.from === null ? `${name(hand.winner)} self-drawn` : `${name(hand.winner)} off ${name(hand.from)}`;
+  const who = [hand.winner, ...(hand.alsoWon ?? []).map((o) => o.winner)].map(name);
+  const winners = who.length === 1 ? who[0] : `${who.slice(0, -1).join(", ")} and ${who[who.length - 1]}`;
+  const how = hand.from === null ? `${winners} self-drawn` : `${winners} off ${name(hand.from)}`;
   const what = hand.pattern ? `${hand.pattern.name}, ${hand.faan} faan` : `${hand.faan} faan`;
   return `${how} · ${what}`;
 }

@@ -106,6 +106,11 @@ export const HURRY_COOLDOWN_MS = 10_000;
  * come and start to think.
  */
 export const HURRY_GRACE_MS = 3_000;
+/**
+ * How long a person has to take back the tile they just threw. The table
+ * waits it out before anyone draws or a claim is settled, so it is short.
+ */
+export const TAKE_BACK_MS = 2_000;
 
 export interface RoomSettings {
   speed: SpeedLevel;
@@ -115,9 +120,17 @@ export interface RoomSettings {
   rotation: 0 | 1 | 2 | 3;
   /** How well the computer plays the seats nobody has taken. */
   difficulty: Difficulty;
+  /** Whether a person may take back a discard in the moment after throwing it. */
+  takeBack: boolean;
 }
 
-export const DEFAULT_ROOM_SETTINGS: RoomSettings = { speed: 2, turnLimit: 30, rotation: 0, difficulty: "normal" };
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  speed: 2,
+  turnLimit: 30,
+  rotation: 0,
+  difficulty: "normal",
+  takeBack: true,
+};
 
 export function turnMs(speed: SpeedLevel): number {
   return SPEED_LEVELS.find((s) => s.level === speed)?.turnMs ?? 1500;
@@ -198,6 +211,24 @@ export interface Room {
    * for which move, so a hurry-up can leave every turn a moment first.
    */
   acting: { key: string; since: number } | null;
+  /**
+   * Turns the computer finished for each chair while the person in it was
+   * away or out of time, since they last moved themselves, so their phone can
+   * say so when they look again.
+   */
+  stoodIn: number[];
+  /**
+   * A person's discard that can still be taken back: the table as it was
+   * before the throw, kept here on the server and never sent to anyone.
+   */
+  takeBack: {
+    seat: Seat;
+    tileId: string;
+    until: number;
+    before: GameState;
+    lastStepAt: number;
+    lastPlayed: Room["lastPlayed"];
+  } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -256,6 +287,8 @@ export interface RoomView {
     allowance: number;
     /** Several sets to choose between and no extra time asked for yet. */
     canExtend: boolean;
+    /** Who has already declared a win on this tile, at a table that pays every winner. */
+    declared: Seat[];
   } | null;
   actions: TurnActions | null;
   settings: RoomSettings;
@@ -290,6 +323,10 @@ export interface RoomView {
    * nobody is in the first moments of their turn. 0 once they may.
    */
   hurryGraceLeft: number;
+  /** Turns the computer finished for this viewer's chair since they last moved; 0 for anyone not seated. */
+  stoodIn: number;
+  /** How long this viewer has left to take back the tile they just threw, in ms; 0 when they cannot. */
+  takeBackIn: number;
 }
 
 const HIDDEN: TileCode = "back";
@@ -324,6 +361,8 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     displaced: [],
     hurry: null,
     acting: null,
+    stoodIn: [0, 0, 0, 0],
+    takeBack: null,
   };
 }
 
@@ -337,6 +376,8 @@ export function normalizeRoom(room: Room): Room {
   room.displaced ??= [];
   room.hurry ??= null;
   room.acting ??= null;
+  room.stoodIn ??= [0, 0, 0, 0];
+  room.takeBack ??= null;
   return room;
 }
 
@@ -357,6 +398,7 @@ export function startPlay(room: Room, now = Date.now()): void {
   room.warmup = seatedCount(room) < 2;
   room.claimResponses = {};
   room.claimDeadline = null;
+  room.stoodIn = [0, 0, 0, 0];
   room.state = startHand(room.state);
   beginHand(room, now);
   syncSeats(room, now);
@@ -396,6 +438,7 @@ export function returnToLobby(room: Room, state: GameState): void {
   room.state = state;
   room.claimResponses = {};
   room.claimDeadline = null;
+  room.takeBack = null;
   // A new game numbers its hands and moves from the start again, so an old
   // stamp could pass for the first turn of the next.
   room.acting = null;
@@ -558,6 +601,7 @@ export function sitDown(
     room.displaced = [...room.displaced, { token: occupant.token, seat }].slice(-DISPLACED_KEPT);
   }
   room.seats[seat] = { kind: "human", name: seatName(input.name, seat), token: input.token, lastSeen: now };
+  room.stoodIn[seat] = 0;
   syncSeats(room, now);
   return null;
 }
@@ -741,10 +785,33 @@ export function drain(room: Room, now = Date.now()): boolean {
   };
   const pace = turnMs(room.settings.speed);
   const strategy = strategyFor(room.settings.difficulty);
+  // A turn the table finished for somebody who has a chair: a discard made or
+  // a hand won in their name.
+  const playedFor = (seat: Seat, before: GameState) => {
+    if (room.seats[seat].kind !== "human") return;
+    const after = room.state;
+    const threw = after.lastDiscard?.from === seat && after.lastDiscard.tile.id !== before.lastDiscard?.tile.id;
+    const won =
+      before.phase !== "handOver" &&
+      after.result?.type === "win" &&
+      (after.result.winner === seat || (after.result.others ?? []).some((o) => o.winner === seat));
+    if (threw || won) room.stoodIn[seat] += 1;
+  };
 
   for (let guard = 0; guard < 400; guard += 1) {
     const state = room.state;
     if (state.phase === "handOver" || state.phase === "gameOver") break;
+
+    // Nobody draws and no claim is settled while the tile can still be taken
+    // back; after that the table moves on as if it had been thrown then.
+    const hold = room.takeBack;
+    if (hold) {
+      const live = state.lastDiscard?.tile.id === hold.tileId;
+      if (live && now < hold.until) break;
+      if (live) room.lastStepAt = Math.max(room.lastStepAt, hold.until);
+      room.takeBack = null;
+      changed = true;
+    }
 
     if (state.phase === "claiming") {
       const turn = claimTurn(state);
@@ -773,6 +840,7 @@ export function drain(room: Room, now = Date.now()): boolean {
       }
       const taken = state.lastDiscard?.tile.id;
       move(turn ? answerClaim(state, turn.seat, optionId) : resolveClaims(state, []));
+      if (turn && room.claimResponses[String(turn.seat)] === undefined) playedFor(turn.seat, state);
       room.claimResponses = {};
       room.claimDeadline = null;
       // A claim is a move of its own: the table shows the discard landing and
@@ -802,6 +870,7 @@ export function drain(room: Room, now = Date.now()): boolean {
       const next = discard(state, state.turn, tileId);
       if (next.lastDiscard?.tile.id !== tileId) break;
       move(next);
+      playedFor(state.turn, state);
       room.lastStepAt = due;
       openWindow();
       continue;
@@ -813,6 +882,7 @@ export function drain(room: Room, now = Date.now()): boolean {
     const next = stepAiTurn(state, rng, strategy);
     if (next === state) break;
     move(next);
+    playedFor(state.turn, state);
     room.lastStepAt = due;
     openWindow();
   }
@@ -911,6 +981,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         deadlineIn: Math.max(0, (room.claimDeadline ?? now + CLAIM_WINDOW_MS) - now),
         allowance: CLAIM_WINDOW_MS + (extended ? CLAIM_MORE_TIME_MS : 0),
         canExtend: !extended && choosingBetweenSets(asked.options),
+        declared: state.claimedWins ?? [],
       };
     }
   }
@@ -985,7 +1056,54 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - now }
         : null,
     hurryGraceLeft: hurryGraceLeft(room, now),
+    stoodIn: you.role === "player" && you.seat !== null ? room.stoodIn[you.seat] : 0,
+    takeBackIn: you.seat !== null && takeBackRefusal(room, you.seat, now) === null ? room.takeBack!.until - now : 0,
   };
+}
+
+/**
+ * Why this seat cannot take its discard back right now, or null if it can:
+ * its own tile, still the last thing to happen, in time, and nobody has
+ * claimed it.
+ */
+export function takeBackRefusal(room: Room, seat: Seat, now = Date.now()): string | null {
+  const hold = room.takeBack;
+  if (!room.settings.takeBack) return "This table does not take discards back";
+  if (!hold || hold.seat !== seat || room.state.lastDiscard?.tile.id !== hold.tileId) {
+    return "There is no discard of yours to take back";
+  }
+  if (now >= hold.until) return "Too late to take it back";
+  if (Object.values(room.claimResponses).some((answer) => answer !== null)) return "Somebody has claimed it";
+  return null;
+}
+
+/** Remember a person's discard for the moment it can be taken back. */
+export function noteDiscard(room: Room, seat: Seat, before: GameState, now = Date.now()): void {
+  room.takeBack =
+    room.settings.takeBack && room.state.lastDiscard?.from === seat
+      ? {
+          seat,
+          tileId: room.state.lastDiscard.tile.id,
+          until: now + TAKE_BACK_MS,
+          before,
+          lastStepAt: room.lastStepAt,
+          lastPlayed: room.lastPlayed,
+        }
+      : null;
+}
+
+/** Put the tile back in the hand and the table back as it was before it was thrown. */
+export function takeBackDiscard(room: Room, seat: Seat, now = Date.now()): string | null {
+  const refused = takeBackRefusal(room, seat, now);
+  if (refused) return refused;
+  const hold = room.takeBack!;
+  room.state = hold.before;
+  room.lastStepAt = hold.lastStepAt;
+  room.lastPlayed = hold.lastPlayed;
+  room.claimResponses = {};
+  room.claimDeadline = null;
+  room.takeBack = null;
+  return null;
 }
 
 /** Where each seat should physically sit, for the table to display. */

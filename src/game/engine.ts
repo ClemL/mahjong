@@ -30,6 +30,7 @@ import {
   flowersInPlay,
   halfShare,
   liabilityInPlay,
+  multipleWinnersInPlay,
   othersPayHalfInPlay,
   roundsInGame,
 } from "./rules";
@@ -53,6 +54,8 @@ export interface ClaimOption {
   tileIds: string[];
   /** Codes of the resulting meld, for display. */
   codes: TileCode[];
+  /** What a win would score, so the claimant can see why before taking it. */
+  score?: ScoreResult;
 }
 
 export interface PendingClaim {
@@ -71,6 +74,11 @@ export interface HandResult {
   dealerKeeps: boolean;
   /** Who paid a self-drawn win alone under 包, if anyone. */
   liable?: Seat | null;
+  /**
+   * The other players who won on the same discard, at a table that pays every
+   * winner (雙響, 三響); `winner` is the first after the discarder.
+   */
+  others?: { winner: Seat; score: ScoreResult }[];
 }
 
 /** One completed hand, kept for the score history and end-of-round summary. */
@@ -88,6 +96,8 @@ export interface HandRecord {
   scores: number[];
   /** The win's biggest pattern, to name the hand by. Absent from hands recorded before it was kept. */
   pattern?: { name: string; chinese: string } | null;
+  /** The other players who won on the same discard, at a table that pays every winner. */
+  alsoWon?: { winner: Seat; faan: number; value: number }[];
 }
 
 /** A move worth showing in a play log, with the tiles it involved. */
@@ -129,6 +139,11 @@ export interface GameState {
   pendingClaims: PendingClaim[];
   /** Set while an added kong is exposed to being robbed. */
   robbingKongTile: Tile | null;
+  /**
+   * Who has declared a win on the discard while others who could also win on
+   * it are still being asked, at a table that pays every winner.
+   */
+  claimedWins?: Seat[];
   scores: number[];
   result: HandResult | null;
   /** Completed hands, oldest first. */
@@ -619,7 +634,7 @@ function winOptionFor(
   };
   const score = scoreHand(ctx);
   if (!score || score.faan < state.config.minFaan) return null;
-  return { id: `win`, type: "win", tileIds: [], codes: [tile.code] };
+  return { id: `win`, type: "win", tileIds: [], codes: [tile.code], score };
 }
 
 /** Claim options for one seat. `isNext` allows chows. */
@@ -732,7 +747,19 @@ export function answerClaim(previous: GameState, seat: Seat, optionId: string | 
   const turn = claimTurn(previous);
   if (!turn || turn.seat !== seat) return previous;
   if (optionId === null) return passClaim(previous, seat);
-  if (!turn.options.some((o) => o.id === optionId)) return previous;
+  const option = turn.options.find((o) => o.id === optionId);
+  if (!option) return previous;
+  if (option.type === "win" && multipleWinnersInPlay(previous.config)) {
+    // Every win on the tile is paid, so the others who could win on it are
+    // still asked; a tile that wins a hand is nobody's for a set.
+    const state = clone(previous);
+    state.claimedWins = [...(state.claimedWins ?? []), seat];
+    state.pendingClaims = state.pendingClaims
+      .filter((c) => c.seat !== seat)
+      .map((c) => ({ ...c, options: c.options.filter((o) => o.type === "win") }))
+      .filter((c) => c.options.length > 0);
+    return state.pendingClaims.length > 0 ? state : resolveClaims(state, []);
+  }
   return resolveClaims(previous, [{ seat, optionId }]);
 }
 
@@ -762,6 +789,18 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
     taken.push({ seat: decision.seat, option, priority: CLAIM_PRIORITY[option.type], distance });
   }
 
+  taken.sort((a, b) => b.priority - a.priority || a.distance - b.distance);
+  const declared = state.claimedWins ?? [];
+  // A win already declared stands even if the table turned the rule off while
+  // the others were still being asked.
+  const winners = multipleWinnersInPlay(state.config) || declared.length > 0
+    ? [...new Set([...declared, ...taken.filter((t) => t.option.type === "win").map((t) => t.seat)])]
+    : taken[0]?.option.type === "win"
+      ? [taken[0].seat]
+      : [];
+  state.claimedWins = [];
+  if (winners.length > 0) return settleDiscardWins(state, winners, discarder, tile);
+
   if (taken.length === 0) {
     if (state.robbingKongTile) {
       finishAddedKong(state, discarder, state.robbingKongTile);
@@ -776,46 +815,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
     return advanceTurn(state);
   }
 
-  taken.sort((a, b) => b.priority - a.priority || a.distance - b.distance);
   const winner = taken[0];
-
-  if (winner.option.type === "win") {
-    const p = player(state, winner.seat);
-    // Read before the tile leaves the pond, which is what makes it the first discard.
-    const opening = openingWin(state, winner.seat, discarder);
-    // Move the winning tile out of wherever it currently sits: the discarder's
-    // pond, or the declarer's hand when an added kong is being robbed.
-    const source = player(state, discarder);
-    if (state.robbingKongTile) {
-      source.hand = source.hand.filter((t) => t.id !== tile.id);
-    } else {
-      source.discards = source.discards.filter((t) => t.id !== tile.id);
-    }
-    p.hand.push(tile);
-    sortHand(p);
-    const robbing = state.robbingKongTile !== null;
-    const score = scoreHand({
-      concealed: p.hand.filter((t) => !isFlower(t.code)),
-      melds: p.melds,
-      flowers: p.flowers,
-      winningTile: tile.code,
-      seat: winner.seat,
-      roundWind: state.roundWind,
-      selfDrawn: false,
-      robbingKong: robbing,
-      onKongReplacement: false,
-      onLastTile: state.lastTileInPlay,
-      ...opening,
-      config: state.config,
-    });
-    if (!score) {
-      p.hand = p.hand.filter((t) => t.id !== tile.id);
-      state.phase = "action";
-      return advanceTurn(state);
-    }
-    settleWin(state, winner.seat, discarder, score, false);
-    return state;
-  }
 
   // A meld claim: take the discard out of the discarder's pond.
   const discarderState = player(state, discarder);
@@ -875,6 +875,87 @@ export function liableSeat(melds: Meld[]): Seat | null {
     if (index === 3 || (dragonSet && dragonSets === 3)) liable = meld.claimedFrom;
   }
   return liable;
+}
+
+/**
+ * Settle a win, or several, on a discard (or a robbed kong's tile). Each
+ * winner is paid by the discarder in full and, where the others pay half, by
+ * each player who neither threw the tile nor won on it. The tile itself goes
+ * to the first winner after the discarder; anyone else wins on it all the same.
+ */
+function settleDiscardWins(state: GameState, seats: Seat[], discarder: Seat, tile: Tile): GameState {
+  const distance = (seat: Seat) => (((seat - discarder) % 4) + 4) % 4;
+  const robbing = state.robbingKongTile !== null;
+  const wins: { winner: Seat; score: ScoreResult }[] = [];
+  for (const seat of [...seats].sort((a, b) => distance(a) - distance(b))) {
+    const p = player(state, seat);
+    const score = scoreHand({
+      concealed: [...p.hand.filter((t) => !isFlower(t.code)), tile],
+      melds: p.melds,
+      flowers: p.flowers,
+      winningTile: tile.code,
+      seat,
+      roundWind: state.roundWind,
+      selfDrawn: false,
+      robbingKong: robbing,
+      onKongReplacement: false,
+      onLastTile: state.lastTileInPlay,
+      // Read before the tile leaves the pond, which is what makes it the first discard.
+      ...openingWin(state, seat, discarder),
+      config: state.config,
+    });
+    if (score) wins.push({ winner: seat, score });
+  }
+
+  // Out of wherever the tile sits: the discarder's pond, or the declarer's
+  // hand when an added kong is being robbed.
+  const source = player(state, discarder);
+  if (robbing) source.hand = source.hand.filter((t) => t.id !== tile.id);
+  else source.discards = source.discards.filter((t) => t.id !== tile.id);
+  if (wins.length === 0) {
+    state.phase = "action";
+    return advanceTurn(state);
+  }
+  const first = player(state, wins[0].winner);
+  first.hand.push(tile);
+  sortHand(first);
+
+  const payments = [0, 0, 0, 0];
+  const winners = new Set(wins.map((w) => w.winner));
+  for (const { winner, score } of wins) {
+    payments[discarder] -= score.value;
+    payments[winner] += score.value;
+    if (!othersPayHalfInPlay(state.config)) continue;
+    for (const p of state.players) {
+      if (p.seat === discarder || winners.has(p.seat)) continue;
+      payments[p.seat] -= halfShare(score.value);
+      payments[winner] += halfShare(score.value);
+    }
+  }
+  for (let i = 0; i < 4; i++) state.scores[i] += payments[i];
+
+  state.result = {
+    type: "win",
+    winner: wins[0].winner,
+    from: discarder,
+    score: wins[0].score,
+    payments,
+    dealerKeeps: winners.has(state.dealer),
+    liable: null,
+    ...(wins.length > 1 ? { others: wins.slice(1) } : {}),
+  };
+  recordHand(state, wins[0].score);
+  state.phase = "handOver";
+  state.pendingClaims = [];
+  state.robbingKongTile = null;
+  for (const { winner, score } of wins) {
+    log(state, winner, `${SEAT_NAMES[winner]} wins ${score.faan} faan (${score.value} points) off ${SEAT_NAMES[discarder]}`, {
+      kind: "win",
+      tiles: [tile.code],
+      from: discarder,
+    });
+  }
+  return state;
 }
 
 function settleWin(
@@ -953,6 +1034,9 @@ function recordHand(state: GameState, score: ScoreResult | null): void {
     payments: [...result.payments],
     scores: [...state.scores],
     pattern: top ? { name: top.name, chinese: top.chinese } : null,
+    ...(result.others
+      ? { alsoWon: result.others.map((o) => ({ winner: o.winner, faan: o.score.faan, value: o.score.value })) }
+      : {}),
   });
 }
 
@@ -1024,6 +1108,21 @@ export function setOthersPayHalf(previous: GameState, othersPayHalf: boolean): G
     othersPayHalf
       ? "On a discard win the other two now pay half each"
       : "On a discard win the discarder now pays alone (出銃全包)",
+  );
+  return state;
+}
+
+/** Whether every player who can win on a discard is paid. Read when a discard is claimed. */
+export function setMultipleWinners(previous: GameState, multipleWinners: boolean): GameState {
+  if (multipleWinnersInPlay(previous.config) === multipleWinners) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, multipleWinners };
+  log(
+    state,
+    null,
+    multipleWinners
+      ? "Everyone who can win on a discard is now paid (雙響)"
+      : "Only the first after the discarder can now win on it (截糊)",
   );
   return state;
 }

@@ -299,6 +299,16 @@
   color: var(--gold);
 }
 
+/* Each further winner's faan, under the first's, split off by a rule. */
+.faan-ledger__also {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
 /* ---- who paid, as bars either side of one line ---- */
 
 .who-pays {
@@ -811,6 +821,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+/* Beside Hide rather than out in the middle of the heading row. */
+.phone-result__share {
+  margin-left: auto;
 }
 
 .phone-result__title {

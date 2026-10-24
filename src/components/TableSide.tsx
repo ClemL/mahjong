@@ -16,6 +16,7 @@ import { Segmented, SwitchRow } from "./SettingControls";
 import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
 import { DIFFICULTY_OPTIONS, LIMITS, SPEEDS, rulesInForce } from "./TableSettings";
 import { chipsOf } from "./TableEffects";
+import { joinNames, winnersOf } from "./TableResult";
 import { positionOf } from "./tableLayout";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
@@ -95,7 +96,7 @@ function RoundCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) 
       ? "The game is over"
       : view.phase === "handOver"
         ? view.result?.type === "win" && view.result.winner !== null
-          ? `${name(view.result.winner)} won the hand`
+          ? `${joinNames(winnersOf(view.result).map((w) => name(w.winner)))} won the hand`
           : "The hand washed out"
         : view.awaitingClaimSeats.length > 0
           ? `Waiting on ${view.awaitingClaimSeats.map(name).join(" and ")}`

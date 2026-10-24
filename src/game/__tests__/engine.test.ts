@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   type GameState,
+  answerClaim,
   claimOptionsFor,
+  claimTurn,
   createGame,
   setRounds,
   discard,
@@ -10,6 +12,7 @@ import {
   resolveClaims,
   setFlowers,
   setMinFaan,
+  setMultipleWinners,
   turnActions,
 } from "../engine";
 import { autoPlayHand } from "../controller";
@@ -143,6 +146,108 @@ describe("claims", () => {
     expect(state.players[0].discards.map((t) => t.id)).toContain(tile.id);
     expectTileConservation(state);
   });
+});
+
+describe("more than one winner on a discard", () => {
+  const tiles = (prefix: string, spec: string): Tile[] =>
+    spec.split(" ").map((code, i) => ({ id: `${prefix}${i}`, code }));
+
+  /** East throws 5 Characters, which South and West are both waiting on. */
+  function bothWaiting(multipleWinners: boolean): GameState {
+    let state = createGame({ seed: 7, config: { ...DEFAULT_RULES, multipleWinners } });
+    for (const p of state.players) {
+      p.isHuman = false;
+      p.flowers = [];
+      p.melds = [];
+    }
+    state.turn = 0;
+    state.phase = "action";
+    state.players[0].hand = tiles("e", "m5 p9 s9");
+    state.players[1].hand = tiles("s", "m1 m2 m3 m4 m6 p1 p2 p3 s1 s2 s3 dr dr");
+    state.players[2].hand = tiles("w", "m3 m4 p4 p5 p6 s4 s5 s6 wn wn wn dg dg");
+    state.players[3].hand = tiles("n", "p1 p9 s1 s9 we ws ww dr dg dw m1 m9 p5");
+    state.drawnTileId = "e0";
+    state = discard(state, 0, "e0");
+    expect(state.phase).toBe("claiming");
+    return state;
+  }
+
+  it("lets only the first after the discarder win, by default", () => {
+    let state = bothWaiting(false);
+    // The win on offer carries what it would score, for the claimant to see before taking it.
+    const offered = claimTurn(state)!.options.find((o) => o.type === "win")!;
+    expect(offered.score?.faan).toBeGreaterThan(0);
+    expect(claimTurn(state)?.seat).toBe(1);
+    state = answerClaim(state, 1, "win");
+    expect(state.phase).toBe("handOver");
+    expect(state.result?.winner).toBe(1);
+    expect(state.result?.score).toEqual(offered.score);
+    expect(state.result?.others).toBeUndefined();
+  });
+
+  it("asks everyone who can win, and pays every winner, at a table that plays it", () => {
+    let state = bothWaiting(true);
+    state = answerClaim(state, 1, "win");
+    // South has declared; West is still asked, and only to win.
+    expect(state.phase).toBe("claiming");
+    expect(claimTurn(state)).toMatchObject({ seat: 2, options: [{ type: "win" }] });
+    state = answerClaim(state, 2, "win");
+
+    expect(state.phase).toBe("handOver");
+    const result = state.result!;
+    expect(result.winner).toBe(1);
+    expect(result.others?.map((o) => o.winner)).toEqual([2]);
+    const south = result.score!.value;
+    const west = result.others![0].score.value;
+    // East pays both in full; North, who neither threw it nor won, pays half of each.
+    expect(result.payments).toEqual([
+      -(south + west),
+      south + Math.ceil(south / 2),
+      west + Math.ceil(west / 2),
+      -(Math.ceil(south / 2) + Math.ceil(west / 2)),
+    ]);
+    expect(state.scores.reduce((a, b) => a + b, 0)).toBe(0);
+    // The tile is South's, the first after the discarder; West won on it all the same.
+    expect(state.players[1].hand.some((t) => t.id === "e0")).toBe(true);
+    expect(state.players[2].hand.some((t) => t.id === "e0")).toBe(false);
+    expect(state.players[0].discards.some((t) => t.id === "e0")).toBe(false);
+    expect(state.history.at(-1)?.alsoWon).toEqual([{ winner: 2, faan: result.others![0].score.faan, value: west }]);
+  });
+
+  it("pays only the one who declares when another lets it go", () => {
+    let state = bothWaiting(true);
+    state = answerClaim(state, 1, null);
+    expect(claimTurn(state)?.seat).toBe(2);
+    state = answerClaim(state, 2, "win");
+    expect(state.result?.winner).toBe(2);
+    expect(state.result?.others).toBeUndefined();
+
+    let declined = bothWaiting(true);
+    declined = answerClaim(declined, 1, "win");
+    declined = answerClaim(declined, 2, null);
+    expect(declined.result?.winner).toBe(1);
+    expect(declined.result?.others).toBeUndefined();
+  });
+
+  it("keeps a declared win when the table turns the rule off before the others answer", () => {
+    let state = bothWaiting(true);
+    state = answerClaim(state, 1, "win");
+    state = setMultipleWinners(state, false);
+    state = answerClaim(state, 2, null);
+    expect(state.phase).toBe("handOver");
+    expect(state.result?.winner).toBe(1);
+  });
+
+  it("keeps every rule over full hands at a table that pays every winner", () => {
+    for (let seed = 0; seed < 30; seed++) {
+      const state = createGame({ seed: seed * 101 + 5, config: { ...DEFAULT_RULES, multipleWinners: true } });
+      for (const p of state.players) p.isHuman = false;
+      const { state: end } = autoPlayHand(state, createRng(seed));
+      expect(end.phase).toBe("handOver");
+      expectTileConservation(end);
+      expect(end.scores.reduce((a, b) => a + b, 0)).toBe(0);
+    }
+  }, 120000);
 });
 
 describe("turn actions", () => {

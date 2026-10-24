@@ -14,7 +14,7 @@ import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
-import { TableResult } from "./TableResult";
+import { TableResult, joinNames, winnersOf } from "./TableResult";
 import { GameComplete } from "./GameComplete";
 import {
   ChipStack,
@@ -133,7 +133,7 @@ function Rack({
   const active = view.turn === seat && view.phase === "action";
   // The hand is only ever sent face up once it is over.
   const shown = player.hand.some((t) => t.code !== "back");
-  const winner = view.result?.type === "win" && view.result.winner === seat;
+  const winner = winnersOf(view.result).some((w) => w.winner === seat);
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
   // Only the seat to play has a clock running, and only when the table set one.
@@ -528,7 +528,8 @@ function Console({
           ) : view.result?.type === "win" && view.result.winner !== null ? (
             <>
               <strong className="console__headline">
-                {occupantName(view.players[view.result.winner])} wins
+                {joinNames(winnersOf(view.result).map((w) => occupantName(view.players[w.winner])))}{" "}
+                {view.result.others ? "win" : "wins"}
               </strong>
               {view.result.score ? (
                 <span className="seat__meta">{view.result.score.scoredFaan} faan</span>
