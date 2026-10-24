@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { replaceWithComputer, robotName, viewFor } from "@/game/room";
+import { openTable, replaceWithComputer, robotName, viewFor } from "@/game/room";
 import { SeatPicker } from "../SeatPicker";
 import { NAMES, dealt } from "./fixtures";
 
@@ -20,7 +20,7 @@ describe("SeatPicker", () => {
     expect(document.activeElement).toBe(box);
     fireEvent.change(box, { target: { value: "Srini" } });
     fireEvent.click(screen.getByRole("button", { name: "Sit down" }));
-    expect(onClaim).toHaveBeenCalledWith(1, "Srini");
+    expect(onClaim).toHaveBeenCalledWith(1, "Srini", false);
   });
 
   it("does not choose a chair somebody sat in after the code was shown", () => {
@@ -31,6 +31,29 @@ describe("SeatPicker", () => {
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.getByRole("button", { name: "Sit down" })).toHaveProperty("disabled", true);
     expect(screen.getByText(NAMES[2])).toBeTruthy();
+  });
+
+  it("offers to take over a table open on another device, game and all", () => {
+    const room = dealt([0, 2]);
+    const onClaim = vi.fn(async () => {});
+    render(
+      <SeatPicker view={viewFor(room, null)} picked="table" onClaim={onClaim} onReset={() => {}} busy={false} error={null} />,
+    );
+    expect(screen.getByText(/Open elsewhere · take over/)).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("The table is open on another device right now.");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Take over the table" }));
+    expect(onClaim).toHaveBeenCalledWith("table", "", true);
+  });
+
+  it("tells the device that had the table that another one took it over", () => {
+    const room = dealt([0]);
+    openTable(room, "another-tablet", { replace: true });
+    render(
+      <SeatPicker view={viewFor(room, "tok-table")} onClaim={vi.fn()} onReset={() => {}} busy={false} error={null} />,
+    );
+    expect(screen.getByText(/Another device took over the table/)).toBeTruthy();
+    expect(screen.getByText("Table").closest("button")).toHaveProperty("disabled", false);
   });
 
   it("tells a phone the table gave its chair to the computer, which then goes by its name", () => {

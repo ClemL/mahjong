@@ -329,6 +329,29 @@ describe("taking back a discard", () => {
   });
 });
 
+describe("taking the table over", () => {
+  it("moves the table to another device mid-game without resetting it", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    await expect(claimSeat(id, { seat: "table" })).rejects.toMatchObject({ status: 409 });
+    const before = await readRoom(id, tokens[0]);
+
+    const { token, view } = await claimSeat(id, { seat: "table", replace: true });
+    expect(view.you.role).toBe("table");
+    expect(view.started).toBe(true);
+    expect(view.handNumber).toBe(before.handNumber);
+    // The phone keeps its chair and its hand.
+    const after = await readRoom(id, tokens[0]);
+    expect(after.you.seat).toBe(0);
+    expect(after.players[0].hand.map((t) => t.id)).toEqual(before.players[0].hand.map((t) => t.id));
+
+    const old = await readRoom(id, table);
+    expect(old.you.role).toBe("spectator");
+    expect(old.tableTakenOver).toBe(true);
+    await expect(control(id, table, { type: "skipOpening" })).rejects.toMatchObject({ status: 403 });
+    await control(id, token, { type: "skipOpening" });
+  });
+});
+
 describe("table control", () => {
   it("refuses commands from a player", async () => {
     const id = await room();

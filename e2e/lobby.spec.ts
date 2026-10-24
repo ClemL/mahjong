@@ -86,3 +86,37 @@ test("the table can step back to the start page and pick its lobby up again", as
     await side.context.close();
   }
 });
+
+test("another tablet takes the table over mid-game, and the first is told why", async ({ browser, request }) => {
+  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
+  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.1" } });
+  expect(reset.ok()).toBe(true);
+
+  const first = await open(browser, TABLET, false);
+  await first.page.goto(`/room/${ROOM}?seat=table`);
+  const kris = await open(browser, PHONE_PORTRAIT, true);
+  await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
+  await expect(first.page.getByText("1 of 4 seated")).toBeVisible();
+  await first.page.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
+  await first.page.getByRole("button", { name: "Skip the deal" }).click();
+  await expect(kris.page.getByRole("button", { name: /Hand hidden/ })).toBeVisible();
+
+  // A device without the table's claim, opening the table, is offered it rather than refused.
+  const second = await open(browser, TABLET, false);
+  await second.page.goto(`/room/${ROOM}?seat=table`);
+  await expect(second.page.getByText(/The table is open on another device right now/)).toBeVisible();
+  if (SHOTS) await second.page.screenshot({ path: `${SHOTS}/table-take-over.png` });
+  await second.page.getByRole("button", { name: "Take over the table" }).click();
+
+  // The same game, carried on: Kris is still at it, and nothing was dealt again.
+  await expect(second.page.getByRole("button", { name: "End game" }).first()).toBeVisible();
+  await expect(second.page.getByText("Kris").first()).toBeVisible();
+  await expect(first.page.getByText(/Another device took over the table/)).toBeVisible();
+  if (SHOTS) await first.page.screenshot({ path: `${SHOTS}/table-taken-over.png` });
+  await expect(kris.page.getByRole("button", { name: /Hand hidden/ })).toBeVisible();
+
+  for (const side of [first, second, kris]) {
+    expect(side.errors).toEqual([]);
+    await side.context.close();
+  }
+});

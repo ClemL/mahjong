@@ -34,6 +34,8 @@ import {
   shouldRegroup,
   sitDown,
   startPlay,
+  TABLE_IDLE_MS,
+  openTable,
   TAKE_BACK_MS,
   noteDiscard,
   takeBackDiscard,
@@ -1025,5 +1027,41 @@ describe("taking back a discard", () => {
     noteDiscard(room, 0, before);
     expect(room.takeBack).toBeNull();
     expect(viewFor(room, "tok-0").takeBackIn).toBe(0);
+  });
+});
+
+describe("taking the table over", () => {
+  it("refuses a second table unless it is taking over, then tells the first device why it lost it", () => {
+    const room = dealt("TEST", 3, [0, 1]);
+    const now = Date.now();
+    expect(openTable(room, "tablet-a", {}, now)).toBeNull();
+    expect(openTable(room, "tablet-b", {}, now)).toBe("The table is already in use");
+    expect(viewFor(room, "tablet-a", now).you.role).toBe("table");
+
+    const scores = [...room.state.scores];
+    const hand = room.state.handNumber;
+    expect(openTable(room, "tablet-b", { replace: true }, now)).toBeNull();
+    // The game carries on as it stood, on the new device.
+    expect(room.started).toBe(true);
+    expect(room.state.handNumber).toBe(hand);
+    expect(room.state.scores).toEqual(scores);
+    expect(viewFor(room, "tablet-b", now).you.role).toBe("table");
+    const old = viewFor(room, "tablet-a", now);
+    expect(old.you.role).toBe("spectator");
+    expect(old.tableTakenOver).toBe(true);
+    expect(old.displacedFrom).toBeNull();
+    // Nobody else is told they lost anything.
+    expect(viewFor(room, null, now).tableTakenOver).toBe(false);
+    expect(viewFor(room, "tok-0", now).tableTakenOver).toBe(false);
+  });
+
+  it("says when the device holding the table has not been seen for a while", () => {
+    const room = dealt("TEST", 3, [0]);
+    const now = Date.now();
+    openTable(room, "tablet", {}, now);
+    expect(viewFor(room, null, now + TABLE_IDLE_MS).tableAway).toBe(false);
+    expect(viewFor(room, null, now + TABLE_IDLE_MS + 1).tableAway).toBe(true);
+    room.table = null;
+    expect(viewFor(room, null, now + TABLE_IDLE_MS + 1).tableAway).toBe(false);
   });
 });

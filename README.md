@@ -148,7 +148,11 @@ held upright turns its controller on its side.
 1. Everyone opens the same table — chosen on the start page, opened the first
    time somebody arrives, so there are no room codes to pass around. The tablet
    puts that address on screen as a QR code for anyone who would rather scan it.
-2. The tablet takes the **Table** seat.
+2. The tablet takes the **Table** seat. A tablet that has lost its claim — a
+   different browser, cleared storage, a replacement tablet — opens the table
+   again and is offered **Take over the table**: the game carries on there as it
+   stands, and the device that had it is told another one took over. **Reset
+   table** is only for starting over.
 3. Everyone else taps the seat they want and sits down. A name is already in the
    box, so sitting down is one tap.
 4. **Nothing is dealt until the table deals**, so four people arriving one at a
