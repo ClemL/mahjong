@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ClaimOption } from "@/game/engine";
-import { HURRY_COOLDOWN_MS, MORE_TIME_MS, type RoomView } from "@/game/room";
+import { HURRY_COOLDOWN_MS, HURRY_GRACE_MS, MORE_TIME_MS, type RoomView } from "@/game/room";
 import { findSets } from "@/game/sets";
 import type { RoomApi } from "@/hooks/useRoom";
 import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
@@ -169,6 +169,8 @@ export function PhoneView({
   // The table resting after anyone's hurry-up: every button waits it out,
   // rather than inviting presses the server will refuse.
   const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null);
+  // Nor is anybody hurried in the first moments of their turn.
+  const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   const compact = layout.compact;
   // A tile is armed by the first tap or click and thrown by the second, so a
@@ -540,27 +542,33 @@ export function PhoneView({
   // The count can outlive the view's cooldown by a render, so both are checked.
   const cooldown = view.hurryCooldown !== null && hurryLeft !== null && hurryLeft > 0 ? view.hurryCooldown : null;
   const cooldownSeconds = Math.ceil((hurryLeft ?? 0) / 1000);
-  const cooldownStyle: CSSProperties & { "--left": number } = {
-    "--left": Math.min(1, (hurryLeft ?? 0) / HURRY_COOLDOWN_MS),
+  const settling = cooldown === null && graceLeft !== null && graceLeft > 0;
+  const graceSeconds = Math.ceil((graceLeft ?? 0) / 1000);
+  const restingStyle: CSSProperties & { "--left": number } = {
+    "--left": cooldown
+      ? Math.min(1, (hurryLeft ?? 0) / HURRY_COOLDOWN_MS)
+      : Math.min(1, (graceLeft ?? 0) / HURRY_GRACE_MS),
   };
   const hurryButton =
     display.hurry === "on" && waitingOn !== null && waitingOn !== seat ? (
       <button
         type="button"
-        className={`btn btn--sm btn--ghost phone__hurry-btn${cooldown ? " phone__hurry-btn--resting" : ""}`}
-        style={cooldown ? cooldownStyle : undefined}
-        disabled={api.busy || cooldown !== null}
+        className={`btn btn--sm btn--ghost phone__hurry-btn${cooldown || settling ? " phone__hurry-btn--resting" : ""}`}
+        style={cooldown || settling ? restingStyle : undefined}
+        disabled={api.busy || cooldown !== null || settling}
         aria-label={
           cooldown
             ? `${cooldown.by === seat ? "You" : nameOf(cooldown.by)} hurried ${nameOf(cooldown.seat)}: hurry up again in ${cooldownSeconds} seconds`
-            : `Hurry up ${nameOf(waitingOn)}: flash their screen`
+            : settling
+              ? `${nameOf(waitingOn)}'s turn has only just started: hurry up in ${graceSeconds} seconds`
+              : `Hurry up ${nameOf(waitingOn)}: flash their screen`
         }
         onClick={() => void api.act({ type: "hurry" })}
       >
         {/* "Hurried" while it is this wait that was nudged; once the turn has
             moved on, the button is only resting. */}
         {cooldown?.seat === waitingOn ? "Hurried" : compact ? "Hurry" : "Hurry up"}
-        {cooldown ? ` ${cooldownSeconds}s` : null}
+        {cooldown ? ` ${cooldownSeconds}s` : settling ? ` ${graceSeconds}s` : null}
       </button>
     ) : null;
 

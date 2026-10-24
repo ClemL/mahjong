@@ -99,6 +99,11 @@ export const HURRY_FLASH_MS = 2_400;
  * table can ask once and then has to let them think.
  */
 export const HURRY_COOLDOWN_MS = 10_000;
+/**
+ * How far into a turn before anyone may hurry it: long enough to see what has
+ * come and start to think.
+ */
+export const HURRY_GRACE_MS = 3_000;
 
 export interface RoomSettings {
   speed: SpeedLevel;
@@ -182,6 +187,11 @@ export interface Room {
   displaced: { token: string; seat: Seat; byTable?: boolean }[];
   /** The last hurry-up: who it was aimed at, who sent it, and when. */
   hurry: { seat: Seat; by: Seat; at: number } | null;
+  /**
+   * When the table started waiting on the person it is waiting on now, and
+   * for which move, so a hurry-up can leave every turn a moment first.
+   */
+  acting: { key: string; since: number } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -262,6 +272,11 @@ export interface RoomView {
    * up button waits it out, not only the sender's. Null once another would be.
    */
   hurryCooldown: { seat: Seat; by: Seat; left: number } | null;
+  /**
+   * How long, in ms, until the person the table is waiting on may be hurried:
+   * nobody is in the first moments of their turn. 0 once they may.
+   */
+  hurryGraceLeft: number;
 }
 
 const HIDDEN: TileCode = "back";
@@ -294,6 +309,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     moreTime: null,
     displaced: [],
     hurry: null,
+    acting: null,
   };
 }
 
@@ -305,6 +321,7 @@ export function normalizeRoom(room: Room): Room {
   room.moreTime ??= null;
   room.displaced ??= [];
   room.hurry ??= null;
+  room.acting ??= null;
   return room;
 }
 
@@ -364,6 +381,9 @@ export function returnToLobby(room: Room, state: GameState): void {
   room.state = state;
   room.claimResponses = {};
   room.claimDeadline = null;
+  // A new game numbers its hands and moves from the start again, so an old
+  // stamp could pass for the first turn of the next.
+  room.acting = null;
 }
 
 /**
@@ -430,13 +450,42 @@ export function actingHumanSeat(room: Room, now = Date.now()): Seat | null {
 }
 
 /**
+ * One move of one person: every turn follows a logged move — a discard, a
+ * claim, a kong — so the log's count tells a seat's turn from its next one.
+ */
+function actingKey(state: GameState, seat: Seat): string {
+  return `${state.handNumber}:${state.phase}:${seat}:${state.logSeq}`;
+}
+
+/** Stamp the moment the table starts waiting on someone new; true when it has. */
+export function noteActing(room: Room, now = Date.now()): boolean {
+  const seat = actingHumanSeat(room, now);
+  const key = seat === null ? null : actingKey(room.state, seat);
+  if ((room.acting?.key ?? null) === key) return false;
+  room.acting = key === null ? null : { key, since: now };
+  return true;
+}
+
+/** How long until the person the table is waiting on may be hurried; 0 once they may, or with nobody to hurry. */
+export function hurryGraceLeft(room: Room, now = Date.now()): number {
+  const seat = actingHumanSeat(room, now);
+  if (seat === null) return 0;
+  // A wait not stamped yet has only just begun.
+  const noted = room.acting?.key === actingKey(room.state, seat) ? room.acting.since : now;
+  // A turn held for the deal, or for a claimed tile to cross the table, starts when that ends.
+  return Math.max(0, Math.max(noted, room.lastStepAt) + HURRY_GRACE_MS - now);
+}
+
+/**
  * Nudge whoever the table is waiting on, or say why not. Nobody hurries
- * themselves or the computer, and one nudge has to settle before the next.
+ * themselves or the computer, nobody is hurried in the first moments of their
+ * turn, and one nudge has to settle before the next.
  */
 export function hurryUp(room: Room, by: Seat, now = Date.now()): string | null {
   const seat = actingHumanSeat(room, now);
   if (seat === null) return "Nobody is holding up the table";
   if (seat === by) return "It is your move";
+  if (hurryGraceLeft(room, now) > 0) return "Their turn has only just started";
   if (room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS) return "They have just been hurried";
   room.hurry = { seat, by, at: now };
   return null;
@@ -725,6 +774,7 @@ export function drain(room: Room, now = Date.now()): boolean {
     openWindow();
   }
 
+  if (noteActing(room, now)) changed = true;
   room.rngCalls += 1;
   return changed;
 }
@@ -888,6 +938,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS
         ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - now }
         : null,
+    hurryGraceLeft: hurryGraceLeft(room, now),
   };
 }
 

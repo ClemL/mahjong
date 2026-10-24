@@ -2,10 +2,12 @@ import { vi } from "vitest";
 import { discard } from "@/game/engine";
 import {
   CLAIM_WINDOW_MS,
+  HURRY_GRACE_MS,
   type Room,
   type RoomView,
   drain,
   newRoom,
+  noteActing,
   notePlayed,
   pendingHumanClaimants,
   startPlay,
@@ -63,6 +65,17 @@ export function claimable(): { room: Room; claimer: Seat } {
     }
   }
   throw new Error("no claimable deal in the first 500 seeds");
+}
+
+/**
+ * The turn on the table already under way: its deal shown and its first
+ * moments, when nobody may hurry it, gone.
+ */
+export function underway(room: Room, now = Date.now()): void {
+  const since = now - HURRY_GRACE_MS;
+  room.lastStepAt = since;
+  room.acting = null;
+  noteActing(room, since);
 }
 
 export function tableView(room: Room): RoomView {

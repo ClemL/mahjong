@@ -5,7 +5,7 @@ import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
 import { hurryUp } from "@/game/room";
 import { PhoneView } from "../PhoneView";
-import { NAMES, claimable, dealt, fakeApi, playerView, sound } from "./fixtures";
+import { NAMES, claimable, dealt, fakeApi, playerView, sound, underway } from "./fixtures";
 
 /** Phones in these tests are touch screens unless they say otherwise. */
 function touchScreen() {
@@ -360,6 +360,7 @@ describe("PhoneView — whose move it is", () => {
     window.localStorage.setItem("hk-mahjong.hurry", "on");
     onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));
     const { room, seat } = onTurn();
+    underway(room);
     const other = ((seat + 1) % 4) as Seat;
     const theirs = playerView(room, other);
     const api = fakeApi(theirs);
@@ -377,10 +378,33 @@ describe("PhoneView — whose move it is", () => {
     expect(within(container).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
   });
 
+  it("waits out the first three seconds of anybody's turn before it can hurry them", () => {
+    window.localStorage.setItem("hk-mahjong.hurry", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));
+    // Dealt just now: the turn on the table has only just begun.
+    const { room, seat } = onTurn();
+    room.lastStepAt = Date.now();
+    const other = ((seat + 1) % 4) as Seat;
+    const theirs = playerView(room, other);
+    expect(theirs.hurryGraceLeft).toBeGreaterThan(0);
+    const api = fakeApi(theirs);
+    const { container } = render(<PhoneView api={api} view={theirs} sound={sound} />);
+    const waiting = within(container).getByRole("button", {
+      name: new RegExp(`^${NAMES[seat]}'s turn has only just started: hurry up in [1-3] seconds$`),
+    });
+    expect(waiting).toHaveProperty("disabled", true);
+    expect(waiting.textContent).toMatch(/^Hurry up [1-3]s$/);
+    fireEvent.click(waiting);
+    expect(api.act).not.toHaveBeenCalled();
+    // The server holds to the same rule.
+    expect(hurryUp(room, other)).toMatch(/only just started/);
+  });
+
   it("rests every Hurry up button at the table after anyone's, counting down the seconds", () => {
     window.localStorage.setItem("hk-mahjong.hurry", "on");
     onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));
     const { room, seat } = onTurn();
+    underway(room);
     const sender = ((seat + 1) % 4) as Seat;
     const bystander = ((seat + 2) % 4) as Seat;
     const name = NAMES[seat];
@@ -407,7 +431,8 @@ describe("PhoneView — whose move it is", () => {
       delete (window.navigator as { vibrate?: unknown }).vibrate;
     });
     const { room, seat } = onTurn();
-    hurryUp(room, ((seat + 1) % 4) as Seat);
+    underway(room);
+    expect(hurryUp(room, ((seat + 1) % 4) as Seat)).toBeNull();
     const mine = playerView(room, seat);
     const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
     // No flash without the setting, but the buzz still comes.
@@ -424,8 +449,9 @@ describe("PhoneView — whose move it is", () => {
 
   it("leaves the hurry-up button and the flash off unless the phone turns them on", () => {
     const { room, seat } = onTurn();
+    underway(room);
     const other = ((seat + 1) % 4) as Seat;
-    hurryUp(room, other);
+    expect(hurryUp(room, other)).toBeNull();
     {
       const mine = playerView(room, seat);
       const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
@@ -438,6 +464,7 @@ describe("PhoneView — whose move it is", () => {
 
   it.each([" zAiD ", "LUCY"])("turns the assists on by default for %j, however it is typed, but never over a choice", (typed) => {
     const { room, seat } = onTurn();
+    underway(room);
     const other = ((seat + 1) % 4) as Seat;
     const occupant = room.seats[other];
     if (occupant.kind === "human") occupant.name = typed;

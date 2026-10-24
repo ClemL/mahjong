@@ -73,6 +73,10 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   await expect(table.getByText("Lucy").first()).toBeVisible();
   await table.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
   await table.getByRole("button", { name: "Skip the deal" }).click();
+  // Nobody is hurried in the first three seconds of their turn: the button counts them down.
+  await expect(
+    zaid.page.getByRole("button", { name: /^Kris's turn has only just started: hurry up in \d seconds$/ }),
+  ).toBeDisabled();
   await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
 
   // The helper has its own row straight above the hand; it once fell into a row under it.
