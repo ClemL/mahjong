@@ -6,6 +6,8 @@ import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
+import { useFullscreen } from "@/hooks/useFullscreen";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import {
   MIN_FAAN_CHOICES,
   flowersInPlay,
@@ -49,6 +51,9 @@ export function TableLobby({
   const phoneDisplay = usePhoneDisplay(
     view.you.seat !== null ? view.players[view.you.seat].occupant.name : null,
   );
+  const fullscreen = useFullscreen("landscape");
+  // A phone left waiting for the deal is kept awake too, if it asked to be.
+  const wakeLock = useWakeLock(view.you.role === "player" && phoneDisplay.keepAwake === "on");
 
   // The join link has to be built in the browser — a statically exported page
   // has no idea what host it will be served from.
@@ -144,6 +149,9 @@ export function TableLobby({
               appearance={appearance}
               layout={layout}
               display={phoneDisplay}
+              fullscreen={fullscreen}
+              wakeLock={phoneDisplay.keepAwake === "on" ? wakeLock : undefined}
+              tableTakeBack={view.settings.takeBack !== false}
               table={tableName(view.roomId)}
               onLeave={() => void api.leave()}
             />
@@ -212,10 +220,6 @@ export function TableLobby({
                   {/* One chair either way round the table; a taken chair
                       means the two players trade places. Labelled with where
                       they land, since left and right depend on where you stand. */}
-                  {here && isTable ? (
-                    <span className="gather__hint">Scanning this chair&apos;s code takes it over</span>
-                  ) : null}
-
                   {canMove ? (
                     <span className="gather__move">
                       {([-1, 1] as const).map((step) => {
@@ -394,7 +398,8 @@ export function TableLobby({
             type="button"
             className="btn btn--primary btn--deal"
             disabled={api.busy || seated.length === 0}
-            onClick={() => void api.control({ type: "deal" })}
+            // The table's look goes with the deal, for every phone to start the game in.
+            onClick={() => void api.control({ type: "deal", look: appearance.appearance })}
           >
             {/* Waiting alone, the honest label for dealing is what it does. */}
             {seated.length === 1 ? "Play the computer" : "Deal"}

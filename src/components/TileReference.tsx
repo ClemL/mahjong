@@ -6,7 +6,7 @@ import { DRAGONS, FLOWERS, SEAT_NAMES, WINDS, flowerOwner, tileLabel, type TileC
 import { TILE_STYLES } from "@/game/appearance";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import { Modal } from "./Modal";
-import { TileFace } from "./TileView";
+import { TileBack, TileFace } from "./TileView";
 import { Choice } from "./Choice";
 
 const RANKS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -82,6 +82,16 @@ export function TileReference({ api }: { api: AppearanceApi }) {
                   </ul>
                 </section>
               ))}
+              {/* How every tile looks face down — in the wall, and in the other hands. */}
+              <section className="tile-ref__group" aria-label="Tile back">
+                <h3 className="modal__section">Back</h3>
+                <ul className="tile-ref__row tile-ref__row--named">
+                  <li className="tile-ref__cell">
+                    <TileBack size="lg" />
+                    <span className="tile-ref__caption">Face down</span>
+                  </li>
+                </ul>
+              </section>
             </Modal>,
             trigger.current?.closest(".screen") ?? document.body,
           )

@@ -112,12 +112,22 @@ const FIELD_KEYS = Object.keys(FIELDS) as (keyof Appearance)[];
 
 /** Coerce anything read back from storage into a valid appearance. */
 export function normalizeAppearance(raw: unknown): Appearance {
+  const result = validAppearance(raw);
+  if (needsMigration(raw) && result.tiles === "pips") result.tiles = "traditional";
+  return result;
+}
+
+/**
+ * Coerce an appearance that was chosen just now — one a table sends with its
+ * deal, say — keeping every valid value as it is. Unlike a stored one, it has
+ * no old default to migrate from, so Pips stays Pips.
+ */
+export function validAppearance(raw: unknown): Appearance {
   const value = (raw ?? {}) as Record<string, unknown>;
   const result = { ...DEFAULT_APPEARANCE } as Record<keyof Appearance, string>;
   for (const key of FIELD_KEYS) {
     if (FIELDS[key].some((o) => o.value === value[key])) result[key] = value[key] as string;
   }
-  if (needsMigration(raw) && result.tiles === "pips") result.tiles = "traditional";
   return result as Appearance;
 }
 

@@ -14,6 +14,8 @@ import {
 export interface AppearanceApi {
   appearance: Appearance;
   set: <K extends keyof Appearance>(key: K, value: Appearance[K]) => void;
+  /** Every setting at once, as when a phone takes on the table's look. */
+  replace: (next: Appearance) => void;
   reset: () => void;
 }
 
@@ -57,5 +59,5 @@ export function useAppearance(): AppearanceApi {
 
   const reset = useCallback(() => persist(DEFAULT_APPEARANCE), [persist]);
 
-  return { appearance, set, reset };
+  return { appearance, set, replace: persist, reset };
 }
