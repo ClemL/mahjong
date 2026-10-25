@@ -7,6 +7,8 @@ import type { CompactLayout } from "@/hooks/useCompactLayout";
 import type { PhoneDisplay, PhoneSize } from "@/hooks/useLocalSetting";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
 import { canVibrate } from "@/hooks/useHaptics";
+import type { FullscreenApi } from "@/hooks/useFullscreen";
+import type { WakeLockState } from "@/hooks/useWakeLock";
 import { type SegmentOption, Segmented, SwitchRow } from "./SettingControls";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
@@ -55,7 +57,9 @@ export function PhoneSettings({
   sound,
   config,
   appearance,
-  fullscreenHint = false,
+  fullscreen,
+  wakeLock,
+  tableTakeBack = true,
   layout,
   display,
   sort,
@@ -65,8 +69,12 @@ export function PhoneSettings({
   sound: SoundToggle;
   config: RuleConfig;
   appearance: AppearanceApi;
-  /** Explain the home-screen route on phones that cannot go full screen. */
-  fullscreenHint?: boolean;
+  /** Full screen for this phone; where it cannot go full screen, the home-screen route is explained. */
+  fullscreen?: FullscreenApi;
+  /** How the keep-awake switch is faring, when it is on. */
+  wakeLock?: WakeLockState;
+  /** Whether the table allows take back at all. */
+  tableTakeBack?: boolean;
   layout?: CompactLayout;
   /** This phone's display choices. */
   display?: PhoneDisplay;
@@ -100,6 +108,34 @@ export function PhoneSettings({
           checked={!sound.muted}
           onChange={(on) => sound.setMuted(!on)}
         />
+        {display ? (
+          <SwitchRow
+            label="Keep awake"
+            hint={
+              wakeLock === "unsupported"
+                ? "This browser cannot keep the screen on"
+                : wakeLock === "denied"
+                  ? "The browser refused; low battery mode can block it"
+                  : "The screen stays on while the table is open on this phone"
+            }
+            checked={display.keepAwake === "on" && wakeLock !== "unsupported"}
+            disabled={wakeLock === "unsupported"}
+            onChange={(on) => display.setKeepAwake(on ? "on" : "off")}
+          />
+        ) : null}
+        {fullscreen ? (
+          <SwitchRow
+            label="Full screen"
+            hint={
+              fullscreen.supported
+                ? "Hides the browser bars and holds the phone sideways"
+                : "This browser cannot go full screen. On iPhone, Share → Add to Home Screen opens the table without the browser bars"
+            }
+            checked={fullscreen.active}
+            disabled={!fullscreen.supported}
+            onChange={(on) => (on ? fullscreen.enter() : fullscreen.exit())}
+          />
+        ) : null}
       </Group>
 
       {sort || layout || display ? (
@@ -149,18 +185,24 @@ export function PhoneSettings({
           />
           <SwitchRow
             label="Hurry up"
-            hint="Nudge a slow player; your screen flashes when they nudge you. You still feel the buzz with it off"
+            hint="A button to nudge a slow player. Whoever you nudge sees it, whatever their own setting — and so do you, when they nudge you"
             checked={display.hurry === "on"}
             onChange={(on) => display.setHurry(on ? "on" : "off")}
           />
+          <SwitchRow
+            label="Take back"
+            hint={
+              !tableTakeBack
+                ? "The table has switched take back off for everyone"
+                : display.takeBackLocked
+                  ? "Always on for Louis"
+                  : "For five seconds after you throw a tile, a button beside your flowers puts it back in your hand. The table waits those seconds out"
+            }
+            checked={tableTakeBack && display.takeBack === "on"}
+            disabled={!tableTakeBack || display.takeBackLocked}
+            onChange={(on) => display.setTakeBack(on ? "on" : "off")}
+          />
         </Group>
-      ) : null}
-
-      {fullscreenHint ? (
-        <p className="seat__meta">
-          This browser cannot go full screen. On iPhone, Share → Add to Home Screen opens the table
-          without the browser bars.
-        </p>
       ) : null}
 
       {onLeave ? (

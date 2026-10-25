@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { DEFAULT_APPEARANCE } from "@/game/appearance";
 import { TableLobby } from "../TableLobby";
 import { fakeApi, lobby, playerView, sound, tableView } from "./fixtures";
 
@@ -89,7 +90,8 @@ describe("TableLobby on the table", () => {
     const api = fakeApi(solo);
     render(<TableLobby api={api} view={solo} sound={sound} />);
     fireEvent.click(screen.getByRole("button", { name: "Play the computer" }));
-    expect(api.control).toHaveBeenCalledWith({ type: "deal" });
+    // The table's look goes with the deal, for the phones to start the game in.
+    expect(api.control).toHaveBeenCalledWith({ type: "deal", look: DEFAULT_APPEARANCE });
   });
 });
 

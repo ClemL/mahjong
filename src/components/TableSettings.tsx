@@ -503,7 +503,7 @@ export function TableSettings({
               />
               <SwitchRow
                 label="Take back a discard"
-                hint="For two seconds after a throw, until someone claims it; the table waits that long before the next draw"
+                hint="For five seconds after a throw, until someone claims it, for players with take back on among their assists (always for Louis); the table waits that long only after their throws"
                 checked={view.settings.takeBack !== false}
                 disabled={api.busy}
                 onChange={(value) => void api.control({ type: "takeBack", value })}

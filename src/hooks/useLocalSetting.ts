@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { alwaysTakesBack } from "@/game/room";
 
 /**
  * A per-device display choice kept in localStorage, like sound or the
@@ -142,6 +143,9 @@ export interface PhoneDisplay {
   /** A buzz when it is your turn, a claim is offered, or you win. */
   vibrate: OnOff;
   setVibrate: (value: OnOff) => void;
+  /** The screen held on while the table is open on this phone. */
+  keepAwake: OnOff;
+  setKeepAwake: (value: OnOff) => void;
   /** A line under three tiles in the hand that already make a set — one of the assists. */
   setHints: OnOff;
   setSetHints: (value: OnOff) => void;
@@ -151,14 +155,20 @@ export interface PhoneDisplay {
   /** The ♿ button that lists what finishes each set the hand has started. */
   helper: OnOff;
   setHelper: (value: OnOff) => void;
+  /** A few seconds after each throw to put the tile back — one of the assists. */
+  takeBack: OnOff;
+  setTakeBack: (value: OnOff) => void;
+  /** Take back is on whatever is chosen: the seat is Louis's. */
+  takeBackLocked: boolean;
 }
 
 /** Players whose seat has the assists on until they say otherwise, lower-cased. */
 const ASSISTED = new Set(["zaid", "lucy"]);
 
 /**
- * The assists — set hints, hurry up and the helper — start off for everyone
- * but the players in `ASSISTED`. A choice made in settings always wins.
+ * The assists — set hints, hurry up, the helper and take back — start off for
+ * everyone but the players in `ASSISTED`. A choice made in settings always
+ * wins, except that take back is never off for Louis.
  */
 export function assistsDefault(name: string | null | undefined): OnOff {
   return ASSISTED.has(name?.trim().toLowerCase() ?? "") ? "on" : "off";
@@ -173,13 +183,17 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     "comfy",
   ]);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
+  const [keepAwake, setKeepAwake] = useLocalSetting<OnOff>("hk-mahjong.keep-awake", "off", ON_OFF);
   const [stretch, setStretch] = useLocalSetting<OnOff>("hk-mahjong.hand-stretch", "off", ON_OFF);
   const [setHintsChoice, setSetHints] = useStoredChoice<OnOff>("hk-mahjong.set-hints", ON_OFF);
   const [hurryChoice, setHurry] = useStoredChoice<OnOff>("hk-mahjong.hurry", ON_OFF);
   const [helperChoice, setHelper] = useStoredChoice<OnOff>("hk-mahjong.helper", ON_OFF);
+  const [takeBackChoice, setTakeBack] = useStoredChoice<OnOff>("hk-mahjong.take-back", ON_OFF);
   const setHints = setHintsChoice ?? assistsDefault(name);
   const hurry = hurryChoice ?? assistsDefault(name);
   const helper = helperChoice ?? assistsDefault(name);
+  const takeBackLocked = alwaysTakesBack(name);
+  const takeBack = takeBackLocked ? "on" : (takeBackChoice ?? assistsDefault(name));
   return {
     playLog,
     setPlayLog,
@@ -189,11 +203,16 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     setStretch,
     vibrate,
     setVibrate,
+    keepAwake,
+    setKeepAwake,
     setHints,
     setSetHints,
     hurry,
     setHurry,
     helper,
     setHelper,
+    takeBack,
+    setTakeBack,
+    takeBackLocked,
   };
 }

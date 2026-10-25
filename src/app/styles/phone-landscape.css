@@ -720,3 +720,120 @@ body:has(.app--handset) {
   padding-top: 14px;
   border-top: 1px solid var(--line-soft);
 }
+
+/* ------------------------------------------------------- a set forming */
+
+/* A set just made from your hand forms in the middle of the screen: the tiles
+   from the hand rise, the claimed one drops in from the table, the set is
+   named, and then it shrinks away towards your open sets in the corner. Over
+   everything, but never in the way of a tap. */
+.phone__forming {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.forming {
+  --tile-lg: clamp(34px, 15cqh, 62px);
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 16px 18px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--felt-edge) 86%, transparent);
+  box-shadow:
+    0 0 0 2px var(--gold),
+    0 18px 40px rgba(0, 0, 0, 0.5);
+  animation: forming-card 1500ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.forming__tile {
+  display: inline-flex;
+}
+
+.forming__tile--hand {
+  animation: forming-rise 480ms cubic-bezier(0.2, 0.85, 0.3, 1) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* The claimed tile drops in from the table once the hand's tiles are on their way. */
+.forming__tile--taken {
+  animation: forming-drop 520ms cubic-bezier(0.2, 0.85, 0.3, 1) 220ms both;
+}
+
+.forming__tag {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 8px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+  animation: tag-in 320ms cubic-bezier(0.2, 0.85, 0.3, 1) 560ms both;
+}
+
+@keyframes forming-rise {
+  0%   { transform: translateY(60cqh) scale(0.8); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes forming-drop {
+  0%   { transform: translateY(-55cqh) rotate(-14deg) scale(1.3); opacity: 0; }
+  70%  { transform: translateY(5px) rotate(2deg) scale(1); opacity: 1; }
+  100% { transform: translateY(0) rotate(0deg) scale(1); opacity: 1; }
+}
+
+/* In, held while the tag reads, then off towards the open sets top right. */
+@keyframes forming-card {
+  0%   { transform: scale(0.92); opacity: 0; }
+  10%  { transform: scale(1); opacity: 1; }
+  78%  { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(28cqw, -34cqh) scale(0.4); opacity: 0; }
+}
+
+/* Its place among the open sets is kept while it forms, and filled as it lands. */
+.meld--arriving {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .phone__forming {
+    display: none;
+  }
+}
+
+/* ----------------------------------------------------------- take back */
+
+/* Take back sits to the right of your flowers, up in the open sets' row. */
+.phone__melds .phone__take-back {
+  align-self: center;
+  margin-left: 6px;
+}
+
+/* ------------------------------------------------------------- win wide */
+
+/* Win is three times the width it would take on its own, so a hurried tap
+   meant for it cannot land on the button beside it, and one meant for its
+   neighbour cannot end the hand. The phone's button size zooms these too. */
+.phone__win {
+  min-width: 276px;
+}
+
+.claim--win {
+  min-width: 196px;
+}
+
+/* Compact lays a claim's name beside its tiles, so it starts out wider. */
+.phone--compact .claim--win {
+  min-width: 300px;
+}

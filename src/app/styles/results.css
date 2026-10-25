@@ -958,3 +958,55 @@
     animation: none;
   }
 }
+
+/* --------------------------------------------------- ready for the next */
+
+/* Each phone says it is ready; the last one deals. Ticked in words as well as
+   in colour, so it never rests on the green. */
+.ready {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.ready__btn {
+  min-height: 40px;
+  padding-inline: 18px;
+}
+
+.ready__note {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-dim);
+}
+
+.ready--done {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--chip-pos);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* At the head of the result's table column, across its width. */
+.phone-result__table > .ready {
+  margin-bottom: 4px;
+}
+
+.phone-result__table > .ready > .ready__btn {
+  flex: 1 1 100%;
+}
+
+.phone-result__table > .ready--done {
+  justify-content: center;
+  text-align: center;
+}
+
+.result-sheet__ready {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}

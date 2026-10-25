@@ -11,6 +11,9 @@ import {
   hasAnyPlayer,
   identify,
   isOpeningTurn,
+  dealNextHand,
+  markReady,
+  setTakeBackAssist,
   seatName,
   sitDown,
   moveSeat,
@@ -42,7 +45,6 @@ import {
   declareSelfDraw,
   discard,
   endGame,
-  nextHand,
   setFlowers,
   setLiability,
   setMultipleWinners,
@@ -52,6 +54,7 @@ import {
   startHand,
 } from "@/game/engine";
 import { ROUND_CHOICES } from "@/game/rules";
+import { validAppearance } from "@/game/appearance";
 import { DIFFICULTIES, type Difficulty } from "@/game/ai";
 import type { Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
@@ -185,6 +188,8 @@ export type PlayerAction =
   | { type: "moreTime" }
   | { type: "hurry" }
   | { type: "takeBack" }
+  | { type: "assist"; takeBack: boolean }
+  | { type: "ready" }
   | { type: "leave" };
 
 export async function act(id: string, token: string, action: PlayerAction): Promise<RoomView> {
@@ -194,6 +199,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     const seat = who.seat;
     const occupant = r.seats[seat];
     if (occupant.kind === "human") occupant.lastSeen = now;
+
+    // A phone saying which assists it has on is not a move: it must not
+    // clear the note of what the computer played while they were away.
+    if (action.type === "assist") {
+      setTakeBackAssist(r, seat, action.takeBack === true);
+      return;
+    }
+
     // They are back and moving for themselves, so whatever the computer did meanwhile is old news.
     r.stoodIn[seat] = 0;
     syncSeats(r);
@@ -243,6 +256,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
       return;
     }
 
+    // The last of them to say so deals the next hand: `mutate` drains the
+    // room after this, and draining deals once everyone is ready.
+    if (action.type === "ready") {
+      const refused = markReady(r, seat);
+      if (refused) throw new RoomError(refused, 409);
+      return;
+    }
+
     if (r.state.turn !== seat || r.state.phase !== "action") {
       throw new RoomError("It is not your turn", 409);
     }
@@ -285,7 +306,8 @@ export async function resetTable(id: string): Promise<RoomView> {
 }
 
 export type TableCommand =
-  | { type: "deal" }
+  /** `look` is the table's appearance, which each phone takes on for the game. */
+  | { type: "deal"; look?: unknown }
   | { type: "regroup" }
   | { type: "nextHand" }
   | { type: "restart" }
@@ -332,6 +354,7 @@ export async function control(
       case "deal":
         if (r.started) throw new RoomError("The hand is already dealt", 409);
         if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
+        if (command.look !== undefined) r.look = { ...validAppearance(command.look), id: now };
         startPlay(r, now);
         break;
       // Abandon a warm-up now that somebody has turned up: everyone back
@@ -345,8 +368,7 @@ export async function control(
       }
       case "nextHand":
         if (r.state.phase !== "handOver") throw new RoomError("The hand is still running", 409);
-        r.state = nextHand(r.state);
-        beginHand(r, now);
+        dealNextHand(r, now);
         break;
       case "redeal":
         r.state = startHand({ ...r.state, phase: "handOver" });

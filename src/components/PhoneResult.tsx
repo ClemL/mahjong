@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { RoomView } from "@/game/room";
 import { summarizeGame } from "@/game/summary";
 import { type Seat, tileName } from "@/game/tiles";
@@ -59,11 +60,14 @@ export function PhoneResult({
   seat,
   nameOf,
   onHide,
+  ready,
 }: {
   view: RoomView;
   seat: Seat;
   nameOf: (s: Seat) => string;
   onHide: () => void;
+  /** Saying you are ready for the next hand, while one is settled. */
+  ready?: ReactNode;
 }) {
   const result = view.result;
   const hide = (
@@ -187,6 +191,8 @@ export function PhoneResult({
       ) : null}
 
       <div className="phone-result__table">
+        {/* First in its column, where it is seen without scrolling. */}
+        {ready}
         <div className="phone-result__head">
           <h2 className="phone-result__title">The table</h2>
           {hide}
@@ -207,8 +213,8 @@ export function PhoneResult({
         </ul>
         <span className="phone-result__next">
           {isLastHand(view)
-            ? "That was the last hand. The table shows the final scores next."
-            : `The table deals hand ${view.handNumber + 1}. ${nameOf(nextDealer)} deals.`}
+            ? "That was the last hand. The final scores come next, once everyone is ready."
+            : `Hand ${view.handNumber + 1} is dealt once everyone is ready. ${nameOf(nextDealer)} deals.`}
         </span>
       </div>
     </section>

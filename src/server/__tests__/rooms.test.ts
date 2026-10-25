@@ -300,6 +300,8 @@ describe("standing in", () => {
     expect(await roomStore().compareAndSet(stored, stored.version)).toBe(true);
     const view = await readRoom(id, tokens[0]);
     expect(view.stoodIn).toBe(2);
+    // Saying which assists are on is not a move of their own.
+    expect((await act(id, tokens[0], { type: "assist", takeBack: true })).stoodIn).toBe(2);
     const after = await act(id, tokens[0], { type: "discard", tileId: view.players[0].hand[0].id });
     expect(after.stoodIn).toBe(0);
   });
@@ -309,6 +311,9 @@ describe("taking back a discard", () => {
   it("returns the tile to the hand once, and the table can switch it off", async () => {
     const { id, tokens, table } = await dealtRoom([0]);
     await control(id, table, { type: "skipOpening" });
+    // Off until the phone says its assist is on.
+    expect((await readRoom(id, tokens[0])).takeBack).toEqual({ on: false, assist: null });
+    expect((await act(id, tokens[0], { type: "assist", takeBack: true })).takeBack).toEqual({ on: true, assist: true });
     const view = await readRoom(id, tokens[0]);
     const tile = view.players[0].hand.find((t) => !t.code.startsWith("f"))!;
     const thrown = await act(id, tokens[0], { type: "discard", tileId: tile.id });
@@ -326,6 +331,52 @@ describe("taking back a discard", () => {
     expect(again.takeBackIn).toBe(0);
     await expect(act(id, tokens[0], { type: "takeBack" })).rejects.toMatchObject({ status: 409 });
     await expect(control(id, tokens[0], { type: "takeBack", value: true })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("the table's look", () => {
+  it("goes out with the deal, every value checked, Pips kept as Pips", async () => {
+    const id = await room();
+    const { token } = await claimSeat(id, { seat: 0 });
+    const table = (await claimSeat(id, { seat: "table" })).token;
+    expect((await readRoom(id, token)).look).toBeNull();
+    await control(id, table, {
+      type: "deal",
+      look: { theme: "midnight", suits: "classic", tiles: "pips", body: "nonsense", backs: "crimson" },
+    });
+    const { look } = await readRoom(id, token);
+    expect(look).toMatchObject({ theme: "midnight", suits: "classic", tiles: "pips", body: "ivory", backs: "crimson" });
+    expect(typeof look?.id).toBe("number");
+  });
+});
+
+describe("ready for the next hand", () => {
+  it("is refused while a hand is still being played", async () => {
+    const { id, tokens } = await dealtRoom([0]);
+    await expect(act(id, tokens[0], { type: "ready" })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("deals the next hand once the people at the table are ready", async () => {
+    const { id, tokens } = await dealtRoom([0, 1]);
+    const stored = (await roomStore().get(id))!;
+    // Settled as a washout, which the dealer keeps.
+    stored.state = {
+      ...stored.state,
+      phase: "handOver",
+      result: { type: "washout", winner: null, from: null, score: null, payments: [0, 0, 0, 0], dealerKeeps: true },
+    };
+    expect(await roomStore().compareAndSet(stored, stored.version)).toBe(true);
+    const hand = (await readRoom(id, tokens[0])).handNumber;
+
+    const one = await act(id, tokens[0], { type: "ready" });
+    expect(one.ready).toEqual([0]);
+    expect(one.readyWaiting).toEqual([1]);
+    expect(one.phase).toBe("handOver");
+
+    const both = await act(id, tokens[1], { type: "ready" });
+    expect(both.handNumber).toBe(hand + 1);
+    expect(both.phase).not.toBe("handOver");
+    expect(both.ready).toEqual([]);
   });
 });
 
