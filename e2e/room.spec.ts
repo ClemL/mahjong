@@ -136,6 +136,17 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
   await table.page.waitForTimeout(2500);
   expect(await landed()).toBe(1);
   await expect(phoneTiles(phone.page)).toHaveCount(13);
+  // Either way East's pond shows it: a tile to tap, which picks out every copy
+  // of it on the table, or the space left where a computer seat took it.
+  if ((await tableDiscards(table.page, 0).count()) === 1) {
+    await table.page.locator('.discards[data-seat="0"] .discards__pick').first().click();
+    await expect(table.page.getByRole("status").filter({ hasText: / on the table/ })).toBeVisible();
+    await expect(table.page.locator(".felt--matching")).toHaveCount(1);
+  } else {
+    await expect(table.page.locator('.discards[data-seat="0"] .discards__gap')).toHaveCount(1);
+  }
+  // Nothing on the table cuts short a call on a discard.
+  await expect(table.page.getByRole("button", { name: /^Skip waiting/ })).toHaveCount(0);
 
   expect(table.errors).toEqual([]);
   expect(phone.errors).toEqual([]);

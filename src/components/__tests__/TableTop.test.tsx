@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { SEAT_IDLE_MS, drain, robotName } from "@/game/room";
 import { SEAT_NAMES, tileName } from "@/game/tiles";
+import type { RoomView } from "@/game/room";
 import { TableTop } from "../TableTop";
 import { gameProgress, standings } from "../TableSide";
 import { NAMES, claimable, dealt, fakeApi, sit, sound, tableView } from "./fixtures";
@@ -210,7 +211,7 @@ describe("TableTop", () => {
     }
   });
 
-  it("spotlights the last discard and lets the table stop waiting on a claim", () => {
+  it("spotlights the last discard, with no button to cut short anyone's call on it", () => {
     feltSize();
     const { room } = claimable();
     const view = tableView(room);
@@ -222,9 +223,76 @@ describe("TableTop", () => {
       `${view.players[discard.from].occupant.name} · ${tileName(discard.tile.code)}`,
     );
     expect(container.querySelectorAll(".rack--deciding")).toHaveLength(view.awaitingClaimSeats.length);
+    // A pung, chow or kong being thought about is left to the person thinking.
+    expect(screen.queryByRole("button", { name: /^Skip waiting/ })).toBeNull();
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: `Skip waiting (${view.awaitingClaimSeats.length})` }));
-    expect(api.control).toHaveBeenCalledWith({ type: "forcePass" });
+  it("leaves a space in a pond where another player took a tile, naming who", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const tiles = [
+      { id: "a", code: "m1" },
+      { id: "b", code: "p2" },
+    ];
+    const withGap: RoomView = {
+      ...view,
+      lastPlayed: null,
+      players: view.players.map((p) =>
+        p.seat === 0 ? { ...p, discards: tiles, taken: [{ at: 1, by: 2 }, { at: 2, by: 3 }] } : p,
+      ),
+    };
+    const { container } = render(<TableTop api={fakeApi(withGap)} view={withGap} sound={sound} />);
+    const pond = container.querySelector('.discards[data-seat="0"]')!;
+    const order = Array.from(pond.children).map((el) =>
+      el.classList.contains("discards__gap") ? `gap:${el.getAttribute("aria-label")}` : el.querySelector(".tile")!.getAttribute("data-code"),
+    );
+    expect(order).toEqual(["m1", `gap:Taken by ${NAMES[2]}`, "p2", `gap:Taken by ${NAMES[3]}`]);
+    // A space is not a tile: counting a pond's tiles still counts only what is in it.
+    expect(pond.querySelectorAll(".tile")).toHaveLength(2);
+  });
+
+  it("picks out every copy of a tapped discard on the table, and lets it go again", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const matched: RoomView = {
+      ...view,
+      lastPlayed: null,
+      players: view.players.map((p) =>
+        p.seat === 0
+          ? { ...p, discards: [{ id: "a", code: "dr" }, { id: "b", code: "m1" }] }
+          : p.seat === 1
+            ? { ...p, discards: [{ id: "c", code: "dr" }] }
+            : p,
+      ),
+    };
+    const { container } = render(<TableTop api={fakeApi(matched)} view={matched} sound={sound} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Show every Red Dragon on the table" })[0]);
+    expect(container.querySelector(".felt--matching")).not.toBeNull();
+    expect(container.querySelector(".felt style")!.textContent).toContain('[data-code="dr"]');
+    // Counted in words, so it never rests on the ring alone.
+    expect(screen.getByRole("status").textContent).toContain("Red Dragon: 2 on the table");
+
+    // The same tile again lets it go.
+    fireEvent.click(screen.getAllByRole("button", { name: "Show every Red Dragon on the table" })[1]);
+    expect(container.querySelector(".felt--matching")).toBeNull();
+  });
+
+  it("draws the table larger or smaller as this tablet's size says", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const tileAt = (density: string) => {
+      window.localStorage.setItem("hk-mahjong.tablet-density", density);
+      const { container, unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+      expect(container.querySelector(`.tabletop--${density}`)).not.toBeNull();
+      const pond = container.querySelector<HTMLElement>(".discards")!;
+      const size = parseFloat(pond.style.getPropertyValue("--tile-md"));
+      unmount();
+      return size;
+    };
+    const sizes = ["cosy", "normal", "compact", "extra"].map(tileAt);
+    expect(sizes[0]).toBeGreaterThan(sizes[1]);
+    expect(sizes[1]).toBeGreaterThan(sizes[2]);
+    expect(sizes[2]).toBeGreaterThan(sizes[3]);
   });
 
   it("redeals at once but asks before restarting", () => {

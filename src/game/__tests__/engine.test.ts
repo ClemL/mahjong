@@ -408,6 +408,18 @@ describe("full hands", () => {
         }
       }
 
+      // Every tile taken out of a pond left a note of where it lay and who took it.
+      const claims = state.players
+        .flatMap((p) => p.melds.filter((m) => m.claimedFrom !== undefined).map((m) => `${m.claimedFrom}>${p.seat}`))
+        .sort();
+      const notes = state.players.flatMap((p) => (p.taken ?? []).map((t) => `${p.seat}>${t.by}`)).sort();
+      for (const claim of claims) expect(notes, `seed ${seed}`).toContain(claim);
+      // A win off a discard leaves one note more: that tile went to a hand, not a set.
+      expect([0, 1]).toContain(notes.length - claims.length);
+      for (const p of state.players) {
+        for (const note of p.taken ?? []) expect(note.at).toBeLessThanOrEqual(p.discards.length);
+      }
+
       const result = state.result!;
       expect(result.payments.reduce((a, b) => a + b, 0)).toBe(0);
       if (result.type === "win") {

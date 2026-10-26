@@ -23,6 +23,8 @@ export interface TableLayoutInput {
   revealed: readonly number[];
   /** Per position: separate groups on that rack (each meld, plus one for flowers). */
   groups: readonly number[];
+  /** How thick the racks are against the usual, for a roomier or a tighter table. */
+  scale?: number;
 }
 
 /** A box positioned by its centre, then rotated to face a seat. */
@@ -158,8 +160,9 @@ export function layoutTable({
   capacity,
   revealed,
   groups,
+  scale = 1,
 }: TableLayoutInput): TableLayout {
-  const rack = Math.round(Math.min(84, Math.max(58, Math.min(width, height) * 0.1)));
+  const rack = Math.round(Math.min(84, Math.max(58, Math.min(width, height) * 0.1)) * scale);
   // The middle of the felt, inside the racks.
   const midW = Math.max(0, width - 2 * rack - 2 * MARGIN);
   const midH = Math.max(0, height - 2 * rack - 2 * MARGIN);
@@ -193,7 +196,7 @@ export function layoutTable({
     const count = revealed[position] ?? 0;
     const fromLength =
       count > 0 ? (length - RACK_INFO - (groups[position] ?? 0) * 8) / count - 2 : MAX_RACK_TILE;
-    return Math.floor(Math.max(16, Math.min(MAX_RACK_TILE, fromHeight, fromLength)));
+    return Math.floor(Math.max(16, Math.min(MAX_RACK_TILE * scale, fromHeight, fromLength)));
   };
 
 

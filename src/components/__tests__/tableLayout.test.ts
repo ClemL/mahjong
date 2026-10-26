@@ -78,6 +78,40 @@ describe("table layout", () => {
   });
 });
 
+describe("the tablet's sizes", () => {
+  // Cosy, normal, compact, extra compact: the capacity and rack scale TableTop passes for each.
+  const sizes = [
+    { capacity: 18, scale: 1 },
+    { capacity: 24, scale: 1 },
+    { capacity: 30, scale: 0.9 },
+    { capacity: 42, scale: 0.8 },
+  ];
+
+  it.each(SCREENS)("draws the discards smaller at each step down, on %s", (name, width, height) => {
+    const tiles = sizes.map(({ capacity, scale }) => layoutTable({ width, height, capacity, scale, ...quiet }).tile);
+    // A window this short has no height for cosy to grow into; it is never smaller, though.
+    if (name === "laptop window") expect(tiles[0]).toBeGreaterThanOrEqual(tiles[1]);
+    else expect(tiles[0], `${tiles}`).toBeGreaterThan(tiles[1]);
+    for (let i = 2; i < tiles.length; i++) expect(tiles[i], `${tiles}`).toBeLessThan(tiles[i - 1]);
+  });
+
+  it("keeps every box clear of the others at every size", () => {
+    for (const [, width, height] of SCREENS) {
+      for (const { capacity, scale } of sizes) {
+        const layout = layoutTable({ width, height, capacity, scale, ...quiet });
+        const boxes = [...layout.racks, ...layout.ponds, layout.console];
+        for (let i = 0; i < boxes.length; i++) {
+          for (let j = i + 1; j < boxes.length; j++) {
+            // Racks meet at the corners by design; ponds and the console never touch anything.
+            if (i < 4 && j < 4) continue;
+            expect(overlaps(boxes[i], boxes[j]), `${width}x${height} capacity ${capacity}: ${i} and ${j}`).toBe(false);
+          }
+        }
+      }
+    }
+  });
+});
+
 describe("rotation", () => {
   it("moves every seat one edge clockwise per quarter turn", () => {
     // Positions run bottom, right, top, left.

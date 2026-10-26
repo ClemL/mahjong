@@ -72,6 +72,10 @@ export function useStoredChoice<T extends string>(key: string, allowed: readonly
 export type OnOff = "on" | "off";
 const ON_OFF: readonly OnOff[] = ["on", "off"];
 
+/** How large the tablet draws the table: its discards, its racks and its own controls. */
+export type TabletDensity = "cosy" | "normal" | "compact" | "extra";
+export const TABLET_DENSITIES: readonly TabletDensity[] = ["cosy", "normal", "compact", "extra"];
+
 /** What the tablet draws besides the game itself. */
 export interface TabletDisplay {
   /** Light the discard area of the seat whose turn it is. */
@@ -80,12 +84,19 @@ export interface TabletDisplay {
   /** The wall of tiles still to be drawn, faint under everything else. */
   wall: OnOff;
   setWall: (value: OnOff) => void;
+  density: TabletDensity;
+  setDensity: (value: TabletDensity) => void;
 }
 
 export function useTabletDisplay(): TabletDisplay {
   const [turnGlow, setTurnGlow] = useLocalSetting<OnOff>("hk-mahjong.turn-glow", "on", ON_OFF);
   const [wall, setWall] = useLocalSetting<OnOff>("hk-mahjong.wall", "on", ON_OFF);
-  return { turnGlow, setTurnGlow, wall, setWall };
+  const [density, setDensity] = useLocalSetting<TabletDensity>(
+    "hk-mahjong.tablet-density",
+    "normal",
+    TABLET_DENSITIES,
+  );
+  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity };
 }
 
 /** The panes beside a squared felt, each of which the tablet can close. */

@@ -528,6 +528,13 @@ export function PhoneView({
   // The beat after your own throw, while it can still be taken back.
   else if (view.turn === seat && view.lastDiscard?.from === seat) prompt = `You threw ${tileName(view.lastDiscard.tile.code)}.`;
   else prompt = `Waiting for ${nameOf(view.turn)}…`;
+  // Whoever is being waited on has already been hurried, and by whom: nobody
+  // else need ask again, and nobody wonders whether anyone has.
+  const waitedOn = view.phase === "claiming" ? deciding : view.turn;
+  const hurriedNote =
+    view.hurried && view.hurried.seat === waitedOn && waitedOn !== seat && prompt.startsWith("Waiting for")
+      ? `Hurried by ${view.hurried.by === seat ? "you" : nameOf(view.hurried.by)}`
+      : null;
 
   // The newest discard at the table, with the wind of whoever threw it — just
   // enough to know what went out without looking up at the shared screen.
@@ -644,6 +651,7 @@ export function PhoneView({
   const promptLine = (
     <p className={`phone__prompt${yourTurn || view.claim ? " phone__prompt--live" : ""}`}>
       {prompt}
+      {hurriedNote ? <span className="phone__hurried-note">{hurriedNote}</span> : null}
       {over && (result || view.phase === "gameOver") && !showResult ? (
         <button type="button" className="btn btn--sm phone__result-open" onClick={() => setResultAside(null)}>
           Result

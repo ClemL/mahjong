@@ -11,7 +11,7 @@ import { NAMES, dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
 const appearance: AppearanceApi = { appearance: DEFAULT_APPEARANCE, set: vi.fn(), replace: vi.fn(), reset: vi.fn() };
 
 function tabletDisplay(): TabletDisplay {
-  return { turnGlow: "on", setTurnGlow: vi.fn(), wall: "on", setWall: vi.fn() };
+  return { turnGlow: "on", setTurnGlow: vi.fn(), wall: "on", setWall: vi.fn(), density: "normal", setDensity: vi.fn() };
 }
 
 function phoneDisplay(): PhoneDisplay {
@@ -127,6 +127,25 @@ describe("the table's settings", () => {
     expect(document.activeElement).toBe(tablet);
     fireEvent.click(screen.getByRole("switch", { name: "Wall" }));
     expect(display.setWall).toHaveBeenCalledWith("off");
+  });
+});
+
+describe("this tablet's size", () => {
+  it("offers cosy, normal, compact and extra compact, and says which is in use", () => {
+    const view = tableView(lobby([0]));
+    const display = tabletDisplay();
+    render(<TableSettings api={fakeApi(view)} view={view} sound={sound} appearance={appearance} display={display} />);
+    fireEvent.click(screen.getByRole("tab", { name: /This tablet/ }));
+    const size = screen.getByRole("group", { name: "Size" });
+    expect(within(size).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Cosy",
+      "Normal",
+      "Compact",
+      "Extra compact",
+    ]);
+    fireEvent.click(within(size).getByRole("button", { name: "Extra compact" }));
+    expect(display.setDensity).toHaveBeenCalledWith("extra");
+    expect(screen.getByRole("tab", { name: /This tablet/ }).textContent).toContain("Normal");
   });
 });
 
