@@ -17,11 +17,20 @@ const MELD_TAG: Record<Meld["type"], string> = {
  * keeps a named tag until the next tile is thrown so a glance shows who took
  * what.
  */
-export function MeldRow({ meld, fresh = false }: { meld: Meld; fresh?: boolean }) {
+export function MeldRow({
+  meld,
+  fresh = false,
+  arriving = false,
+}: {
+  meld: Meld;
+  fresh?: boolean;
+  /** Still on its way here — forming elsewhere on screen — so its place is kept, empty. */
+  arriving?: boolean;
+}) {
   // A concealed kong is shown face down on the ends, as it is on a real table.
   if (meld.type === "kong" && meld.concealed) {
     return (
-      <span className="meld">
+      <span className={arriving ? "meld meld--arriving" : "meld"}>
         <TileBack size="sm" />
         <TileFace code={meld.tiles[1].code} size="sm" />
         <TileFace code={meld.tiles[2].code} size="sm" />
@@ -30,7 +39,7 @@ export function MeldRow({ meld, fresh = false }: { meld: Meld; fresh?: boolean }
     );
   }
   return (
-    <span className={fresh ? "meld meld--fresh" : "meld"}>
+    <span className={["meld", fresh ? "meld--fresh" : "", arriving ? "meld--arriving" : ""].filter(Boolean).join(" ")}>
       {fresh ? (
         <span className="meld__tag" aria-hidden>
           {MELD_TAG[meld.type]}

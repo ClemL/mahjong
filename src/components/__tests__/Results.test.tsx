@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { HandRecord } from "@/game/engine";
 import type { RoomView } from "@/game/room";
+import type { Seat } from "@/game/tiles";
 import { TableTop } from "../TableTop";
 import { PhoneResult } from "../PhoneResult";
 import { PhoneView } from "../PhoneView";
@@ -110,6 +111,16 @@ describe("the table's hand result", () => {
     ]);
     expect(within(sheet).getByText("Others pay half · house rule")).toBeTruthy();
     expect(within(sheet).getByText(`The deal moves on · ${NAMES[1]} deals hand ${over.handNumber + 1}`)).toBeTruthy();
+  });
+
+  it("says who has tapped Ready on their phone and who it is still waiting for", () => {
+    feltSize();
+    const over = discardWin(tableView(dealt()));
+    const { rerender } = render(<TableTop api={fakeApi(over)} view={{ ...over, ready: [], readyWaiting: [0, 1, 2, 3] }} sound={sound} />);
+    const line = () => screen.getByRole("dialog", { name: "Hand result" }).querySelector(".result-sheet__ready")!.textContent;
+    expect(line()).toBe("Deals once everyone taps Ready on their phone.");
+    rerender(<TableTop api={fakeApi(over)} view={{ ...over, ready: [0, 2], readyWaiting: [1, 3] }} sound={sound} />);
+    expect(line()).toBe(`Ready: ${NAMES[0]} and ${NAMES[2]} · waiting for ${NAMES[1]} and ${NAMES[3]}.`);
   });
 
   it("names every winner on one discard, shows each hand, and says who paid each", () => {
@@ -276,6 +287,25 @@ describe("a phone's hand result", () => {
     expect(screen.queryByRole("region", { name: "Hand result" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Result" }));
     expect(screen.getByRole("region", { name: "Hand result" })).toBeTruthy();
+  });
+
+  it("says it is ready for the next hand, from the result or with it put aside, then who it waits for", () => {
+    const view: RoomView = { ...discardWin(playerView(dealt(), 0)), ready: [], readyWaiting: [0, 1, 2, 3] };
+    const api = fakeApi(view);
+    const { rerender } = render(<PhoneView api={api} view={view} sound={sound} />);
+    const result = screen.getByRole("region", { name: "Hand result" });
+    fireEvent.click(within(result).getByRole("button", { name: "Ready for the next hand" }));
+    expect(api.act).toHaveBeenCalledWith({ type: "ready" });
+
+    // Put aside, the result's button is still there among the phone's choices.
+    fireEvent.click(within(result).getByRole("button", { name: "Hide" }));
+    expect(screen.getByRole("button", { name: "Ready for the next hand" })).toBeTruthy();
+    expect(screen.getByText(/Tap Ready for the next one\.$/)).toBeTruthy();
+
+    const waiting: RoomView = { ...view, ready: [0, 2] as Seat[], readyWaiting: [1, 3] as Seat[] };
+    rerender(<PhoneView api={api} view={waiting} sound={sound} />);
+    expect(screen.queryByRole("button", { name: /^Ready for/ })).toBeNull();
+    expect(document.querySelector(".ready--done")!.textContent).toBe(`✓ Ready · waiting for ${NAMES[1]} and ${NAMES[3]}`);
   });
 
   it("gives each phone its place once the game is over", () => {

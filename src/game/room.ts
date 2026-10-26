@@ -19,6 +19,7 @@ import {
   claimTurn,
   createGame,
   discard,
+  nextHand,
   resolveClaims,
   startHand,
   turnActions,
@@ -108,9 +109,18 @@ export const HURRY_COOLDOWN_MS = 10_000;
 export const HURRY_GRACE_MS = 3_000;
 /**
  * How long a person has to take back the tile they just threw. The table
- * waits it out before anyone draws or a claim is settled, so it is short.
+ * waits it out before anyone draws or a claim is settled, which is why it is
+ * held only for the people who have take back on.
  */
-export const TAKE_BACK_MS = 2_000;
+export const TAKE_BACK_MS = 5_000;
+
+/**
+ * Take back is one of a phone's assists, off unless that phone turns it on —
+ * but always on for anyone sitting as Louis, whatever their assists say.
+ */
+export function alwaysTakesBack(name: string | null | undefined): boolean {
+  return name?.trim().toLowerCase() === "louis";
+}
 
 export interface RoomSettings {
   speed: SpeedLevel;
@@ -143,7 +153,14 @@ export type Occupant =
   | { kind: "open" }
   /** Named when the computer took the chair over from somebody. */
   | { kind: "ai"; name?: string }
-  | { kind: "human"; name: string; token: string; lastSeen: number };
+  | {
+      kind: "human";
+      name: string;
+      token: string;
+      lastSeen: number;
+      /** Take back switched on among this person's assists, as their phone last said. */
+      takeBack?: boolean;
+    };
 
 export interface TableDevice {
   token: string;
@@ -218,6 +235,18 @@ export interface Room {
    */
   stoodIn: number[];
   /**
+   * The people who have said they are ready for the next hand, while one is
+   * settled. Once every person at the table has, it is dealt without waiting
+   * for the table to press Next hand.
+   */
+  ready: Seat[];
+  /**
+   * The look the table was dealt with — its felt, tile faces, body, backs and
+   * suit colours — which each phone takes on once per deal. `id` tells one
+   * deal's look from the next.
+   */
+  look: (TableLook & { id: number }) | null;
+  /**
    * A person's discard that can still be taken back: the table as it was
    * before the throw, kept here on the server and never sent to anyone.
    */
@@ -237,6 +266,19 @@ export interface Room {
 }
 
 export type Role = "player" | "table" | "spectator";
+
+/**
+ * The table's appearance as the room carries it. Kept as plain strings here:
+ * the appearance module owns which values are allowed, and the service checks
+ * them before they are stored.
+ */
+export interface TableLook {
+  theme: string;
+  suits: string;
+  tiles: string;
+  body: string;
+  backs: string;
+}
 
 export interface PublicPlayer {
   seat: Seat;
@@ -338,6 +380,18 @@ export interface RoomView {
   takeBackIn: number;
   /** The table has paused the hand: no moves, and every clock stands still. */
   paused: boolean;
+  /**
+   * Whether the table holds this viewer's throws for a take back, and what
+   * their phone last said about the assist (null until it has said anything).
+   * Both false and null for anyone not seated.
+   */
+  takeBack: { on: boolean; assist: boolean | null };
+  /** Who has said they are ready for the next hand, while a hand is settled. */
+  ready: Seat[];
+  /** The people at the table still to say they are ready, while a hand is settled. */
+  readyWaiting: Seat[];
+  /** The look the table was dealt with, for phones to take on once per deal. */
+  look: (TableLook & { id: number }) | null;
 }
 
 const HIDDEN: TileCode = "back";
@@ -373,6 +427,8 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     hurry: null,
     acting: null,
     stoodIn: [0, 0, 0, 0],
+    ready: [],
+    look: null,
     takeBack: null,
     paused: null,
   };
@@ -389,6 +445,8 @@ export function normalizeRoom(room: Room): Room {
   room.hurry ??= null;
   room.acting ??= null;
   room.stoodIn ??= [0, 0, 0, 0];
+  room.ready ??= [];
+  room.look ??= null;
   room.takeBack ??= null;
   room.paused ??= null;
   return room;
@@ -433,6 +491,42 @@ export function openingHoldMs(room: Room): number {
 /** A hand has just been dealt: the clock starts once the table has shown it. */
 export function beginHand(room: Room, now = Date.now()): void {
   room.lastStepAt = now + openingHoldMs(room);
+  room.ready = [];
+}
+
+/** Deal the next hand — or, after the last, go to the final scores. */
+export function dealNextHand(room: Room, now = Date.now()): void {
+  room.state = nextHand(room.state);
+  beginHand(room, now);
+}
+
+/** The people the table would wait on to be ready: seated, and not away. */
+function readyNeeded(room: Room, now: number): Seat[] {
+  return ([0, 1, 2, 3] as Seat[]).filter((seat) => isHumanSeat(room, seat, now));
+}
+
+/** Who at the table has still to say they are ready, while a hand is settled. */
+export function readyWaiting(room: Room, now = Date.now()): Seat[] {
+  if (!room.started || room.state.phase !== "handOver") return [];
+  return readyNeeded(room, now).filter((seat) => !room.ready.includes(seat));
+}
+
+/**
+ * Every person at the table has said they are ready. The computer's seats
+ * are always ready, and somebody who has wandered off is not waited for —
+ * but a table with nobody present is not dealt on its own.
+ */
+export function everyoneReady(room: Room, now = Date.now()): boolean {
+  if (!room.started || room.state.phase !== "handOver") return false;
+  const needed = readyNeeded(room, now);
+  return needed.length > 0 && needed.every((seat) => room.ready.includes(seat));
+}
+
+/** Say this seat is ready for the next hand, or why it cannot be. */
+export function markReady(room: Room, seat: Seat): string | null {
+  if (room.state.phase !== "handOver") return "There is no hand to be ready for";
+  if (!room.ready.includes(seat)) room.ready = [...room.ready, seat];
+  return null;
 }
 
 /** No tile has been thrown yet this hand: the dealer's first turn. */
@@ -453,6 +547,7 @@ export function returnToLobby(room: Room, state: GameState): void {
   room.claimDeadline = null;
   room.takeBack = null;
   room.paused = null;
+  room.ready = [];
   // A new game numbers its hands and moves from the start again, so an old
   // stamp could pass for the first turn of the next.
   room.acting = null;
@@ -811,6 +906,11 @@ export function drain(room: Room, now = Date.now()): boolean {
   for (let i = 0; i < room.rngCalls; i++) rng.next();
 
   let changed = false;
+  // Everyone has said they are ready: the next hand without waiting for the table.
+  if (everyoneReady(room, now)) {
+    dealNextHand(room, now);
+    changed = true;
+  }
   const move = (next: GameState) => {
     room.state = next;
     notePlayed(room);
@@ -1102,7 +1202,38 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     stoodIn: you.role === "player" && you.seat !== null ? room.stoodIn[you.seat] : 0,
     takeBackIn: you.seat !== null && takeBackRefusal(room, you.seat, now) === null ? room.takeBack!.until - now : 0,
     paused: room.paused !== null,
+    takeBack:
+      you.role === "player" && you.seat !== null
+        ? { on: takesBack(room, you.seat), assist: assistChoice(room.seats[you.seat]) }
+        : { on: false, assist: null },
+    ready: room.started && state.phase === "handOver" ? room.ready : [],
+    readyWaiting: readyWaiting(room, now),
+    look: room.look,
   };
+}
+
+function assistChoice(occupant: Occupant): boolean | null {
+  return occupant.kind === "human" && occupant.takeBack !== undefined ? occupant.takeBack : null;
+}
+
+/**
+ * Whether the table holds this seat's throws for a take back: the table
+ * allows it, and the person in the chair has it on among their assists or is
+ * Louis, who always has it.
+ */
+export function takesBack(room: Room, seat: Seat): boolean {
+  const occupant = room.seats[seat];
+  if (!room.settings.takeBack || occupant.kind !== "human") return false;
+  return occupant.takeBack === true || alwaysTakesBack(occupant.name);
+}
+
+/** Record whether this seat's phone has take back on among its assists. */
+export function setTakeBackAssist(room: Room, seat: Seat, on: boolean): void {
+  const occupant = room.seats[seat];
+  if (occupant.kind !== "human") return;
+  occupant.takeBack = on;
+  // Switched off mid-throw, the tile it was holding goes on its way.
+  if (!takesBack(room, seat) && room.takeBack?.seat === seat) room.takeBack = null;
 }
 
 /**
@@ -1142,6 +1273,7 @@ export function takeBackRefusal(room: Room, seat: Seat, now = Date.now()): strin
   const hold = room.takeBack;
   if (room.paused) return "The table is paused";
   if (!room.settings.takeBack) return "This table does not take discards back";
+  if (!takesBack(room, seat)) return "Take back is not on for you";
   if (!hold || hold.seat !== seat || room.state.lastDiscard?.tile.id !== hold.tileId) {
     return "There is no discard of yours to take back";
   }
@@ -1153,7 +1285,7 @@ export function takeBackRefusal(room: Room, seat: Seat, now = Date.now()): strin
 /** Remember a person's discard for the moment it can be taken back. */
 export function noteDiscard(room: Room, seat: Seat, before: GameState, now = Date.now()): void {
   room.takeBack =
-    room.settings.takeBack && room.state.lastDiscard?.from === seat
+    takesBack(room, seat) && room.state.lastDiscard?.from === seat
       ? {
           seat,
           tileId: room.state.lastDiscard.tile.id,

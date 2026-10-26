@@ -46,6 +46,15 @@ export function joinNames(names: string[]): string {
   return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
+/** What the table says about who is ready, under its own Next hand button. */
+export function readyLine(view: RoomView, nameOf: (s: Seat) => string): string {
+  if (view.readyWaiting.length === 0 && view.ready.length > 0) return "Everyone is ready.";
+  const waiting = joinNames(view.readyWaiting.map(nameOf));
+  return view.ready.length === 0
+    ? "Deals once everyone taps Ready on their phone."
+    : `Ready: ${joinNames(view.ready.map(nameOf))} · waiting for ${waiting}.`;
+}
+
 /** Whether the next hand would be past the end of the game. */
 export function isLastHand(view: RoomView): boolean {
   if (view.phase !== "handOver" || !view.result || view.result.dealerKeeps) return false;
@@ -471,6 +480,11 @@ export function TableResult({
               : result.dealerKeeps
                   ? `${name(view.dealer)} deals again`
                   : `The deal moves on · ${name(nextDealer)} deals hand ${view.handNumber + 1}`}
+            {view.phase === "handOver" ? (
+              <span className="result-sheet__ready" role="status">
+                {readyLine(view, name)}
+              </span>
+            ) : null}
           </span>
           {onReplay ? (
             <button type="button" className="btn btn--ghost" onClick={onReplay}>

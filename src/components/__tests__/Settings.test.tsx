@@ -8,7 +8,7 @@ import { TableSettings } from "../TableSettings";
 import { PhoneSettings } from "../PhoneSettings";
 import { NAMES, dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
 
-const appearance: AppearanceApi = { appearance: DEFAULT_APPEARANCE, set: vi.fn(), reset: vi.fn() };
+const appearance: AppearanceApi = { appearance: DEFAULT_APPEARANCE, set: vi.fn(), replace: vi.fn(), reset: vi.fn() };
 
 function tabletDisplay(): TabletDisplay {
   return { turnGlow: "on", setTurnGlow: vi.fn(), wall: "on", setWall: vi.fn(), callouts: "on", setCallouts: vi.fn() };
@@ -24,12 +24,17 @@ function phoneDisplay(): PhoneDisplay {
     setStretch: vi.fn(),
     vibrate: "on",
     setVibrate: vi.fn(),
+    keepAwake: "off",
+    setKeepAwake: vi.fn(),
     setHints: "on",
     setSetHints: vi.fn(),
     hurry: "off",
     setHurry: vi.fn(),
     helper: "on",
     setHelper: vi.fn(),
+    takeBack: "off",
+    setTakeBack: vi.fn(),
+    takeBackLocked: false,
   };
 }
 
@@ -158,11 +163,71 @@ describe("a phone's settings", () => {
     expect(within(assists).getByRole("switch", { name: "Set hints" })).toBeTruthy();
   });
 
+  it("keeps the screen awake and goes full screen from the settings, not the bar", () => {
+    const display = phoneDisplay();
+    const fullscreen = { supported: true, active: false, enter: vi.fn(), exit: vi.fn() };
+    const { rerender } = render(
+      <PhoneSettings sound={sound} config={tableView(lobby([0])).config} appearance={appearance} display={display} fullscreen={fullscreen} />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Keep awake" }));
+    expect(display.setKeepAwake).toHaveBeenCalledWith("on");
+    fireEvent.click(screen.getByRole("switch", { name: "Full screen" }));
+    expect(fullscreen.enter).toHaveBeenCalled();
+
+    const on = { ...fullscreen, active: true };
+    rerender(
+      <PhoneSettings
+        sound={sound}
+        config={tableView(lobby([0])).config}
+        appearance={appearance}
+        display={{ ...display, keepAwake: "on" }}
+        fullscreen={on}
+        wakeLock="unsupported"
+      />,
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Full screen" }));
+    expect(on.exit).toHaveBeenCalled();
+    // A browser that cannot hold the screen on says so rather than pretending.
+    const awake = screen.getByRole("switch", { name: "Keep awake" });
+    expect(awake).toHaveProperty("disabled", true);
+    expect(screen.getByText("This browser cannot keep the screen on")).toBeTruthy();
+  });
+
+  it("offers take back as an assist, always on for Louis, and off for everyone when the table says so", () => {
+    const display = phoneDisplay();
+    const config = tableView(lobby([0])).config;
+    const { rerender } = render(<PhoneSettings sound={sound} config={config} appearance={appearance} display={display} />);
+    const assists = () => screen.getByRole("heading", { name: "Assists" }).parentElement!;
+    fireEvent.click(within(assists()).getByRole("switch", { name: "Take back" }));
+    expect(display.setTakeBack).toHaveBeenCalledWith("on");
+
+    rerender(
+      <PhoneSettings sound={sound} config={config} appearance={appearance} display={{ ...display, takeBack: "on", takeBackLocked: true }} />,
+    );
+    const louis = within(assists()).getByRole("switch", { name: "Take back" });
+    expect(louis.getAttribute("aria-checked")).toBe("true");
+    expect(louis).toHaveProperty("disabled", true);
+    expect(screen.getByText("Always on for Louis")).toBeTruthy();
+
+    rerender(<PhoneSettings sound={sound} config={config} appearance={appearance} display={display} tableTakeBack={false} />);
+    expect(within(assists()).getByRole("switch", { name: "Take back" })).toHaveProperty("disabled", true);
+    expect(screen.getByText("The table has switched take back off for everyone")).toBeTruthy();
+  });
+
   it("starts every assist off, but on for the players who get them, until a choice is made", () => {
     const plain = renderHook(() => usePhoneDisplay("Kris")).result.current;
-    expect([plain.setHints, plain.helper, plain.hurry]).toEqual(["off", "off", "off"]);
+    expect([plain.setHints, plain.helper, plain.hurry, plain.takeBack]).toEqual(["off", "off", "off", "off"]);
     const lucy = renderHook(() => usePhoneDisplay(" lucy ")).result.current;
-    expect([lucy.setHints, lucy.helper, lucy.hurry]).toEqual(["on", "on", "on"]);
+    expect([lucy.setHints, lucy.helper, lucy.hurry, lucy.takeBack]).toEqual(["on", "on", "on", "on"]);
+    // Louis has take back whatever has been chosen, and only take back.
+    window.localStorage.setItem("hk-mahjong.take-back", "off");
+    try {
+      const louis = renderHook(() => usePhoneDisplay("Louis")).result.current;
+      expect([louis.takeBack, louis.takeBackLocked, louis.helper]).toEqual(["on", true, "off"]);
+      expect(renderHook(() => usePhoneDisplay("Kris")).result.current.takeBack).toBe("off");
+    } finally {
+      window.localStorage.removeItem("hk-mahjong.take-back");
+    }
     window.localStorage.setItem("hk-mahjong.set-hints", "on");
     try {
       expect(renderHook(() => usePhoneDisplay("Kris")).result.current.setHints).toBe("on");

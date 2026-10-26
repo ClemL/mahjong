@@ -40,6 +40,11 @@ import {
   openTable,
   TAKE_BACK_MS,
   noteDiscard,
+  alwaysTakesBack,
+  setTakeBackAssist,
+  markReady,
+  everyoneReady,
+  readyWaiting,
   takeBackDiscard,
   takeBackRefusal,
   syncSeats,
@@ -965,9 +970,10 @@ describe("claim order at the table", () => {
 });
 
 describe("taking back a discard", () => {
-  /** East, a person, throws their first tile; South, also a person, could claim it. */
+  /** East, a person with take back on, throws their first tile; South, also a person, could claim it. */
   function thrown(now = Date.now()) {
     const room = dealt("TEST", 9, [0, 1]);
+    setTakeBackAssist(room, 0, true);
     room.lastStepAt = now - 5_000;
     const before = room.state;
     const tile = before.players[0].hand.find((t) => !t.code.startsWith("f"))!;
@@ -1011,6 +1017,8 @@ describe("taking back a discard", () => {
     const late = thrown();
     expect(takeBackDiscard(late.room, 0, late.now + TAKE_BACK_MS)).toBe("Too late to take it back");
     const other = thrown();
+    expect(takeBackDiscard(other.room, 1, other.now)).toBe("Take back is not on for you");
+    setTakeBackAssist(other.room, 1, true);
     expect(takeBackDiscard(other.room, 1, other.now)).toBe("There is no discard of yours to take back");
     const claimed = thrown();
     claimed.room.claimResponses["1"] = "pung";
@@ -1021,14 +1029,108 @@ describe("taking back a discard", () => {
     expect(takeBackDiscard(passed.room, 0, passed.now)).toBeNull();
   });
 
+  it("is held only for someone with the assist on, or for Louis whatever the assist says", () => {
+    const throwFirst = (room: Room) => {
+      const before = room.state;
+      room.state = discard(before, 0, before.players[0].hand.find((t) => !t.code.startsWith("f"))!.id);
+      noteDiscard(room, 0, before);
+    };
+    // Nobody waits out a throw that cannot be taken back.
+    const plain = dealt("TEST", 9, [0, 1]);
+    expect(viewFor(plain, "tok-0").takeBack).toEqual({ on: false, assist: null });
+    throwFirst(plain);
+    expect(plain.takeBack).toBeNull();
+    expect(viewFor(plain, "tok-0").takeBackIn).toBe(0);
+    expect(takeBackRefusal(plain, 0)).toBe("Take back is not on for you");
+
+    const assisted = dealt("TEST", 9, [0, 1]);
+    setTakeBackAssist(assisted, 0, true);
+    expect(viewFor(assisted, "tok-0").takeBack).toEqual({ on: true, assist: true });
+    throwFirst(assisted);
+    expect(assisted.takeBack?.seat).toBe(0);
+
+    for (const name of ["Louis", " lOUIS "]) {
+      const louis = dealt("TEST", 9, [1]);
+      seat(louis, 0, "tok-0", name);
+      setTakeBackAssist(louis, 0, false);
+      expect(viewFor(louis, "tok-0").takeBack).toEqual({ on: true, assist: false });
+      throwFirst(louis);
+      expect(louis.takeBack?.seat).toBe(0);
+    }
+    expect(alwaysTakesBack("Louise")).toBe(false);
+    // Nobody else's view says anything about it.
+    expect(viewFor(assisted, "tok-1").takeBack).toEqual({ on: false, assist: null });
+    expect(viewFor(assisted, "table").takeBack).toEqual({ on: false, assist: null });
+  });
+
+  it("lets go of a held throw when its owner turns the assist off", () => {
+    const { room } = thrown();
+    setTakeBackAssist(room, 0, false);
+    expect(room.takeBack).toBeNull();
+  });
+
   it("is never offered at a table that has it switched off", () => {
     const room = dealt("TEST", 9, [0, 1]);
+    setTakeBackAssist(room, 0, true);
     room.settings.takeBack = false;
     const before = room.state;
     room.state = discard(before, 0, before.players[0].hand[0].id);
     noteDiscard(room, 0, before);
     expect(room.takeBack).toBeNull();
     expect(viewFor(room, "tok-0").takeBackIn).toBe(0);
+  });
+});
+
+describe("ready for the next hand", () => {
+  /** A hand the computer played out while everyone was away, and then everyone back at the table. */
+  function settled(seats: Seat[], back: Seat[] = seats) {
+    const room = dealt("TEST", 12, seats);
+    const now = Date.now() + SEAT_IDLE_MS + 1;
+    drain(room, now);
+    expect(room.state.phase).toBe("handOver");
+    for (const s of back) touch(room, `tok-${s}`, now);
+    return { room, now, hand: room.state.handNumber };
+  }
+
+  it("deals the next hand once every person at the table has said so", () => {
+    const { room, now, hand } = settled([0, 1]);
+    expect(viewFor(room, "tok-0", now).readyWaiting).toEqual([0, 1]);
+    expect(viewFor(room, "table", now).ready).toEqual([]);
+
+    expect(markReady(room, 0)).toBeNull();
+    expect(markReady(room, 0)).toBeNull();
+    expect(viewFor(room, "tok-1", now).ready).toEqual([0]);
+    expect(readyWaiting(room, now)).toEqual([1]);
+    expect(everyoneReady(room, now)).toBe(false);
+    drain(room, now);
+    expect(room.state.handNumber).toBe(hand);
+
+    expect(markReady(room, 1)).toBeNull();
+    expect(everyoneReady(room, now)).toBe(true);
+    drain(room, now);
+    expect(room.state.handNumber).toBe(hand + 1);
+    expect(room.state.phase).not.toBe("handOver");
+    // A fresh hand starts with nobody ready, and only a settled hand says who was.
+    expect(room.ready).toEqual([]);
+    expect(viewFor(room, "tok-0", now)).toMatchObject({ ready: [], readyWaiting: [] });
+  });
+
+  it("does not wait for someone who has wandered off, nor deal for a table nobody is at", () => {
+    const away = settled([0, 1], [0]);
+    markReady(away.room, 0);
+    drain(away.room, away.now);
+    expect(away.room.state.handNumber).toBe(away.hand + 1);
+
+    const empty = settled([0, 1], []);
+    expect(everyoneReady(empty.room, empty.now)).toBe(false);
+    drain(empty.room, empty.now);
+    expect(empty.room.state.handNumber).toBe(empty.hand);
+  });
+
+  it("is only for a settled hand", () => {
+    const room = dealt("TEST", 12, [0]);
+    expect(markReady(room, 0)).toBe("There is no hand to be ready for");
+    expect(viewFor(room, "tok-0").readyWaiting).toEqual([]);
   });
 });
 

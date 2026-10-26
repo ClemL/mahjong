@@ -24,7 +24,9 @@ for (const [label, viewport] of [
     await page.goto("/");
     await page.getByRole("button", { name: "Show every tile" }).click();
     const sheet = page.getByRole("dialog", { name: "Every tile" });
-    await expect(sheet.locator(".tile")).toHaveCount(42);
+    // One of each of the 42 faces, and the back they all share.
+    await expect(sheet.locator(".tile")).toHaveCount(43);
+    await expect(sheet.getByRole("region", { name: "Tile back" }).locator(".tile--back")).toBeVisible();
     // Nine to a row must fit without the sheet scrolling sideways.
     const overflow = await sheet.evaluate((el) => el.scrollWidth - el.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);

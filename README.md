@@ -179,8 +179,8 @@ it holds, and whether it is still deciding on a claim. It also prints the
 seating — *Seat 1 East · bottom edge · Kris* — so people know where to sit. It
 never receives anyone's concealed tiles.
 
-It also drives the game: next hand, redeal, restart and reset scores, end the
-game early (the hand being played goes unscored, and everyone goes to the final
+It also drives the game: next hand (or each phone taps **Ready**, and the last
+one in deals it), redeal, restart and reset scores, end the game early (the hand being played goes unscored, and everyone goes to the final
 scores), change the faan minimum, free a seat, and skip a player who is not
 answering a claim. **Pause** stops a hand where it stands: no computer turn, no
 claim window and no turn clock runs, every phone says the table is paused and
@@ -191,8 +191,9 @@ its hand cannot be played, and **Resume** gives everyone back the time they had.
 - **The table keeps the screen awake.** A tablet acting as the table would
   otherwise sleep mid-hand. The lock is re-taken whenever the page becomes
   visible again, since browsers drop it on hide, and the table says so when the
-  browser cannot hold one (Safari only gained it in 16.4). Only the table does:
-  a phone sleeps as it normally would.
+  browser cannot hold one (Safari only gained it in 16.4). A phone sleeps as it
+  normally would unless **Keep awake** is on in its settings, beside **Full
+  screen**.
 - **Discarding takes two taps on touch.** The first arms the tile and offers
   *Discard* / *Keep*; the second throws it. With a mouse a click still discards
   directly — a mis-click is cheap, a stray touch on a phone you are holding is
@@ -250,12 +251,17 @@ view so the pond is visible somewhere.
   threshold asks to be tapped back in rather than quietly catching up, and then
   says how many turns the computer played for it while it was gone. The same
   count covers a turn the table threw for someone whose time ran out.
-- **Taking a discard back.** For two seconds after a person throws a tile, the
+- **Taking a discard back.** For five seconds after a person throws a tile, the
   server keeps the table as it was before the throw and holds the next draw and
   any claim; **Take back** on the phone restores it, with the turn clock where it
-  stood. Once someone has claimed the tile, or the two seconds are up, it is
-  final. That snapshot never leaves the server, and the table can switch the
-  whole thing off under **Pace & turns**.
+  stood. Once someone has claimed the tile, or the five seconds are up, it is
+  final. It is held only for people who have take back on among their assists
+  (their phone tells the server) and for anyone sitting as Louis, so nobody else
+  waits it out. That snapshot never leaves the server, and the table can switch
+  the whole thing off under **Pace & turns**.
+- **Ready for the next hand.** Once a hand is settled each phone has **Ready**;
+  when every person at the table (not the computer's seats, not anyone away) has
+  tapped it, the server deals the next hand without the table pressing Next hand.
 - **Rate limiting.** Seat claims are throttled per IP through Upstash, shared
   across serverless instances: 20 claim attempts per 10 minutes, and 120 actions
   a minute. The table is open to anyone holding the link, so that limit is what
@@ -332,6 +338,12 @@ CSS, so switching costs no React re-render, and a small inline script restores
 the choice before first paint rather than flashing the default theme. Both tile
 faces are always in the DOM with one hidden, which is why the switch is instant.
 
+The tablet's own look goes out with the deal, and every phone takes it on once
+per game: the table, the faces, the body, the backs and the suit colors all
+start out matching. Anything a player changes after that stays theirs until
+the next deal. The **Every tile** sheet shows the back the tiles share as well
+as each face.
+
 Light and dark tables get chart palettes **selected for their own surface**
 rather than one flipped from the other, each validated against the surface it
 actually sits on.
@@ -392,17 +404,26 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   between, **+20s** adds twenty seconds to the claim, once a discard.
 - Whenever you can win, off a discard or self-drawn, the faan it would score
   sits beside **Win**; tap it to see the patterns behind it before you take it.
-- **Take back** appears for two seconds after you throw a tile, unless the table
-  has turned it off.
+- **Take back** appears for five seconds after you throw a tile, to the right of
+  your flowers, if it is on among your assists — always, for a player named
+  Louis — unless the table has turned it off.
+- A set you make — a claimed chow, pung or kong, or a kong from your hand —
+  forms in the middle of the phone and then shrinks into place among your open
+  sets. With reduced motion it is only marked where it lands.
+- **Win** is three times the width of the other buttons, so a hurried tap
+  cannot land on its neighbour.
 - **Hide hand** turns your tiles face down for when the phone is put down; every
   hand arrives face down until you turn it up.
-- **Set hints** (the line under tiles that already make a set), the **helper**
-  and **hurry up** are the assists: each phone's own choice, off unless that
-  phone turns them on — or on from the start for the players who get them.
+- **Set hints** (the line under tiles that already make a set), the **helper**,
+  **hurry up** and **take back** are the assists: each phone's own choice, off
+  unless that phone turns them on — or on from the start for the players who
+  get them.
 - **Stretch to the edges**, under the phone's settings, runs the hand out to
   the edges of the screen and scales its tiles up to fill it; the fewer tiles
   in hand, the larger they get.
-- **Hurry up** flashes the screen of whoever the table is waiting on. Nobody can
+- **Hurry up** flashes the screen of whoever the table is waiting on, whether or
+  not they have the setting on themselves: it only decides who has the button.
+  Nobody can
   be hurried in the first three seconds of their turn (or of their call on a
   discard); the button counts those seconds down. After a hurry-up, every button
   at the table rests for ten seconds.

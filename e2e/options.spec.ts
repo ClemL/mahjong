@@ -30,14 +30,23 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": nextAddress() } });
   expect(reset.ok()).toBe(true);
 
-  const kris = await open(browser, PHONE_LANDSCAPE, true, { "hk-mahjong.hand-stretch": "on" });
+  const kris = await open(browser, PHONE_LANDSCAPE, true, {
+    "hk-mahjong.hand-stretch": "on",
+    // Take back is one of the assists, off unless the phone turns it on.
+    "hk-mahjong.take-back": "on",
+  });
   await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
-  const table = await open(browser, TABLET, false);
+  // The table deals in its own look, and every phone starts the game in it.
+  const tableLook = { theme: "midnight", suits: "classic", tiles: "western", body: "bone", backs: "crimson", rev: 2 };
+  const table = await open(browser, TABLET, false, { "hk-mahjong.appearance": JSON.stringify(tableLook) });
   await table.page.goto(`/room/${ROOM}?seat=table`);
   await expect(table.page.getByText("Kris").first()).toBeVisible();
   await table.page.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
   await table.page.getByRole("button", { name: "Skip the deal" }).click();
   await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
+  await expect
+    .poll(() => kris.page.evaluate(() => ({ ...document.documentElement.dataset })))
+    .toMatchObject({ theme: "midnight", suits: "classic", tiles: "western", body: "bone", backs: "crimson" });
 
   // Stretched, the hand runs from one edge of the screen to the other.
   await kris.page.getByRole("button", { name: /Hand hidden/ }).tap();
@@ -51,15 +60,24 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await expect.poll(right).toBeGreaterThanOrEqual(PHONE_LANDSCAPE.width - 6);
   await expect.poll(async () => (await tiles.first().boundingBox())!.x).toBeLessThanOrEqual(6);
   await expectNoSidewaysScroll(kris.page);
-  // Keeping the screen awake is the table's job, not a phone's.
-  await expect(kris.page.getByRole("button", { name: /awake/i })).toHaveCount(0);
+  // Keep awake and full screen live in the phone's settings, not on its bar.
+  await expect(kris.page.locator(".phone__bar").getByRole("button", { name: /awake|full screen/i })).toHaveCount(0);
+  await kris.page.getByRole("button", { name: /Settings/ }).first().tap();
+  await expect(kris.page.getByRole("switch", { name: "Keep awake" })).toBeVisible();
+  await expect(kris.page.getByRole("switch", { name: "Full screen" })).toBeVisible();
+  await expect(kris.page.getByRole("switch", { name: "Take back" })).toHaveAttribute("aria-checked", "true");
+  await kris.page.getByRole("button", { name: "Close" }).first().tap();
+  await expect(kris.page.getByRole("switch", { name: "Keep awake" })).toHaveCount(0);
 
   // A tile thrown can be taken back in the moment after, and the table waits for it.
   const thrown = tiles.first();
   await thrown.tap();
   await thrown.tap();
   await expect(tiles).toHaveCount(13);
-  await kris.page.getByRole("button", { name: /^Take back/ }).tap();
+  // Up beside the flowers and open sets, away from the hand and the buttons for the next move.
+  const takeBack = kris.page.getByRole("button", { name: /^Take back/ });
+  await expect(kris.page.locator(".phone__melds").getByRole("button", { name: /^Take back/ })).toBeVisible();
+  await takeBack.tap();
   await expect(tiles).toHaveCount(14);
   await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
   await expect(table.page.locator('.discards[data-seat="0"] .tile')).toHaveCount(0);

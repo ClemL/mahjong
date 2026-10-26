@@ -11,6 +11,7 @@ export interface FullscreenApi {
   active: boolean;
   /** Must be called from inside a tap or click — browsers refuse it otherwise. */
   enter: () => void;
+  exit: () => void;
 }
 
 /**
@@ -48,5 +49,12 @@ export function useFullscreen(orientation?: "landscape"): FullscreenApi {
       });
   }, [orientation]);
 
-  return { supported, active, enter };
+  const exit = useCallback(() => {
+    if (!document.fullscreenElement) return;
+    void document.exitFullscreen().catch(() => {
+      // Already on its way out.
+    });
+  }, []);
+
+  return { supported, active, enter, exit };
 }

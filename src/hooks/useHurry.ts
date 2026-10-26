@@ -11,11 +11,11 @@ const HURRY_PATTERN = [120, 80, 120, 80, 120];
  * Who has just told this seat to hurry up, while the screen should be flashing
  * for it. Each nudge flashes and buzzes once, however many polls carry it.
  *
- * The buzz does not wait on `flash`: the Hurry up setting is this phone's own
- * button and flash, and a player who never turned it on is still the one the
- * table is waiting for. Only the Vibrate setting silences it.
+ * Neither waits on this phone's own Hurry up setting: that is the button for
+ * hurrying others, and a player who never turned it on is still the one the
+ * table is waiting for. Only the Vibrate setting silences the buzz.
  */
-export function useHurryFlash(view: RoomView, flash: boolean, vibrate: boolean): string | null {
+export function useHurryFlash(view: RoomView, vibrate: boolean): string | null {
   const [by, setBy] = useState<string | null>(null);
   const shown = useRef<number | null>(null);
   const hurry = view.hurry;
@@ -42,5 +42,5 @@ export function useHurryFlash(view: RoomView, flash: boolean, vibrate: boolean):
     const timer = window.setTimeout(() => setBy(null), HURRY_FLASH_MS);
     return () => window.clearTimeout(timer);
   }, [id]);
-  return flash ? by : null;
+  return by;
 }

@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
 import { hurryUp, noteDiscard } from "@/game/room";
 import { discard } from "@/game/engine";
+import type { RoomView } from "@/game/room";
+import type { Meld } from "@/game/melds";
 import { PhoneView } from "../PhoneView";
 import { NAMES, claimable, dealt, fakeApi, playerView, sound, underway } from "./fixtures";
 
@@ -388,24 +390,165 @@ describe("PhoneView", () => {
     expect(screen.getByText("The computer played 4 turns for you.")).toBeTruthy();
   });
 
-  it("offers to take back the tile just thrown, only to whoever threw it", () => {
+  it("offers to take back the tile just thrown, beside the flowers, only to whoever threw it with the assist on", () => {
+    window.localStorage.setItem("hk-mahjong.take-back", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.take-back"));
     const { room, seat } = onTurn();
+    const occupant = room.seats[seat];
+    if (occupant.kind === "human") occupant.takeBack = true;
     const before = room.state;
     const tile = before.players[seat].hand.find((t) => !t.code.startsWith("f"))!;
     room.state = discard(before, seat, tile.id);
     noteDiscard(room, seat, before);
     const view = playerView(room, seat);
     const api = fakeApi(view);
-    const { unmount } = render(<PhoneView api={api} view={view} sound={sound} />);
+    const { container, unmount } = render(<PhoneView api={api} view={view} sound={sound} />);
     expect(screen.getByText(`You threw ${tileName(tile.code)}.`)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: `Take back ${tileName(tile.code)}` }));
+    const button = screen.getByRole("button", { name: `Take back ${tileName(tile.code)}` });
+    // Up in the open sets' row, after the flowers: nowhere near the hand.
+    expect(container.querySelector(".phone__melds")!.contains(button)).toBe(true);
+    expect(container.querySelector(".phone__status")!.contains(button)).toBe(false);
+    fireEvent.click(button);
     expect(api.act).toHaveBeenCalledWith({ type: "takeBack" });
+    // The phone already said it has the assist on, so it does not say so again.
+    expect(api.act).not.toHaveBeenCalledWith(expect.objectContaining({ type: "assist" }));
     unmount();
 
     const other = ((seat + 1) % 4) as Seat;
     const theirs = playerView(room, other);
     render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
     expect(screen.queryByRole("button", { name: /^Take back/ })).toBeNull();
+  });
+
+  it("tells the table when take back is turned on, and offers nothing to a phone without it", () => {
+    const { room, seat } = onTurn();
+    const before = room.state;
+    const tile = before.players[seat].hand.find((t) => !t.code.startsWith("f"))!;
+    room.state = discard(before, seat, tile.id);
+    noteDiscard(room, seat, before);
+    const view = playerView(room, seat);
+    const off = fakeApi(view);
+    const first = render(<PhoneView api={off} view={view} sound={sound} />);
+    expect(screen.queryByRole("button", { name: /^Take back/ })).toBeNull();
+    // Off and never said is the same thing: nothing to send.
+    expect(off.act).not.toHaveBeenCalled();
+    first.unmount();
+
+    window.localStorage.setItem("hk-mahjong.take-back", "on");
+    onTestFinished(() => window.localStorage.removeItem("hk-mahjong.take-back"));
+    const on = fakeApi(view);
+    render(<PhoneView api={on} view={view} sound={sound} />);
+    expect(on.act).toHaveBeenCalledWith({ type: "assist", takeBack: true });
+  });
+
+  it("shows a set it has just made forming in the middle, then marks it where it lands", () => {
+    vi.useFakeTimers();
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const { seat, view } = onTurn();
+    const api = fakeApi(view);
+    const { container, rerender } = render(<PhoneView api={api} view={view} sound={sound} />);
+    expect(container.querySelector(".phone__forming")).toBeNull();
+
+    const pung: Meld = {
+      type: "pung",
+      concealed: false,
+      claimedFrom: ((seat + 3) % 4) as Seat,
+      claimedTileId: "x2",
+      tiles: [
+        { id: "x0", code: "dr" },
+        { id: "x1", code: "dr" },
+        { id: "x2", code: "dr" },
+      ],
+    };
+    const withSet = (v: RoomView): RoomView => ({
+      ...v,
+      players: v.players.map((p) => (p.seat === seat ? { ...p, melds: [...p.melds, pung] } : p)),
+    });
+    rerender(<PhoneView api={api} view={withSet(view)} sound={sound} />);
+    const forming = container.querySelector(".phone__forming")!;
+    expect(forming.textContent).toContain("Pung 碰");
+    // The tiles from the hand rise; the claimed one drops in from the table.
+    expect(forming.querySelectorAll(".forming__tile--hand")).toHaveLength(2);
+    expect(forming.querySelectorAll(".forming__tile--taken")).toHaveLength(1);
+    // Its place among the open sets waits for it, empty.
+    expect(container.querySelector(".phone__melds .meld--arriving")).not.toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(1_600);
+    });
+    expect(container.querySelector(".phone__forming")).toBeNull();
+    expect(container.querySelector(".phone__melds .meld--fresh")).not.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(3_000);
+    });
+    expect(container.querySelector(".phone__melds .meld--fresh")).toBeNull();
+  });
+
+  it("leaves alone the sets already laid out when it first looks, and forms nothing without motion", () => {
+    const { room, seat } = onTurn();
+    const view = playerView(room, seat);
+    const meld: Meld = {
+      type: "chow",
+      concealed: false,
+      claimedTileId: "y0",
+      tiles: [
+        { id: "y0", code: "m1" },
+        { id: "y1", code: "m2" },
+        { id: "y2", code: "m3" },
+      ],
+    };
+    const laid: RoomView = {
+      ...view,
+      players: view.players.map((p) => (p.seat === seat ? { ...p, melds: [meld] } : p)),
+    };
+    const { container, unmount } = render(<PhoneView api={fakeApi(laid)} view={laid} sound={sound} />);
+    expect(container.querySelector(".phone__forming, .meld--fresh, .meld--arriving")).toBeNull();
+    unmount();
+
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === "(prefers-reduced-motion: reduce)",
+          media: query,
+          addEventListener: () => {},
+          removeEventListener: () => {},
+        }) as unknown as MediaQueryList,
+    );
+    const still = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    still.rerender(<PhoneView api={fakeApi(laid)} view={laid} sound={sound} />);
+    expect(still.container.querySelector(".phone__forming")).toBeNull();
+    expect(still.container.querySelector(".phone__melds .meld--fresh")).not.toBeNull();
+  });
+
+  it("starts each game in the look the table was dealt with, once per deal", () => {
+    const { view } = onTurn();
+    window.localStorage.removeItem("hk-mahjong.look-adopted");
+    window.localStorage.removeItem("hk-mahjong.appearance");
+    onTestFinished(() => {
+      window.localStorage.removeItem("hk-mahjong.look-adopted");
+      window.localStorage.removeItem("hk-mahjong.appearance");
+    });
+    const look = { theme: "midnight", suits: "classic", tiles: "pips", body: "bone", backs: "crimson", id: 7 };
+    const dealtIn: RoomView = { ...view, look };
+    const first = render(<PhoneView api={fakeApi(dealtIn)} view={dealtIn} sound={sound} />);
+    expect({ ...document.documentElement.dataset }).toMatchObject({
+      theme: "midnight",
+      suits: "classic",
+      tiles: "pips",
+      body: "bone",
+      backs: "crimson",
+    });
+    expect(JSON.parse(window.localStorage.getItem("hk-mahjong.appearance")!)).toMatchObject({ theme: "midnight", tiles: "pips" });
+    first.unmount();
+
+    // A player who changes their look keeps it until the next deal.
+    document.documentElement.dataset.theme = "slate";
+    const again = render(<PhoneView api={fakeApi(dealtIn)} view={dealtIn} sound={sound} />);
+    expect(document.documentElement.dataset.theme).toBe("slate");
+    again.rerender(<PhoneView api={fakeApi(dealtIn)} view={{ ...dealtIn, look: { ...look, theme: "jade", id: 8 } }} sound={sound} />);
+    expect(document.documentElement.dataset.theme).toBe("jade");
   });
 
   it("hides the play log when the phone's settings say so", () => {
@@ -544,7 +687,7 @@ describe("PhoneView — whose move it is", () => {
     expect(within(elsewhere).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
   });
 
-  it("buzzes the phone being hurried, even with its own Hurry up setting off", () => {
+  it("flashes and buzzes the phone being hurried, even with its own Hurry up setting off", () => {
     const vibrate = vi.fn(() => true);
     Object.defineProperty(window.navigator, "vibrate", { value: vibrate, configurable: true });
     onTestFinished(() => {
@@ -555,8 +698,8 @@ describe("PhoneView — whose move it is", () => {
     expect(hurryUp(room, ((seat + 1) % 4) as Seat)).toBeNull();
     const mine = playerView(room, seat);
     const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
-    // No flash without the setting, but the buzz still comes.
-    expect(container.querySelector(".phone__hurry")).toBeNull();
+    // The setting is the button for hurrying others; being hurried flashes and buzzes regardless.
+    expect(container.querySelector(".phone__hurry")).not.toBeNull();
     expect(vibrate).toHaveBeenCalledWith([120, 80, 120, 80, 120]);
 
     // The Vibrate setting is what silences it.
@@ -567,7 +710,7 @@ describe("PhoneView — whose move it is", () => {
     expect(vibrate).not.toHaveBeenCalledWith([120, 80, 120, 80, 120]);
   });
 
-  it("leaves the hurry-up button and the flash off unless the phone turns them on", () => {
+  it("leaves the hurry-up button off unless the phone turns it on, but flashes whoever is hurried", () => {
     const { room, seat } = onTurn();
     underway(room);
     const other = ((seat + 1) % 4) as Seat;
@@ -575,7 +718,8 @@ describe("PhoneView — whose move it is", () => {
     {
       const mine = playerView(room, seat);
       const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
-      expect(container.querySelector(".phone--hurried, .phone__hurry")).toBeNull();
+      expect(container.querySelector(".phone--hurried")).not.toBeNull();
+      expect(within(container).getByRole("alert").textContent).toBe(`${NAMES[other]} says hurry up!`);
       const theirs = playerView(room, other);
       const { container: elsewhere } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
       expect(within(elsewhere).queryByRole("button", { name: /^Hurry up/ })).toBeNull();

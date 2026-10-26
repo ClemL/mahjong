@@ -25,6 +25,8 @@ import { useFlip } from "@/hooks/useFlip";
 import { useHaptics } from "@/hooks/useHaptics";
 import { useDealIn } from "@/hooks/useDealIn";
 import { useHurryFlash } from "@/hooks/useHurry";
+import { useWakeLock } from "@/hooks/useWakeLock";
+import { useTableLook } from "@/hooks/useTableLook";
 import { HelperButton, HelperPanel } from "./HelperPanel";
 import { TileBack, TileButton, TileFace } from "./TileView";
 import { MeldRow, bonusClass } from "./MeldRow";
@@ -34,6 +36,9 @@ import { SettingsMenu } from "./SettingsMenu";
 import { PhoneSettings } from "./PhoneSettings";
 import { PlayLog } from "./PlayLog";
 import { PhoneResult } from "./PhoneResult";
+import { ReadyUp } from "./ReadyUp";
+import { FormingMeld, useFormingMeld } from "./FormingMeld";
+import { useTakeBackAssist } from "@/hooks/useTakeBackAssist";
 import { FaanPreview, FaanToggle } from "./FaanPreview";
 import { joinNames, winnersOf, youFirst } from "./TableResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
@@ -148,7 +153,12 @@ export function PhoneView({
   const layout = useCompactLayout();
   const display = usePhoneDisplay(me.occupant.name);
   useHaptics(view, display.vibrate === "on");
-  const hurriedBy = useHurryFlash(view, display.hurry === "on", display.vibrate === "on");
+  const wakeLock = useWakeLock(display.keepAwake === "on");
+  useTableLook(view, appearance);
+  // Flashed whatever this phone's own Hurry up setting says: that setting is
+  // the button for hurrying others, not a way out of being hurried.
+  const hurriedBy = useHurryFlash(view, display.vibrate === "on");
+  useTakeBackAssist(view, api, display.takeBack === "on");
   const [helperOpen, setHelperOpen] = useState(false);
   // The table resting after anyone's hurry-up: every button waits it out,
   // rather than inviting presses the server will refuse.
@@ -178,6 +188,10 @@ export function PhoneView({
   }, [view.handNumber]);
   const rootRef = useRef<HTMLDivElement>(null);
   const dealIn = useDealIn(view, seat, rootRef, hidden);
+  // A set just made from this hand: shown forming in the middle of the
+  // screen, then marked where it lands among the open sets.
+  const forming = useFormingMeld(me.melds, view.handNumber);
+  const ready = () => void api.act({ type: "ready" });
   const [sent, setSent] = useState<Sent | null>(null);
   // The claim being pressed or hovered, whose tiles the hand lifts.
   const [preview, setPreview] = useState<ClaimOption | null>(null);
@@ -506,7 +520,7 @@ export function PhoneView({
   const deciding = view.awaitingClaimSeats[0];
   let prompt: string;
   if (view.phase === "gameOver") prompt = result ? `${winText} That is the game.` : "The table ended the game.";
-  else if (view.phase === "handOver") prompt = `${winText} The table deals the next one.`;
+  else if (view.phase === "handOver") prompt = `${winText} Tap Ready for the next one.`;
   else if (view.paused) prompt = "Paused — the table will pick the hand back up.";
   else if (view.claim && view.claim.declared.length > 0)
     prompt = `${joinNames(view.claim.declared.map(nameOf))} won on ${tileName(view.lastDiscard!.tile.code)} — you can win on it too`;
@@ -659,7 +673,12 @@ export function PhoneView({
   const sets = (
     <>
       {me.melds.map((m, i) => (
-        <MeldRow key={`m${i}`} meld={m} />
+        <MeldRow
+          key={`m${i}`}
+          meld={m}
+          fresh={forming?.index === i && forming.landed}
+          arriving={forming?.index === i && !forming.landed}
+        />
       ))}
       {me.flowers.length > 0 ? (
         <span className="meld phone__flowers">
@@ -672,7 +691,7 @@ export function PhoneView({
   );
   const hasSets = me.melds.length > 0 || me.flowers.length > 0;
   const exposed =
-    hasSets || ghosts ? (
+    hasSets || ghosts || takeBackButton ? (
       <div className="seat__row phone__melds">
         {hasSets ? (
           <button
@@ -684,6 +703,9 @@ export function PhoneView({
             {sets}
           </button>
         ) : null}
+        {/* To the right of the flowers: up out of the way of the hand and the
+            buttons for the next move, where a hurried tap cannot find it. */}
+        {takeBackButton}
         {ghosts}
       </div>
     ) : null;
@@ -778,19 +800,8 @@ export function PhoneView({
         {compact ? lastPlayed : null}
         {compact ? promptLine : null}
         {compact ? turnTimer : null}
-        {compact ? takeBackButton : null}
         {compact ? hurryButton : null}
         {exposedInHeader ? exposed : null}
-        {fullscreen.supported && !fullscreen.active ? (
-          <button
-            type="button"
-            className="btn btn--sm btn--ghost"
-            aria-label="Full screen"
-            onClick={fullscreen.enter}
-          >
-            {compact ? "⛶" : "Full screen"}
-          </button>
-        ) : null}
         {helperAvailable ? (
           <HelperButton
             open={helperOpen}
@@ -817,7 +828,9 @@ export function PhoneView({
               sound={sound}
               config={view.config}
               appearance={appearance}
-              fullscreenHint={!fullscreen.supported}
+              fullscreen={fullscreen}
+              wakeLock={display.keepAwake === "on" ? wakeLock : undefined}
+              tableTakeBack={view.settings.takeBack !== false}
               layout={layout}
               display={display}
               sort={order}
@@ -833,7 +846,6 @@ export function PhoneView({
           {lastPlayed}
           {promptLine}
           {turnTimer}
-          {takeBackButton}
           {hurryButton}
         </div>
       )}
@@ -899,10 +911,13 @@ export function PhoneView({
               />
             ) : (
               <>
+                {view.phase === "handOver" ? (
+                  <ReadyUp view={view} seat={seat} nameOf={nameOf} busy={api.busy} onReady={ready} />
+                ) : null}
                 {view.actions?.canWin ? (
                   <button
                     type="button"
-                    className="btn btn--win"
+                    className="btn btn--win phone__win"
                     disabled={api.busy || view.paused}
                     onClick={() => void api.act({ type: "win" })}
                   >
@@ -982,7 +997,17 @@ export function PhoneView({
         )}
       </div>
       {showResult ? (
-        <PhoneResult view={view} seat={seat} nameOf={nameOf} onHide={() => setResultAside(resultKey)} />
+        <PhoneResult
+          view={view}
+          seat={seat}
+          nameOf={nameOf}
+          onHide={() => setResultAside(resultKey)}
+          ready={
+            view.phase === "handOver" ? (
+              <ReadyUp view={view} seat={seat} nameOf={nameOf} busy={api.busy} onReady={ready} />
+            ) : null
+          }
+        />
       ) : null}
       {hurriedBy !== null ? (
         <div className="phone__hurry" role="alert">
@@ -1010,6 +1035,9 @@ export function PhoneView({
           spread={260}
           style={{ left: "50%", top: "45%" }}
         />
+      ) : null}
+      {forming && !forming.landed ? (
+        <FormingMeld key={forming.key} meld={forming.meld} onDone={forming.land} />
       ) : null}
       {sent ? (
         <span
