@@ -84,8 +84,12 @@ export interface TabletDisplay {
   /** The wall of tiles still to be drawn, faint under everything else. */
   wall: OnOff;
   setWall: (value: OnOff) => void;
+  /** How large the table is drawn: its discards, its racks and its own controls. */
   density: TabletDensity;
   setDensity: (value: TabletDensity) => void;
+  /** Claims and wins called out loud, as the players would at a real table. */
+  callouts: OnOff;
+  setCallouts: (value: OnOff) => void;
 }
 
 export function useTabletDisplay(): TabletDisplay {
@@ -96,7 +100,8 @@ export function useTabletDisplay(): TabletDisplay {
     "normal",
     TABLET_DENSITIES,
   );
-  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity };
+  const [callouts, setCallouts] = useLocalSetting<OnOff>("hk-mahjong.callouts", "on", ON_OFF);
+  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity, callouts, setCallouts };
 }
 
 /** The panes beside a squared felt, each of which the tablet can close. */

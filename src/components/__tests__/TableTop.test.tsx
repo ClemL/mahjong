@@ -29,6 +29,26 @@ function feltSize(width = 1264, height = 700) {
 const racks = (container: HTMLElement) => Array.from(container.querySelectorAll("section.rack"));
 
 describe("TableTop", () => {
+  it("pauses a hand in play from the bar, and lays Paused over the felt until it resumes", () => {
+    feltSize();
+    const view = tableView(dealt());
+    const api = fakeApi(view);
+    const { unmount } = render(<TableTop api={api} view={view} sound={sound} />);
+    fireEvent.click(screen.getAllByRole("button", { name: "Pause" })[0]);
+    expect(api.control).toHaveBeenCalledWith({ type: "pause", value: true });
+    expect(screen.queryByText("Paused")).toBeNull();
+    unmount();
+
+    const paused = { ...view, paused: true };
+    const resume = fakeApi(paused);
+    const { container } = render(<TableTop api={resume} view={paused} sound={sound} />);
+    const overlay = container.querySelector<HTMLElement>(".felt__paused")!;
+    expect(overlay.getAttribute("role")).toBe("status");
+    expect(within(overlay).getByText("Paused")).toBeTruthy();
+    fireEvent.click(within(overlay).getByRole("button", { name: "Resume" }));
+    expect(resume.control).toHaveBeenCalledWith({ type: "pause", value: false });
+  });
+
   it("places nothing on the felt until it has been measured", () => {
     feltSize(0, 0);
     const view = { ...tableView(dealt()), roomId: "TABLE2" };

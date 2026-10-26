@@ -27,6 +27,8 @@ import {
   noteDiscard,
   openClaimWindow,
   openTable,
+  pauseTable,
+  resumeTable,
   resetRoom,
   returnToLobby,
   beginHand,
@@ -56,8 +58,9 @@ import {
 import { ROUND_CHOICES } from "@/game/rules";
 import { validAppearance } from "@/game/appearance";
 import { DIFFICULTIES, type Difficulty } from "@/game/ai";
-import type { Seat } from "@/game/tiles";
+import { SEAT_NAMES, type Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
+import { type GameRecord, gameRecord } from "@/game/history";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
@@ -123,12 +126,16 @@ async function mutate(
     const room = await load(id);
     const expected = room.version;
     const now = Date.now();
+    const wasOver = room.state.phase === "gameOver";
     apply(room, now);
     notePlayed(room);
     drain(room, now);
     room.version = expected + 1;
     room.updatedAt = now;
-    if (await roomStore().compareAndSet(room, expected)) return room;
+    if (await roomStore().compareAndSet(room, expected)) {
+      await keepIfFinished(room, wasOver, now);
+      return room;
+    }
   }
   throw new RoomError("The room changed while you were acting — try again", 409);
 }
@@ -141,6 +148,7 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
   // only written when it has gone stale, so polling once a second does not
   // turn into a write once a second.
   const beat = touch(room, token, now);
+  const wasOver = room.state.phase === "gameOver";
   const advanced = drain(room, now);
   if (advanced || beat) {
     const expected = room.version;
@@ -148,7 +156,7 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
     // the table changed and re-render on someone else's poll.
     if (advanced) room.version = expected + 1;
     room.updatedAt = now;
-    await roomStore().compareAndSet(room, expected);
+    if (await roomStore().compareAndSet(room, expected)) await keepIfFinished(room, wasOver, now);
   }
   return viewFor(room, token, now);
 }
@@ -210,6 +218,9 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     // They are back and moving for themselves, so whatever the computer did meanwhile is old news.
     r.stoodIn[seat] = 0;
     syncSeats(r);
+
+    // Paused, the hand waits for the table: nothing is played, asked for or nudged.
+    if (r.paused && action.type !== "leave") throw new RoomError("The table is paused", 409);
 
     // Getting up mid-hand hands the chair to the computer, which carries on
     // from exactly where the person left it; in the lobby it is simply free.
@@ -330,7 +341,8 @@ export type TableCommand =
   | { type: "replaceWithComputer"; seat: Seat }
   | { type: "rename"; seat: Seat; name: string }
   | { type: "moveSeat"; seat: Seat; step: 1 | -1 }
-  | { type: "forcePass" };
+  | { type: "forcePass" }
+  | { type: "pause"; value: boolean };
 
 /**
  * Commands the table device issues. A seated player may only rename their own
@@ -350,7 +362,15 @@ export async function control(
     ) {
       throw new RoomError("Not the table", 403);
     }
+    // Moving the hand on, or ending it, picks a paused table back up first.
+    if (["nextHand", "redeal", "endGame", "skipOpening"].includes(command.type)) resumeTable(r, now);
     switch (command.type) {
+      case "pause":
+        if (command.value === true) {
+          const refused = pauseTable(r, now);
+          if (refused) throw new RoomError(refused, 409);
+        } else resumeTable(r, now);
+        break;
       case "deal":
         if (r.started) throw new RoomError("The hand is already dealt", 409);
         if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
@@ -486,6 +506,40 @@ export async function control(
     }
   });
   return viewFor(room, token);
+}
+
+/**
+ * Keep a game for the table's history if this write is the one that ended it.
+ * A game ends on the table's command, or when the last hand's Ready deals on —
+ * from any player's move or poll — so it is checked wherever a room is
+ * written, and only by the write that won, so it is never kept twice.
+ */
+async function keepIfFinished(room: Room, wasOver: boolean, now: number): Promise<void> {
+  if (wasOver || room.state.phase !== "gameOver" || room.state.history.length === 0) return;
+  await roomStore().addGame(room.id, finishedGame(room, now));
+}
+
+/** The game just over, as the table's history will keep it. */
+function finishedGame(room: Room, now: number): GameRecord {
+  const seen = viewFor(room, null, now);
+  return gameRecord({
+    // A new game is dealt from a new seed, so the seed names the game.
+    id: `g${room.state.rngSeed}`,
+    endedAt: now,
+    endedEarly: room.state.dealership < 4,
+    history: room.state.history,
+    players: seen.players.map((p) => ({
+      name: p.occupant.name ?? SEAT_NAMES[p.seat],
+      human: p.occupant.kind === "human",
+    })),
+  });
+}
+
+/** The games this table has finished, newest first. Names and scores only: nothing about any hand. */
+export async function listGames(id: string): Promise<GameRecord[]> {
+  const table = findTable(id);
+  if (!table) throw new RoomError("No such table", 404);
+  return roomStore().games(table.id);
 }
 
 export { RoomError };

@@ -25,6 +25,7 @@ import { useWakeLock } from "@/hooks/useWakeLock";
 import { type TabletDensity, type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
 import { TableResult, joinNames, winnersOf } from "./TableResult";
+import { HandReplay } from "./HandReplay";
 import { GameComplete } from "./GameComplete";
 import {
   ChipStack,
@@ -44,6 +45,7 @@ import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
 import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
 import { TableSide } from "./TableSide";
 import type { SoundToggle } from "@/hooks/useRoomSound";
+import { useCallouts } from "@/hooks/useCallouts";
 import {
   POSITION_ROTATION,
   type TableLayout,
@@ -163,7 +165,7 @@ function Rack({
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
   // Only the seat to play has a clock running, and only when the table set one.
-  const left = useCountdown(active ? view.turnDeadlineIn : null);
+  const left = useCountdown(active ? view.turnDeadlineIn : null, !view.paused);
   const status = deciding
     ? "deciding…"
     : active
@@ -716,6 +718,7 @@ export function Felt({
   onNextHand,
   onNewGame,
   onSkipDeal,
+  onResume,
   busy = false,
   sheetHost = null,
 }: {
@@ -732,9 +735,14 @@ export function Felt({
   onNewGame: () => void;
   /** The deal has been skipped here; whoever holds play for it should stop. */
   onSkipDeal?: () => void;
+  /** Pick a paused hand back up. */
+  onResume?: () => void;
   busy?: boolean;
 }) {
   const felt = useRef<HTMLDivElement>(null);
+  // The hand being replayed over the result, named by its number so a new
+  // deal closes it on its own.
+  const [replaying, setReplaying] = useState<number | null>(null);
   const size = useElementSize(felt);
 
   const position = (seat: Seat) => positionOf(seat, view.settings.rotation);
@@ -879,7 +887,13 @@ export function Felt({
           {/* A moment has the felt to itself; the sheet follows it, or a skip. */}
           {sheet.open && !momentLive ? (
             <SheetSlot host={sheetHost}>
-              {view.phase === "gameOver" ? (
+              {replaying === view.handNumber && view.phase === "handOver" ? (
+                <HandReplay
+                  view={view}
+                  name={(seat) => occupantName(view.players[seat])}
+                  onClose={() => setReplaying(null)}
+                />
+              ) : view.phase === "gameOver" ? (
                 <GameComplete
                   view={view}
                   name={(seat) => occupantName(view.players[seat])}
@@ -894,6 +908,7 @@ export function Felt({
                   tile={Math.round(Math.min(40, Math.max(26, layout.tile * 1.05)))}
                   onHide={sheet.hide}
                   onNextHand={onNextHand}
+                  onReplay={() => setReplaying(view.handNumber)}
                   busy={busy}
                 />
               )}
@@ -927,6 +942,17 @@ export function Felt({
               Skip ⏭
             </button>
           ) : null}
+          {view.paused ? (
+            <div className="felt__paused" role="status">
+              <span className="felt__paused-title">Paused</span>
+              <span className="felt__paused-note">Every clock has stopped. Nobody can play until the table picks it up.</span>
+              {onResume ? (
+                <button type="button" className="btn btn--primary" disabled={busy} onClick={onResume}>
+                  Resume
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>
@@ -944,6 +970,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   const appearance = useAppearance();
   const fullscreen = useFullscreen("landscape");
   const display = useTabletDisplay();
+  useCallouts(view, display.callouts === "on" && sound?.muted !== true);
   const sheet = useResultSheet(view);
   const root = useRef<HTMLDivElement | null>(null);
   // Kept as state as well, to hand the result sheet somewhere to go.
@@ -991,6 +1018,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         onNextHand={() => void api.control({ type: "nextHand" })}
         onNewGame={() => void api.control({ type: "restart" })}
         onSkipDeal={() => void api.control({ type: "skipOpening" })}
+        onResume={() => void api.control({ type: "pause", value: false })}
         busy={api.busy}
         sheetHost={split ? host : null}
       />

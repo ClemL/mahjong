@@ -25,6 +25,8 @@ import { type SegmentOption, Segmented, SwitchRow } from "./SettingControls";
 import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
 import { positionOf } from "./tableLayout";
+import { GameHistory } from "./GameHistory";
+import { useTableGames } from "@/hooks/useTableGames";
 
 export const SPEEDS: SegmentOption<`${SpeedLevel}`>[] = SPEED_LEVELS.map((s) => ({
   value: `${s.level}` as `${SpeedLevel}`,
@@ -130,7 +132,7 @@ export function rulesInForce(config: RuleConfig): string[] {
   ];
 }
 
-type Section = "rules" | "players" | "pace" | "tablet" | "look" | "reference";
+type Section = "rules" | "players" | "pace" | "history" | "tablet" | "look" | "reference";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -245,6 +247,12 @@ const ICONS: Record<Section, ReactNode> = {
       <path d="M12 9v4l2 2M9 2h6" />
     </>
   ),
+  history: (
+    <>
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5M12 7v5l3 2" />
+    </>
+  ),
   tablet: (
     <>
       <rect x="3" y="4" width="18" height="14" rx="2" />
@@ -286,6 +294,8 @@ export function TableSettings({
   display?: TabletDisplay;
 }) {
   const [section, setSection] = useState<Section>("rules");
+  // Read when the section is opened, and again whenever a game ends.
+  const games = useTableGames(view.roomId, section === "history", view.phase === "gameOver");
   const ids = useId();
   const tabs = useRef<(HTMLButtonElement | null)[]>([]);
   const config = view.config;
@@ -312,6 +322,11 @@ export function TableSettings({
       key: "pace",
       name: "Pace & turns",
       summary: `${difficultyLabel}, ${speedLabel.toLowerCase()} computers · ${view.settings.turnLimit === 0 ? "no turn limit" : `${limitLabel(view.settings.turnLimit)} turns`}`,
+    },
+    {
+      key: "history",
+      name: "History",
+      summary: games === null ? "Past games and who won them" : `${games.length} ${games.length === 1 ? "game" : "games"} kept`,
     },
     {
       key: "tablet",
@@ -545,6 +560,12 @@ export function TableSettings({
                     onChange={(on) => display.setTurnGlow(on ? "on" : "off")}
                   />
                   <SwitchRow
+                    label="Spoken calls"
+                    hint="The tablet says 碰, 上, 槓 and 食糊 aloud, in Cantonese where it has the voice; not while the sound is off"
+                    checked={display.callouts === "on"}
+                    onChange={(on) => display.setCallouts(on ? "on" : "off")}
+                  />
+                  <SwitchRow
                     label="Wall"
                     hint="The tiles still to be drawn, faint under the table; draws leave from it"
                     checked={display.wall === "on"}
@@ -561,6 +582,8 @@ export function TableSettings({
             </Card>
           </div>
         ) : null}
+
+        {section === "history" ? <GameHistory games={games} /> : null}
 
         {section === "look" ? <AppearancePanel api={appearance} /> : null}
 

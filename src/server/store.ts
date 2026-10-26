@@ -3,6 +3,7 @@ import "server-only";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { Redis } from "@upstash/redis";
 import type { Room } from "@/game/room";
+import { GAMES_KEPT, type GameRecord } from "@/game/history";
 
 /**
  * Room persistence.
@@ -49,13 +50,34 @@ export interface RoomStore {
   /** Removes a room, so the next arrival deals a fresh table. */
   delete(id: string): Promise<void>;
   isPersistent(): boolean;
+  /** Keep a finished game, newest first, the oldest dropped past `GAMES_KEPT`. */
+  addGame(id: string, game: GameRecord): Promise<void>;
+  /** The table's finished games, newest first. */
+  games(id: string): Promise<GameRecord[]>;
 }
 
 const ROOM_TTL_SECONDS = 60 * 60 * 12;
+/**
+ * A room lapses after half a day without a move; the games it finished are
+ * kept far longer, under a key of their own, so a table that meets once a week
+ * still has last week's results.
+ */
+const GAMES_TTL_SECONDS = 60 * 60 * 24 * 180;
 const key = (id: string) => `mahjong:room:${id}`;
+const gamesKey = (id: string) => `mahjong:games:${id}`;
 
 class MemoryStore implements RoomStore {
   private rooms = new Map<string, string>();
+  private finished = new Map<string, GameRecord[]>();
+
+  async addGame(id: string, game: GameRecord): Promise<void> {
+    const kept = (this.finished.get(id) ?? []).filter((g) => g.id !== game.id);
+    this.finished.set(id, [game, ...kept].slice(0, GAMES_KEPT));
+  }
+
+  async games(id: string): Promise<GameRecord[]> {
+    return [...(this.finished.get(id) ?? [])];
+  }
 
   async get(id: string): Promise<Room | null> {
     const raw = this.rooms.get(key(id));
@@ -100,6 +122,20 @@ return 1
 
 class UpstashStore implements RoomStore {
   constructor(private redis: Redis) {}
+
+  async addGame(id: string, game: GameRecord): Promise<void> {
+    const pipeline = this.redis.pipeline();
+    pipeline.lpush(gamesKey(id), JSON.stringify(game));
+    pipeline.ltrim(gamesKey(id), 0, GAMES_KEPT - 1);
+    pipeline.expire(gamesKey(id), GAMES_TTL_SECONDS);
+    await pipeline.exec();
+  }
+
+  async games(id: string): Promise<GameRecord[]> {
+    const raw = await this.redis.lrange<string | GameRecord>(gamesKey(id), 0, GAMES_KEPT - 1);
+    // The client may hand back each entry already parsed.
+    return raw.map((entry) => (typeof entry === "string" ? (JSON.parse(entry) as GameRecord) : entry));
+  }
 
   async get(id: string): Promise<Room | null> {
     const raw = await this.redis.get<string | Room>(key(id));

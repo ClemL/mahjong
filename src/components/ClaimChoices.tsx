@@ -45,6 +45,7 @@ export function ClaimChoices({
   onPreview,
   onMoreTime,
   faan,
+  running = true,
 }: {
   options: ClaimOption[];
   discard: TileCode;
@@ -58,8 +59,10 @@ export function ClaimChoices({
   onMoreTime?: () => void;
   /** Shown after a win, to open what it would score. */
   faan?: ReactNode;
+  /** False while the table is paused: the window holds where it is. */
+  running?: boolean;
 }) {
-  const left = useCountdown(deadlineIn) ?? 0;
+  const left = useCountdown(deadlineIn, running) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
     "--left": Math.min(1, left / allowance),
   };
