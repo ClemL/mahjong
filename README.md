@@ -182,7 +182,9 @@ never receives anyone's concealed tiles.
 It also drives the game: next hand (or each phone taps **Ready**, and the last
 one in deals it), redeal, restart and reset scores, end the game early (the hand being played goes unscored, and everyone goes to the final
 scores), change the faan minimum, free a seat, and skip a player who is not
-answering a claim.
+answering a claim. **Pause** stops a hand where it stands: no computer turn, no
+claim window and no turn clock runs, every phone says the table is paused and
+its hand cannot be played, and **Resume** gives everyone back the time they had.
 
 ### On the devices themselves
 
@@ -370,6 +372,8 @@ src/game/          Rules engine — no React, no DOM
   sets.ts, waits.ts, helper.ts   Hints: finished sets, waits, sets started
   patternTiles.ts  The tiles behind each faan pattern, for the result
   summary.ts       A finished game's standings and facts
+  replay.ts        A finished hand rebuilt move by move from its log
+  history.ts       The table's kept games, and each person's record across them
   room.ts          Multiplayer room model: seating, draining, redaction
   presence.ts      Away and heartbeat timings
   tables.ts        The three fixed tables
@@ -430,7 +434,10 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   deal after winning (連莊); a loss or a washout passes it on.
 - **Difficulty** — Easy, Normal or Hard — is how well the computer plays the
   seats nobody has taken; the table sets it with the pace.
-- **Sound** is each device's own.
+- **Sound** is each device's own. The tablet also calls claims and wins aloud —
+  碰, 上, 槓, 食糊, 自摸 — in Cantonese where the device has a voice for it and in
+  English where not; **Spoken calls**, under **This tablet**, turns that off, and
+  it is silent whenever the tablet's sound is.
 
 ### Table and tiles
 
@@ -514,6 +521,19 @@ sheet, or saves it where there is none.
 When two or three players win on one discard, the result names them all, shows
 each winning hand and its faan, and **Who pays** marks the seats that paid half
 of each.
+
+**Replay hand**, on the tablet's hand result, plays the hand back move by move
+from its log: the four ponds filling and the sets going down in order, each move
+said in words, stepped through, scrubbed or played. On a short tablet the final
+scores keep their heading — **Share scores** and **New game** with it — in view,
+and only the body under it scrolls.
+
+**History**, in the table's settings, keeps the table's finished games (any that
+ended with at least one hand played; the last 50, for 180 days, under a key of
+their own so they outlive the room) and each person's record across them: games,
+firsts, average place, chips won or lost, wins and best hand. Names are matched
+whatever case they were typed in, and a chair the computer played is nobody's
+record.
 
 The chart's four series use categorical slots 1–4 of a reference palette,
 validated against each theme's chart surface: on the dark themes, worst adjacent

@@ -187,6 +187,27 @@ describe("PhoneView", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
+  it("throws nothing and answers nothing while the table is paused", () => {
+    touchScreen();
+    const { view } = onTurn();
+    const paused = { ...view, paused: true };
+    const api = fakeApi(paused);
+    const { container, unmount } = render(<PhoneView api={api} view={paused} sound={sound} />);
+    expect(screen.getByText("Paused — the table will pick the hand back up.")).toBeTruthy();
+    expect(screen.getByText("Paused by the table. Your clock has stopped.")).toBeTruthy();
+    const tile = handButtons(container)[0];
+    fireEvent.click(tile);
+    fireEvent.click(tile);
+    expect(api.act).not.toHaveBeenCalled();
+    unmount();
+
+    const { room, claimer } = claimable();
+    const asked = { ...playerView(room, claimer), paused: true };
+    render(<PhoneView api={fakeApi(asked)} view={asked} sound={sound} />);
+    const group = screen.getByRole("group", { name: /^Claim / });
+    expect(within(group).getAllByRole("button").every((b) => (b as HTMLButtonElement).disabled)).toBe(true);
+  });
+
   it("lets an armed tile be kept or thrown from the confirm bar", () => {
     touchScreen();
     const { seat, view } = onTurn();

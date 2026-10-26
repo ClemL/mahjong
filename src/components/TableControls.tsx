@@ -48,8 +48,19 @@ export function TableActions({
   view: RoomView;
   sheet: { aside: boolean; show: () => void };
 }) {
+  const live = view.started && (view.phase === "action" || view.phase === "claiming");
   return (
     <>
+      {live ? (
+        <button
+          type="button"
+          className={`btn btn--sm${view.paused ? " btn--primary" : ""}`}
+          disabled={api.busy}
+          onClick={() => void api.control({ type: "pause", value: !view.paused })}
+        >
+          {view.paused ? "Resume" : "Pause"}
+        </button>
+      ) : null}
       {sheet.aside ? (
         <button type="button" className="btn btn--sm" onClick={sheet.show}>
           {view.phase === "gameOver" ? "Final scores" : "Result"}

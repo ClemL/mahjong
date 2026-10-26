@@ -162,9 +162,9 @@ export function PhoneView({
   const [helperOpen, setHelperOpen] = useState(false);
   // The table resting after anyone's hurry-up: every button waits it out,
   // rather than inviting presses the server will refuse.
-  const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null);
+  const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null, !view.paused);
   // Nor is anybody hurried in the first moments of their turn.
-  const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null);
+  const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null, !view.paused);
   const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
   const compact = layout.compact;
@@ -227,8 +227,11 @@ export function PhoneView({
     fullscreen.enter();
   };
 
-  const yourTurn = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
-  const turnLeft = useCountdown(yourTurn ? view.turnDeadlineIn : null);
+  const toPlay = view.turn === seat && view.phase === "action" && view.actions?.canDiscard;
+  // Paused, the turn is still yours and its clock still shows, stopped, but
+  // nothing can be played until the table picks the hand up.
+  const yourTurn = toPlay && !view.paused;
+  const turnLeft = useCountdown(toPlay ? view.turnDeadlineIn : null, !view.paused);
 
   // ---- dragging tiles into your own order, or flicking one away ---------
   const handRef = useRef<HTMLDivElement>(null);
@@ -518,6 +521,7 @@ export function PhoneView({
   let prompt: string;
   if (view.phase === "gameOver") prompt = result ? `${winText} That is the game.` : "The table ended the game.";
   else if (view.phase === "handOver") prompt = `${winText} Tap Ready for the next one.`;
+  else if (view.paused) prompt = "Paused — the table will pick the hand back up.";
   else if (view.claim && view.claim.declared.length > 0)
     prompt = `${joinNames(view.claim.declared.map(nameOf))} won on ${tileName(view.lastDiscard!.tile.code)} — you can win on it too`;
   else if (view.claim) prompt = `${nameOf(view.lastDiscard!.from)} discarded ${tileName(view.lastDiscard!.tile.code)}`;
@@ -565,7 +569,7 @@ export function PhoneView({
       : Math.min(1, (graceLeft ?? 0) / HURRY_GRACE_MS),
   };
   const hurryButton =
-    display.hurry === "on" && waitingOn !== null && waitingOn !== seat ? (
+    display.hurry === "on" && waitingOn !== null && waitingOn !== seat && !view.paused ? (
       <button
         type="button"
         className={`btn btn--sm btn--ghost phone__hurry-btn${cooldown || settling ? " phone__hurry-btn--resting" : ""}`}
@@ -628,7 +632,7 @@ export function PhoneView({
           <button
             type="button"
             className="btn btn--sm btn--ghost phone__more-time"
-            disabled={api.busy}
+            disabled={api.busy || view.paused}
             aria-label={`More time: add ${MORE_TIME_MS / 1000} seconds, once per turn`}
             onClick={() => void api.act({ type: "moreTime" })}
           >
@@ -856,6 +860,11 @@ export function PhoneView({
             <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
           ) : null}
           {faanOpen && winOnOffer ? <FaanPreview score={winOnOffer} /> : null}
+          {view.paused ? (
+            <div className="confirm-bar confirm-bar--note phone__paused" role="status">
+              <span className="confirm-bar__text">Paused by the table. Your clock has stopped.</span>
+            </div>
+          ) : null}
           {standIn > 0 ? (
             <div className="confirm-bar confirm-bar--note" role="status">
               <span className="confirm-bar__text">
@@ -891,7 +900,8 @@ export function PhoneView({
                 deadlineIn={view.claim.deadlineIn}
                 allowance={view.claim.allowance}
                 onMoreTime={view.claim.canExtend ? () => void api.act({ type: "moreTime" }) : undefined}
-                busy={api.busy}
+                busy={api.busy || view.paused}
+                running={!view.paused}
                 onClaim={(optionId) => {
                   setPreview(null);
                   void api.act({ type: "claim", optionId });
@@ -908,7 +918,7 @@ export function PhoneView({
                   <button
                     type="button"
                     className="btn btn--win phone__win"
-                    disabled={api.busy}
+                    disabled={api.busy || view.paused}
                     onClick={() => void api.act({ type: "win" })}
                   >
                     Win 自摸
@@ -920,7 +930,7 @@ export function PhoneView({
                     key={`${kong.kind}-${kong.code}`}
                     type="button"
                     className="btn btn--primary"
-                    disabled={api.busy}
+                    disabled={api.busy || view.paused}
                     onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
                   >
                     {kong.kind === "concealed" ? "Kong" : "Add to kong"}

@@ -9,6 +9,8 @@ import { PhoneResult } from "../PhoneResult";
 import { PhoneView } from "../PhoneView";
 import { NAMES, dealt, fakeApi, playerView, sound, tableView } from "./fixtures";
 import { cardFileName, scoreCard } from "../scoreCard";
+import { autoPlayHand } from "@/game/controller";
+import { createRng } from "@/game/rng";
 
 /** A felt measured at a landscape tablet's size, as soon as it is observed. */
 function feltSize(width = 1264, height = 700) {
@@ -334,5 +336,27 @@ describe("a game ended early", () => {
     expect(within(standings).getByText(/^Game ended early/)).toBeTruthy();
     expect(within(standings).getByText("2nd")).toBeTruthy();
     expect(screen.getByText("The table ended the game.")).toBeTruthy();
+  });
+});
+
+describe("replaying the hand", () => {
+  it("opens from the result and steps through the hand's moves in words", () => {
+    feltSize();
+    const room = dealt();
+    // A few real moves, played by the computer, so the log has a hand to replay.
+    for (const p of room.state.players) p.isHuman = false;
+    const played = autoPlayHand(room.state, createRng(4));
+    room.state = played.state;
+    const view = tableView(room);
+    render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    fireEvent.click(screen.getByRole("button", { name: "Replay hand" }));
+    const replay = screen.getByRole("dialog", { name: `Replay of hand ${view.handNumber}` });
+    expect(within(replay).getByText("The hand as dealt, before the first discard.")).toBeTruthy();
+    fireEvent.click(within(replay).getByRole("button", { name: "Next move" }));
+    expect(within(replay).getByRole("heading", { level: 2 }).textContent).toMatch(/ threw .+\.$/);
+    fireEvent.click(within(replay).getByRole("button", { name: "Last move" }));
+    expect(within(replay).getByRole("heading", { level: 2 }).textContent).toMatch(/won on|drew the winning tile|threw/);
+    fireEvent.click(within(replay).getByRole("button", { name: "Back to the result" }));
+    expect(screen.getByRole("dialog", { name: "Hand result" })).toBeTruthy();
   });
 });

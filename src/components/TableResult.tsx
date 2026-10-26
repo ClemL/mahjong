@@ -358,6 +358,7 @@ export function TableResult({
   tile,
   onHide,
   onNextHand,
+  onReplay,
   busy,
 }: {
   view: RoomView;
@@ -366,6 +367,8 @@ export function TableResult({
   tile: number;
   onHide: () => void;
   onNextHand: () => void;
+  /** Play the hand back, move by move. */
+  onReplay?: () => void;
   busy: boolean;
 }) {
   const result = view.result;
@@ -483,6 +486,11 @@ export function TableResult({
               </span>
             ) : null}
           </span>
+          {onReplay ? (
+            <button type="button" className="btn btn--ghost" onClick={onReplay}>
+              Replay hand
+            </button>
+          ) : null}
           <button type="button" className="btn btn--ghost" onClick={onHide}>
             See the table
           </button>

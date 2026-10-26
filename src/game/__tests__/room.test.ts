@@ -34,6 +34,8 @@ import {
   shouldRegroup,
   sitDown,
   startPlay,
+  pauseTable,
+  resumeTable,
   TABLE_IDLE_MS,
   openTable,
   TAKE_BACK_MS,
@@ -1165,5 +1167,55 @@ describe("taking the table over", () => {
     expect(viewFor(room, null, now + TABLE_IDLE_MS + 1).tableAway).toBe(true);
     room.table = null;
     expect(viewFor(room, null, now + TABLE_IDLE_MS + 1).tableAway).toBe(false);
+  });
+});
+
+describe("pausing the table", () => {
+  it("is only for a hand in play", () => {
+    const room = newRoom("TEST", undefined, 3);
+    expect(pauseTable(room)).toBe("There is no hand in play to pause");
+    const live = dealt("TEST", 3, [0]);
+    expect(pauseTable(live)).toBeNull();
+    expect(pauseTable(live)).toBe("The table is already paused");
+  });
+
+  it("stops everything, and every clock stands where it was", () => {
+    const room = dealt("TEST", 12, [0]);
+    const start = Date.now();
+    room.lastStepAt = start;
+    expect(pauseTable(room, start + 4_000)).toBeNull();
+    const before = { ...room.state };
+    const frozen = viewFor(room, "tok-0", start + 4_000);
+    expect(frozen.paused).toBe(true);
+    // Long after any computer turn or time limit would have come due, nothing has moved.
+    expect(drain(room, start + SEAT_IDLE_MS / 2)).toBe(false);
+    expect(room.state.turn).toBe(before.turn);
+    expect(room.state.log.length).toBe(before.log.length);
+    const later = viewFor(room, "tok-0", start + 120_000);
+    expect(later.turnDeadlineIn).toBe(frozen.turnDeadlineIn);
+    expect(later.hurryGraceLeft).toBe(frozen.hurryGraceLeft);
+  });
+
+  it("picks up with the time that was left, however long it lasted", () => {
+    const room = dealt("TEST", 12, [0]);
+    const start = Date.now();
+    room.lastStepAt = start;
+    const left = viewFor(room, "tok-0", start + 4_000).turnDeadlineIn;
+    pauseTable(room, start + 4_000);
+    resumeTable(room, start + 64_000);
+    expect(room.paused).toBeNull();
+    expect(room.lastStepAt).toBe(start + 60_000);
+    expect(viewFor(room, "tok-0", start + 64_000).turnDeadlineIn).toBe(left);
+  });
+
+  it("will not take a discard back while paused", () => {
+    const room = dealt("TEST", 9, [0, 1]);
+    const now = Date.now();
+    const before = room.state;
+    room.state = discard(before, 0, before.players[0].hand.find((t) => !t.code.startsWith("f"))!.id);
+    noteDiscard(room, 0, before, now);
+    pauseTable(room, now);
+    expect(takeBackRefusal(room, 0, now)).toBe("The table is paused");
+    expect(viewFor(room, "tok-0", now).takeBackIn).toBe(0);
   });
 });
