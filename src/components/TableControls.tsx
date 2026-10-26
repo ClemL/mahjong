@@ -76,16 +76,6 @@ export function TableActions({
           {isLastHand(view) ? "Final scores" : "Next hand"}
         </button>
       ) : null}
-      {view.awaitingClaimSeats.length > 0 ? (
-        <button
-          type="button"
-          className="btn btn--sm"
-          disabled={api.busy}
-          onClick={() => void api.control({ type: "forcePass" })}
-        >
-          Skip waiting ({view.awaitingClaimSeats.length})
-        </button>
-      ) : null}
       <button
         type="button"
         className="btn btn--sm"

@@ -44,6 +44,12 @@ export interface PlayerState {
   melds: Meld[];
   flowers: Tile[];
   discards: Tile[];
+  /**
+   * Where tiles thrown into this pond were taken by someone else: `at` is how
+   * many of the pond's discards lay before the tile, `by` who took it. The
+   * table leaves a space there, so the pond still reads in the order thrown.
+   */
+  taken?: { at: number; by: Seat }[];
   isHuman: boolean;
 }
 
@@ -242,6 +248,7 @@ export function createGame(options: GameOptions = {}): GameState {
       melds: [],
       flowers: [],
       discards: [],
+      taken: [],
       isHuman: seat === humanSeat,
     })),
     wall: [],
@@ -289,6 +296,7 @@ export function startHand(previous: GameState): GameState {
     p.melds = [];
     p.flowers = [];
     p.discards = [];
+    p.taken = [];
   }
 
   // Deal 13 tiles to each player, starting with the dealer.
@@ -823,8 +831,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
   const winner = taken[0];
 
   // A meld claim: take the discard out of the discarder's pond.
-  const discarderState = player(state, discarder);
-  discarderState.discards = discarderState.discards.filter((t) => t.id !== tile.id);
+  takeFromPond(player(state, discarder), tile, winner.seat);
 
   const claimer = player(state, winner.seat);
   const fromHand = claimer.hand.filter((t) => winner.option.tileIds.includes(t.id));
@@ -882,6 +889,14 @@ export function liableSeat(melds: Meld[]): Seat | null {
   return liable;
 }
 
+/** Take a claimed tile out of its pond, leaving a note of where it lay and who took it. */
+function takeFromPond(owner: PlayerState, tile: Tile, by: Seat): void {
+  const at = owner.discards.findIndex((t) => t.id === tile.id);
+  if (at < 0) return;
+  owner.discards = owner.discards.filter((t) => t.id !== tile.id);
+  owner.taken = [...(owner.taken ?? []), { at, by }];
+}
+
 /**
  * Settle a win, or several, on a discard (or a robbed kong's tile). Each
  * winner is paid by the discarder in full and, where the others pay half, by
@@ -916,6 +931,7 @@ function settleDiscardWins(state: GameState, seats: Seat[], discarder: Seat, til
   // hand when an added kong is being robbed.
   const source = player(state, discarder);
   if (robbing) source.hand = source.hand.filter((t) => t.id !== tile.id);
+  else if (wins.length > 0) takeFromPond(source, tile, wins[0].winner);
   else source.discards = source.discards.filter((t) => t.id !== tile.id);
   if (wins.length === 0) {
     state.phase = "action";

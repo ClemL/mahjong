@@ -1,8 +1,19 @@
 /* ------------------------------------------------------------- hurry up */
 
+/* One width whatever it says — Hurry up, Hurried 9s, a count and its bar —
+   so nothing beside it shifts as the label changes. */
 .phone__hurry-btn {
   flex: none;
+  box-sizing: border-box;
+  width: 8.6em;
+  padding-inline: 4px;
+  text-align: center;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.phone--compact .phone__hurry-btn {
+  width: 7.2em;
 }
 
 /* Resting after anyone's hurry-up: the seconds until the table takes another,
@@ -68,4 +79,17 @@
   .phone__hurry {
     animation: none;
   }
+}
+
+/* Beside "Waiting for …": the person waited on has been hurried, and by whom. */
+.phone__hurried-note {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  color: var(--ink);
+  font-size: 0.85em;
+  font-weight: 700;
+  white-space: nowrap;
 }

@@ -6,7 +6,7 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Difficulty } from "@/game/ai";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import type { OnOff, TabletDisplay } from "@/hooks/useLocalSetting";
+import type { OnOff, TabletDensity, TabletDisplay } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import { THEMES, TILE_STYLES } from "@/game/appearance";
 import {
@@ -59,6 +59,18 @@ export const LIMITS: SegmentOption<string>[] = TURN_LIMITS.map((seconds) => ({
       ? "Wait as long as a player takes"
       : `After ${seconds < 60 ? `${seconds} seconds` : `${seconds / 60} minute${seconds > 60 ? "s" : ""}`}, the tile just drawn is discarded for them`,
 }));
+
+/** How large this tablet draws the table, roomiest first. */
+const DENSITY_OPTIONS: SegmentOption<TabletDensity>[] = [
+  { value: "cosy", label: "Cosy", hint: "Larger discards, thicker racks and bigger buttons, for reading across a table" },
+  { value: "normal", label: "Normal", hint: "The usual size" },
+  { value: "compact", label: "Compact", hint: "Smaller discards and racks, more room in the middle" },
+  {
+    value: "extra",
+    label: "Extra compact",
+    hint: "The smallest tiles and racks, for a small tablet or a long hand",
+  },
+];
 
 const MIN_FAAN: SegmentOption<`${number}`>[] = MIN_FAAN_CHOICES.map((n) => ({
   value: `${n}` as `${number}`,
@@ -322,6 +334,7 @@ export function TableSettings({
       summary: [
         sound ? (sound.muted ? "Sound off" : "Sound on") : null,
         display ? (display.wall === "on" ? "wall shown" : "wall hidden") : null,
+        display ? DENSITY_OPTIONS.find((d) => d.value === display.density)?.label : null,
       ]
         .filter(Boolean)
         .join(" · "),
@@ -557,6 +570,12 @@ export function TableSettings({
                     hint="The tiles still to be drawn, faint under the table; draws leave from it"
                     checked={display.wall === "on"}
                     onChange={(on) => display.setWall(on ? "on" : "off")}
+                  />
+                  <Segmented
+                    label="Size"
+                    options={DENSITY_OPTIONS}
+                    value={display.density}
+                    onChange={display.setDensity}
                   />
                 </>
               ) : null}

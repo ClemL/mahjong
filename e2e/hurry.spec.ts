@@ -99,6 +99,8 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   await expect(lucy.page.getByRole("button", { name: "Hurry up Kris: flash their screen" })).toBeEnabled();
   const hurry = zaid.page.getByRole("button", { name: "Hurry up Kris: flash their screen" });
   await expect(hurry).toBeVisible();
+  // One width through every label it shows, so nothing beside it shifts.
+  const widthBefore = (await hurry.boundingBox())!.width;
   await hurry.tap();
   await expect(kris.page.getByRole("alert").filter({ hasText: "Zaid says hurry up!" })).toBeVisible();
   await expect(kris.page.locator(".phone--hurried")).toHaveCount(1);
@@ -113,6 +115,9 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   const resting = lucy.page.getByRole("button", { name: /^Zaid hurried Kris: hurry up again in \d+ seconds$/ });
   await expect(resting).toBeDisabled();
   await expect(resting).toHaveText(/^Hurried \d+s$/);
+  expect((await zaid.page.locator(".phone__hurry-btn").boundingBox())!.width).toBeCloseTo(widthBefore, 0);
+  // Everyone still waiting is told who already hurried Kris.
+  await expect(lucy.page.locator(".phone__prompt")).toHaveText("Waiting for Kris…Hurried by Zaid");
   // Kris is never offered a button to hurry himself, and the flash plays out.
   await expect(kris.page.getByRole("button", { name: /^Hurry up/ })).toHaveCount(0);
   await expect(kris.page.locator(".phone__hurry")).toHaveCount(0, { timeout: 6_000 });

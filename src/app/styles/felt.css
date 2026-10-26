@@ -331,3 +331,115 @@
   font-size: clamp(18px, 2.4cqw, 30px);
   color: var(--gold);
 }
+
+/* A claimed tile's place in its pond, left empty: an outline the size of a
+   tile, with the wind of whoever took it, so the pond still reads in the
+   order it was thrown. */
+.discards__gap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--tile-md);
+  height: calc(var(--tile-md) * 1.38);
+  box-sizing: border-box;
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 32%, transparent);
+  border-radius: calc(var(--tile-md) * 0.16);
+}
+
+.discards__gap-wind {
+  font-size: calc(var(--tile-md) * 0.42);
+  line-height: 1;
+  color: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+/* Each discard is a button that picks out every copy of it on the table; it
+   keeps the tile's own look. */
+.discards__pick {
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: calc(var(--tile-md) * 0.16);
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.discards__pick:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* A tile picked out: every copy of it on the table stays at full strength,
+   ringed (the rule is written by TableTop for the tile picked), while the
+   rest fall back. */
+.felt--matching .discards .tile,
+.felt--matching .rack .tile:not(.tile--back),
+.felt--matching .console .tile {
+  opacity: 0.35;
+  transition: opacity 160ms ease;
+}
+
+.felt__match {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 14px;
+  border-radius: 999px;
+  background: var(--modal-bg);
+  border: 1px solid var(--claim-outline);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .felt--matching .discards .tile,
+  .felt--matching .rack .tile,
+  .felt--matching .console .tile {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------- tablet sizes */
+
+/* The table's own controls follow its size: the bar over the felt, or the
+   side panel beside a squared one. The discards and racks are sized by
+   tableLayout.ts. */
+.tabletop--cosy > .tabletop__bar,
+.tabletop--cosy > .side {
+  zoom: 1.12;
+}
+
+.tabletop--compact > .tabletop__bar,
+.tabletop--compact > .side {
+  zoom: 0.92;
+}
+
+.tabletop--extra > .tabletop__bar,
+.tabletop--extra > .side {
+  zoom: 0.84;
+}
+
+/* Zoom carries into fixed descendants, so the full-screen sheets, drawers,
+   dialogs and the film opened from those controls are zoomed back, and still
+   cover exactly the screen. */
+.tabletop--cosy > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+  zoom: 0.892857; /* 1 / 1.12 */
+}
+
+.tabletop--compact > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+  zoom: 1.086957; /* 1 / 0.92 */
+}
+
+.tabletop--extra > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+  zoom: 1.190476; /* 1 / 0.84 */
+}

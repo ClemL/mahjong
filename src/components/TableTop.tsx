@@ -1,18 +1,28 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  Fragment,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { createPortal } from "react-dom";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Meld } from "@/game/melds";
-import { SEAT_NAMES, type Seat, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, type TileCode, roundName, seatWind, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useElementSize } from "@/hooks/useElementSize";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
-import { type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
+import { type TabletDensity, type TabletDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { TileFace } from "./TileView";
 import { TableResult, joinNames, winnersOf } from "./TableResult";
 import { HandReplay } from "./HandReplay";
@@ -56,6 +66,22 @@ const URGENT_MS = 5000;
 
 /** Ponds are sized for a full hand's worth from the start, so tiles do not shrink as it fills. */
 const POND_CAPACITY = 24;
+
+/**
+ * What each of the tablet's sizes does: how many discards a pond is sized
+ * for — fewer is larger tiles, and a pond that outgrows it shrinks them as it
+ * always has — and how thick the racks are. Thicker racks would cost the
+ * discards more than they gain, so cosy keeps the usual. Measured over five
+ * felts from 780 to 1264 wide, each size's discards come out smaller than the
+ * one before. The table's own controls are zoomed in CSS, by the class on the
+ * tabletop.
+ */
+const DENSITY: Record<TabletDensity, { capacity: number; rack: number }> = {
+  cosy: { capacity: 0.75, rack: 1 },
+  normal: { capacity: 1, rack: 1 },
+  compact: { capacity: 1.25, rack: 0.9 },
+  extra: { capacity: 1.75, rack: 0.8 },
+};
 
 /** Custom properties are not in React's style typing. */
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
@@ -257,18 +283,42 @@ function Discards({
   position,
   centreId,
   lit,
+  nameOf,
+  onPick,
 }: {
   player: PublicPlayer;
   layout: TableLayout;
   position: number;
   centreId: string | null;
   lit: boolean;
+  nameOf: (seat: Seat) => string;
+  /** Show every copy of this tile on the table. */
+  onPick: (code: TileCode) => void;
 }) {
   const style: Vars = {
     ...placementStyle(layout.ponds[position]),
     "--tile-md": `${layout.tile}px`,
     gap: layout.gap,
   };
+  // A claimed tile leaves its space behind, so the pond still reads in the
+  // order it was thrown and shows who took what from it.
+  const gapsAt = (i: number) =>
+    (player.taken ?? [])
+      .map((gap, n) => ({ ...gap, n }))
+      .filter((gap) => gap.at === i)
+      .map((gap) => (
+        <span
+          key={`gap-${gap.n}`}
+          className="discards__gap"
+          role="img"
+          aria-label={`Taken by ${nameOf(gap.by)}`}
+          title={`Taken by ${nameOf(gap.by)}`}
+        >
+          <span className="discards__gap-wind" aria-hidden>
+            {tileGlyph(seatWind(gap.by))}
+          </span>
+        </span>
+      ));
   return (
     <div
       className={lit ? "discards discards--turn" : "discards"}
@@ -276,13 +326,60 @@ function Discards({
       data-seat={player.seat}
       aria-label={`${SEAT_NAMES[player.seat]} discards`}
     >
-      {player.discards
-        .filter((t) => t.id !== centreId)
-        .map((t) => (
-          <TileFace key={t.id} code={t.code} size="md" />
-        ))}
+      {player.discards.map((t, i) => (
+        <Fragment key={t.id}>
+          {gapsAt(i)}
+          {t.id === centreId ? null : (
+            <button
+              type="button"
+              className="discards__pick"
+              aria-label={`Show every ${tileName(t.code)} on the table`}
+              onClick={() => onPick(t.code)}
+            >
+              <TileFace code={t.code} size="md" />
+            </button>
+          )}
+        </Fragment>
+      ))}
+      {gapsAt(player.discards.length)}
     </div>
   );
+}
+
+/** How long tapped tiles stay picked out before the table lets them go. */
+const MATCH_MS = 8_000;
+
+/** Every tile in sight on the table: the ponds, the middle, the open sets and flowers, and hands turned up. */
+function tilesInSight(view: RoomView): TileCode[] {
+  const codes: TileCode[] = [];
+  for (const p of view.players) {
+    codes.push(...p.discards.map((t) => t.code), ...p.flowers.map((t) => t.code));
+    for (const m of p.melds) {
+      // A concealed kong shows its ends face down.
+      codes.push(...(m.type === "kong" && m.concealed ? m.tiles.slice(1, 3) : m.tiles).map((t) => t.code));
+    }
+    codes.push(...p.hand.filter((t) => t.code !== "back").map((t) => t.code));
+  }
+  return codes;
+}
+
+/**
+ * A tile tapped in a pond, and every other copy of it on the table picked out
+ * with it, until it is tapped again, another is tapped, or a few seconds pass.
+ * Ringed and left at full strength while everything else fades back, and
+ * counted in words, so the match never rests on the ring's colour alone.
+ */
+function useTileMatch(view: RoomView) {
+  const [code, setCode] = useState<TileCode | null>(null);
+  useEffect(() => {
+    if (code === null) return;
+    const timer = window.setTimeout(() => setCode(null), MATCH_MS);
+    return () => window.clearTimeout(timer);
+  }, [code]);
+  useEffect(() => setCode(null), [view.handNumber]);
+  const pick = (next: TileCode) => setCode((current) => (current === next ? null : next));
+  const count = code ? tilesInSight(view).filter((c) => c === code).length : 0;
+  return { code, count, pick, clear: () => setCode(null) };
 }
 
 /**
@@ -657,7 +754,12 @@ export function Felt({
   const layout = layoutTable({
     width: size.width,
     height: size.height,
-    capacity: Math.max(POND_CAPACITY, ...view.players.map((p) => p.discards.length)),
+    // A space left by a claimed tile takes a place in its pond like a tile.
+    capacity: Math.max(
+      Math.round(POND_CAPACITY * DENSITY[display.density].capacity),
+      ...view.players.map((p) => p.discards.length + (p.taken?.length ?? 0)),
+    ),
+    scale: DENSITY[display.density].rack,
     // A hand turned face up at the end needs room on its rack too.
     revealed: bySeatAtPosition((seat) => {
       const p = view.players[seat];
@@ -670,6 +772,7 @@ export function Felt({
       return p.melds.length + (p.flowers.length > 0 ? 1 : 0) + shown;
     }),
   });
+  const match = useTileMatch(view);
   const over = view.phase === "handOver" || view.phase === "gameOver";
   // The tile in the middle; it joins its pond when the next one is thrown.
   const centreId = !over && view.lastPlayed ? view.lastPlayed.tile.id : null;
@@ -707,7 +810,26 @@ export function Felt({
   };
 
   return (
-    <div className="felt" ref={felt}>
+    <div className={match.code ? "felt felt--matching" : "felt"} ref={felt}>
+      {/* Only tile codes reach this rule, never anything typed. */}
+      {match.code && /^[a-z0-9]+$/.test(match.code) ? (
+        <style>{`.felt.felt--matching .tile[data-code="${match.code}"] { opacity: 1; outline: 3px solid var(--claim-outline); outline-offset: 1px; z-index: 2; }`}</style>
+      ) : null}
+      {match.code ? (
+        // At the top of the middle, clear of every rack and pond.
+        <div
+          className="felt__match"
+          role="status"
+          style={{ top: layout.console.cy - layout.console.h / 2 + 8 }}
+        >
+          <span>
+            {tileName(match.code)}: {match.count} on the table
+          </span>
+          <button type="button" className="btn btn--sm btn--ghost" onClick={match.clear}>
+            Clear
+          </button>
+        </div>
+      ) : null}
       {/* Nothing is placed until the felt has a size to solve against. */}
       {size.width > 0 ? (
         <>
@@ -735,6 +857,8 @@ export function Felt({
               layout={layout}
               position={position(seat)}
               centreId={centreId}
+              nameOf={(s) => occupantName(view.players[s])}
+              onPick={match.pick}
               lit={
                 display.turnGlow === "on" &&
                 ((view.phase === "action" && view.turn === seat) ||
@@ -861,7 +985,7 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   return (
     <div
       ref={attach}
-      className={split ? "tabletop tabletop--wide" : "tabletop"}
+      className={`tabletop tabletop--${display.density}${split ? " tabletop--wide" : ""}`}
       style={split ? ({ "--felt-side": `${split.felt}px` } as Vars) : undefined}
     >
       {split ? null : (

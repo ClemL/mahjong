@@ -641,6 +641,26 @@ describe("PhoneView — whose move it is", () => {
     expect(within(container).queryByRole("button", { name: /^Hurry up/ })).toBeNull();
   });
 
+  it("says beside the wait who has already hurried the person being waited on", () => {
+    const { room, seat } = onTurn();
+    underway(room);
+    const sender = ((seat + 1) % 4) as Seat;
+    const bystander = ((seat + 2) % 4) as Seat;
+    expect(hurryUp(room, sender)).toBeNull();
+    const theirs = playerView(room, bystander);
+    const { container } = render(<PhoneView api={fakeApi(theirs)} view={theirs} sound={sound} />);
+    expect(container.querySelector(".phone__prompt")!.textContent).toBe(
+      `Waiting for ${NAMES[seat]}…Hurried by ${NAMES[sender]}`,
+    );
+    const mine = playerView(room, sender);
+    const own = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    expect(own.container.querySelector(".phone__hurried-note")!.textContent).toBe("Hurried by you");
+    // The one being waited on has the flash; the note is for everyone else.
+    const target = playerView(room, seat);
+    const them = render(<PhoneView api={fakeApi(target)} view={target} sound={sound} />);
+    expect(them.container.querySelector(".phone__hurried-note")).toBeNull();
+  });
+
   it("waits out the first three seconds of anybody's turn before it can hurry them", () => {
     window.localStorage.setItem("hk-mahjong.hurry", "on");
     onTestFinished(() => window.localStorage.removeItem("hk-mahjong.hurry"));

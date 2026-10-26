@@ -748,6 +748,22 @@ describe("hurry up", () => {
     expect(viewFor(room, "tok-0", t0 + HURRY_FLASH_MS).hurry).toBeNull();
   });
 
+  it("says who hurried the person waited on for as long as the wait lasts, and no longer", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    const t0 = underway(room);
+    expect(viewFor(room, "tok-2", t0).hurried).toBeNull();
+    expect(hurryUp(room, 2, t0)).toBeNull();
+    // Long after the flash and the rest, it still says so while seat 0 has not moved.
+    for (const token of ["tok-0", "tok-2", "table", null]) {
+      expect(viewFor(room, token, t0 + HURRY_COOLDOWN_MS + 30_000).hurried).toEqual({ seat: 0, by: 2 });
+    }
+    // Their move ends the wait, and the note with it.
+    const before = room.state;
+    room.state = discard(before, 0, before.players[0].hand.find((t) => !t.code.startsWith("f"))!.id);
+    noteActing(room, t0 + 1_000);
+    expect(viewFor(room, "tok-2", t0 + 1_000).hurried).toBeNull();
+  });
+
   it("refuses hurrying yourself, the computer, or twice in a row", () => {
     const room = dealt("TEST", 5, [0, 2]);
     const t0 = underway(room);
@@ -957,6 +973,8 @@ describe("claim order at the table", () => {
     drain(room);
     expect(room.state.phase).toBe("handOver");
     expect(viewFor(room, "table").result?.others?.map((o) => o.winner)).toEqual([2]);
+    // The tile went to the first winner after the thrower, and its place in the pond says so.
+    expect(room.state.players[0].taken).toEqual([{ at: 0, by: 1 }]);
   });
 
   it("never asks about the chow once the pung is taken", () => {
@@ -966,6 +984,21 @@ describe("claim order at the table", () => {
     expect(room.state.phase).toBe("action");
     expect(room.state.turn).toBe(2);
     expect(room.state.players[2].melds.map((m) => m.type)).toEqual(["pung"]);
+  });
+
+  it("leaves a note in the discarder's pond of where the claimed tile lay and who took it", () => {
+    const room = chowAgainstPung();
+    const before = room.state.players[0].discards.length;
+    room.claimResponses["2"] = "pung:p5";
+    drain(room);
+    const east = room.state.players[0];
+    expect(east.discards.some((t) => t.id === "p5#x")).toBe(false);
+    expect(east.taken).toEqual([{ at: before - 1, by: 2 }]);
+    // Every view carries it: it names a seat and a place in the pond, not a tile anyone may not see.
+    for (const token of ["tok-0", "tok-1", "table", null]) {
+      expect(viewFor(room, token).players[0].taken).toEqual([{ at: before - 1, by: 2 }]);
+    }
+    expect(viewFor(room, "tok-0").players[1].taken).toEqual([]);
   });
 });
 

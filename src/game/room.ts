@@ -288,6 +288,8 @@ export interface PublicPlayer {
   melds: Meld[];
   flowers: Tile[];
   discards: Tile[];
+  /** Where a tile thrown into this pond was taken by someone else, and by whom: the table leaves a space. */
+  taken: { at: number; by: Seat }[];
   occupant: { kind: Occupant["kind"]; name: string | null; away: boolean };
 }
 
@@ -374,6 +376,11 @@ export interface RoomView {
    * nobody is in the first moments of their turn. 0 once they may.
    */
   hurryGraceLeft: number;
+  /**
+   * The person the table is waiting on has been hurried during this wait, and
+   * by whom; null once they move, or if nobody has hurried them.
+   */
+  hurried: { seat: Seat; by: Seat } | null;
   /** Turns the computer finished for this viewer's chair since they last moved; 0 for anyone not seated. */
   stoodIn: number;
   /** How long this viewer has left to take back the tile they just threw, in ms; 0 when they cannot. */
@@ -683,6 +690,19 @@ export function hurryUp(room: Room, by: Seat, now = Date.now()): string | null {
   if (room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS) return "They have just been hurried";
   room.hurry = { seat, by, at: now };
   return null;
+}
+
+/**
+ * The hurry-up aimed at whoever the table is waiting on now, if it was sent
+ * during this wait. Unlike the flash it lasts until they move, so everyone
+ * waiting can see they have already been asked, and by whom.
+ */
+export function hurriedThisWait(room: Room, now = Date.now()): { seat: Seat; by: Seat } | null {
+  const hurry = room.hurry;
+  const seat = actingHumanSeat(room, now);
+  if (!hurry || seat === null || hurry.seat !== seat) return null;
+  const since = room.acting?.key === actingKey(room.state, seat) ? room.acting.since : now;
+  return hurry.at >= since ? { seat, by: hurry.by } : null;
 }
 
 /** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's default. */
@@ -1105,6 +1125,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       melds: p.melds,
       flowers: p.flowers,
       discards: p.discards,
+      taken: p.taken ?? [],
       occupant: occupantSummary(room.seats[p.seat], p.seat, playing, now),
     };
   });
@@ -1199,6 +1220,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
         ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - clock }
         : null,
     hurryGraceLeft: hurryGraceLeft(room, clock),
+    hurried: hurriedThisWait(room, clock),
     stoodIn: you.role === "player" && you.seat !== null ? room.stoodIn[you.seat] : 0,
     takeBackIn: you.seat !== null && takeBackRefusal(room, you.seat, now) === null ? room.takeBack!.until - now : 0,
     paused: room.paused !== null,

@@ -181,10 +181,19 @@ never receives anyone's concealed tiles.
 
 It also drives the game: next hand (or each phone taps **Ready**, and the last
 one in deals it), redeal, restart and reset scores, end the game early (the hand being played goes unscored, and everyone goes to the final
-scores), change the faan minimum, free a seat, and skip a player who is not
-answering a claim. **Pause** stops a hand where it stands: no computer turn, no
-claim window and no turn clock runs, every phone says the table is paused and
-its hand cannot be played, and **Resume** gives everyone back the time they had.
+scores), change the faan minimum and free a seat. **Pause** stops a hand where
+it stands: no computer turn, no claim window and no turn clock runs, every
+phone says the table is paused and its hand cannot be played, and **Resume**
+gives everyone back the time they had. Nothing on the table cuts short a
+player's call on a discard: a pung, chow or kong being thought about runs its
+own clock.
+
+Tap any tile in a pond and every copy of it on the table — in the ponds, the
+middle, the open sets and flowers, and hands turned up at the end — is ringed
+while the rest fade back, with a line saying how many are in sight; tap it
+again, tap Clear, or wait a few seconds to let it go. **Size**, under **This
+tablet**, draws the table Cosy, Normal, Compact or Extra compact: the discards,
+the racks and the table's own buttons together.
 
 ### On the devices themselves
 
@@ -423,7 +432,8 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   in hand, the larger they get.
 - **Hurry up** flashes the screen of whoever the table is waiting on, whether or
   not they have the setting on themselves: it only decides who has the button.
-  Nobody can
+  Everyone else's *Waiting for …* line then says who hurried them, until they
+  move. The button keeps one width whatever it says. Nobody can
   be hurried in the first three seconds of their turn (or of their call on a
   discard); the button counts those seconds down. After a hurry-up, every button
   at the table rests for ten seconds.
@@ -474,7 +484,9 @@ across the tile face, which also keeps them separable for red-green color
 vision deficiency.
 
 Discards stack **six to a row** in front of each seat, the way a pond is laid
-out at a real table, rather than in one long wrapping line.
+out at a real table, rather than in one long wrapping line. A tile claimed by
+another player leaves its space behind, outlined with the wind of whoever took
+it, so a pond still reads in the order it was thrown.
 
 Tiles are animated so the table is readable at a glance: a discard flies in
 from the direction of the player who threw it, a tile retrieved from the pond

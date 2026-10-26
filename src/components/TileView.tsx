@@ -131,6 +131,7 @@ export function TileFace({
         .filter(Boolean)
         .join(" ")}
       title={tileName(code)}
+      data-code={code}
     >
       <span className="tile__label" aria-hidden>
         {tileLabel(code)}
