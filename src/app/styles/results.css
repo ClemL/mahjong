@@ -10,6 +10,8 @@
   inset: 0;
   z-index: 26;
   display: grid;
+  /* One cell the size of the screen, so a card can be held to its height. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 12px;
@@ -574,6 +576,58 @@
   min-height: 0;
 }
 
+/* The final scores keep their heading — and New game and Share scores in it —
+   in view: only the body scrolls, inside a card no taller than the screen.
+   The card itself never scrolls, so its see-through backing covers all of it. */
+.result-sheet__card.game-over {
+  max-height: 100%;
+}
+
+.game-over__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A short tablet tightens the final scores so they fit on one screen. */
+@media (orientation: landscape) and (max-height: 760px), (orientation: portrait) and (max-width: 760px) {
+  .result-sheet:has(.game-over) {
+    padding: 8px;
+  }
+
+  .result-sheet__card.game-over {
+    gap: 10px;
+    padding: 14px 18px 12px;
+  }
+
+  .game-over .result-sheet__title {
+    font-size: clamp(22px, 2.8cqw, 32px);
+  }
+
+  .game-over__body,
+  .game-over__side {
+    gap: 10px;
+  }
+
+  .game-over .result-sheet__panel {
+    gap: 6px;
+    padding: 10px 14px;
+  }
+
+  .game-over .standings__row {
+    min-height: 38px;
+  }
+
+  .game-over .game-stat {
+    padding: 8px 12px;
+  }
+
+  .game-over .chips-chart__svg {
+    max-height: 300px;
+  }
+}
+
 /* The chart sits on the surface its colours were validated against. */
 .chips-chart {
   position: relative;
@@ -956,5 +1010,108 @@
   .result-sheet,
   .result-hand--reveal .result-hand__group {
     animation: none;
+  }
+}
+
+/* ---- a finished hand played back, move by move ---- */
+
+.replay__caption {
+  font-size: clamp(20px, 2.6cqw, 30px);
+}
+
+.replay__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.replay__play {
+  min-width: 9ch;
+}
+
+.replay__scrub {
+  flex: 1;
+  min-width: 140px;
+  accent-color: var(--gold);
+}
+
+.replay__seats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  --tile-sm: 26px;
+}
+
+.replay__seat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--shade-2);
+}
+
+/* Who moved is said by the tag as well as the border, never the colour alone. */
+.replay__seat--moved {
+  border-color: var(--gold);
+}
+
+.replay__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.replay__tag {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--on-gold);
+  background: var(--gold);
+}
+
+.replay__sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: calc(var(--tile-sm) * 1.35);
+}
+
+.replay__set {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.replay__none {
+  align-self: center;
+  font-size: 13px;
+  color: var(--ink-dim);
+}
+
+.replay__pond {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.replay__marked {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+@media (orientation: landscape) and (max-width: 900px), (orientation: portrait) and (max-height: 900px) {
+  .replay__seats {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

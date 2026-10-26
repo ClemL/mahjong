@@ -64,6 +64,31 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
   await expect(table.page.locator('.discards[data-seat="0"] .tile')).toHaveCount(0);
 
+  // The table pauses the hand: the felt says so, and the phone can throw nothing until it resumes.
+  await table.page.getByRole("button", { name: "Pause" }).first().click();
+  await expect(table.page.locator(".felt__paused")).toBeVisible();
+  await expect(kris.page.getByText("Paused by the table. Your clock has stopped.")).toBeVisible();
+  await expect(tiles.first()).toHaveAttribute("aria-disabled", "true");
+  // Tapped anyway, twice, as a discard would be: nothing leaves the hand.
+  await tiles.first().tap({ force: true });
+  await tiles.first().tap({ force: true });
+  await kris.page.waitForTimeout(500);
+  await expect(tiles).toHaveCount(14);
+  await table.page.getByRole("button", { name: "Resume" }).first().click();
+  await expect(table.page.locator(".felt__paused")).toHaveCount(0);
+  await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
+
+  // The phone's settings scroll under their heading, with nothing showing above it.
+  await kris.page.getByRole("button", { name: "Settings" }).first().tap();
+  const drawer = kris.page.locator(".drawer");
+  await expect(drawer).toBeVisible();
+  const gap = await drawer.evaluate((el) => {
+    el.scrollTop = 200;
+    return el.querySelector(".drawer__head")!.getBoundingClientRect().top - el.getBoundingClientRect().top;
+  });
+  expect(gap).toBeLessThanOrEqual(0.5);
+  await kris.page.getByRole("button", { name: "Close" }).tap();
+
   // The table ends the game mid-hand: straight to the final scores, everywhere.
   table.page.once("dialog", (dialog) => void dialog.accept());
   await table.page.getByRole("button", { name: "End game" }).first().click();
@@ -81,21 +106,29 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await expect(sheet.getByRole("button", { name: "Image saved" })).toBeVisible();
   if (process.env.SCORE_CARD_OUT) await picture.saveAs(process.env.SCORE_CARD_OUT);
 
-  // On a screen too short for it, the final scores scroll, and the card's
-  // see-through colour runs the full length of it rather than one screenful.
-  await table.page.setViewportSize({ width: TABLET.width, height: 480 });
-  const covered = await sheet.evaluate((card) => {
-    const scroller = card.scrollHeight > card.clientHeight ? card : card.parentElement!;
-    const overflowing = scroller.scrollHeight > scroller.clientHeight;
-    scroller.scrollTop = scroller.scrollHeight;
+  // On a screen too short for them, the final scores scroll under a heading
+  // that stays put with New game and Share scores in it, and the card's
+  // see-through colour runs the full length of the card.
+  await table.page.setViewportSize({ width: TABLET.width, height: 460 });
+  const short = await sheet.evaluate((card) => {
+    const body = card.querySelector<HTMLElement>(".game-over__body")!;
+    const overflowing = body.scrollHeight > body.clientHeight;
+    body.scrollTop = body.scrollHeight;
+    const head = card.querySelector(".result-sheet__head")!.getBoundingClientRect();
+    const box = card.getBoundingClientRect();
     return {
       overflowing,
+      headInView: head.top >= box.top && head.bottom <= box.bottom && head.top >= 0,
+      cardFits: box.bottom <= innerHeight,
       content: card.scrollHeight,
       backing: parseFloat(getComputedStyle(card, "::before").height),
     };
   });
-  expect(covered.overflowing).toBe(true);
-  expect(covered.backing).toBeGreaterThanOrEqual(covered.content - 1);
+  expect(short.overflowing).toBe(true);
+  expect(short.headInView).toBe(true);
+  expect(short.cardFits).toBe(true);
+  expect(short.backing).toBeGreaterThanOrEqual(short.content - 1);
+  await expect(sheet.getByRole("button", { name: "New game" })).toBeInViewport();
 
   expect(kris.errors).toEqual([]);
   expect(table.errors).toEqual([]);

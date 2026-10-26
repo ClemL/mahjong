@@ -11,7 +11,7 @@ import { NAMES, dealt, fakeApi, lobby, sound, tableView } from "./fixtures";
 const appearance: AppearanceApi = { appearance: DEFAULT_APPEARANCE, set: vi.fn(), reset: vi.fn() };
 
 function tabletDisplay(): TabletDisplay {
-  return { turnGlow: "on", setTurnGlow: vi.fn(), wall: "on", setWall: vi.fn() };
+  return { turnGlow: "on", setTurnGlow: vi.fn(), wall: "on", setWall: vi.fn(), callouts: "on", setCallouts: vi.fn() };
 }
 
 function phoneDisplay(): PhoneDisplay {
@@ -117,11 +117,16 @@ describe("the table's settings", () => {
 
     const pace = screen.getByRole("tab", { name: /Pace & turns/ });
     fireEvent.keyDown(pace, { key: "ArrowDown" });
+    const history = screen.getByRole("tab", { name: /^History/ });
+    expect(history.getAttribute("aria-selected")).toBe("true");
+    fireEvent.keyDown(history, { key: "ArrowDown" });
     const tablet = screen.getByRole("tab", { name: /This tablet/ });
     expect(tablet.getAttribute("aria-selected")).toBe("true");
     expect(document.activeElement).toBe(tablet);
     fireEvent.click(screen.getByRole("switch", { name: "Wall" }));
     expect(display.setWall).toHaveBeenCalledWith("off");
+    fireEvent.click(screen.getByRole("switch", { name: "Spoken calls" }));
+    expect(display.setCallouts).toHaveBeenCalledWith("off");
   });
 });
 
@@ -173,5 +178,40 @@ describe("a phone's settings", () => {
     expect(vibrate).toHaveProperty("disabled", true);
     expect(vibrate.getAttribute("aria-checked")).toBe("false");
     expect(screen.getByText(/iPhones never can/)).toBeTruthy();
+  });
+});
+
+describe("the table's history", () => {
+  it("lists each person's record and the games, newest first, once the section is opened", async () => {
+    const games = [
+      {
+        id: "g2",
+        endedAt: Date.UTC(2026, 9, 24, 20, 0),
+        hands: 12,
+        endedEarly: false,
+        players: [
+          { seat: 1, name: "Srini", human: true, chips: 150, place: 1, wins: 4, thrown: 0, bestFaan: 7 },
+          { seat: 0, name: "Kris", human: true, chips: 120, place: 2, wins: 2, thrown: 1, bestFaan: 3 },
+          { seat: 2, name: "Robot Hanna", human: false, chips: 80, place: 3, wins: 1, thrown: 2, bestFaan: 1 },
+          { seat: 3, name: "Robot Clem", human: false, chips: 50, place: 4, wins: 0, thrown: 3, bestFaan: 0 },
+        ],
+        biggest: { name: "Srini", faan: 7, pattern: "Half Flush 混一色" },
+      },
+    ];
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({ games }) }));
+    vi.stubGlobal("fetch", fetchMock);
+    const view = tableView(lobby([0]));
+    render(<TableSettings api={fakeApi(view)} view={view} sound={sound} appearance={appearance} display={tabletDisplay()} />);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("tab", { name: /^History/ }));
+    expect(fetchMock).toHaveBeenCalledWith(`/api/rooms/${view.roomId}/games`);
+    const table = await screen.findByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(rows.map((r) => r.querySelector("th")!.textContent)).toEqual(["Srini", "Kris"]);
+    expect(within(rows[0]).getByText("7 faan")).toBeTruthy();
+    expect(screen.getByText(/Biggest hand: Srini, 7 faan · Half Flush 混一色/)).toBeTruthy();
+    expect(screen.getByText(/12 hands/)).toBeTruthy();
+    vi.unstubAllGlobals();
   });
 });

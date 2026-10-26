@@ -229,6 +229,11 @@ export interface Room {
     lastStepAt: number;
     lastPlayed: Room["lastPlayed"];
   } | null;
+  /**
+   * When the table paused the hand, if it has. Nothing moves while it is set,
+   * and every clock reads as it stood at that moment.
+   */
+  paused: { at: number } | null;
 }
 
 export type Role = "player" | "table" | "spectator";
@@ -331,6 +336,8 @@ export interface RoomView {
   stoodIn: number;
   /** How long this viewer has left to take back the tile they just threw, in ms; 0 when they cannot. */
   takeBackIn: number;
+  /** The table has paused the hand: no moves, and every clock stands still. */
+  paused: boolean;
 }
 
 const HIDDEN: TileCode = "back";
@@ -367,6 +374,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     acting: null,
     stoodIn: [0, 0, 0, 0],
     takeBack: null,
+    paused: null,
   };
 }
 
@@ -382,6 +390,7 @@ export function normalizeRoom(room: Room): Room {
   room.acting ??= null;
   room.stoodIn ??= [0, 0, 0, 0];
   room.takeBack ??= null;
+  room.paused ??= null;
   return room;
 }
 
@@ -443,6 +452,7 @@ export function returnToLobby(room: Room, state: GameState): void {
   room.claimResponses = {};
   room.claimDeadline = null;
   room.takeBack = null;
+  room.paused = null;
   // A new game numbers its hands and moves from the start again, so an old
   // stamp could pass for the first turn of the next.
   room.acting = null;
@@ -792,6 +802,8 @@ export function drain(room: Room, now = Date.now()): boolean {
   // same hand together, instead of the first phone to connect kicking off a
   // game the computer then plays on everyone else's behalf.
   if (!room.started) return false;
+  // Paused, nothing moves: no computer turn, no lapsed claim, no time run out.
+  if (room.paused) return false;
   // A table where everyone has wandered off still plays on; one whose seats
   // have all been freed has nobody left to play for.
   if (!hasAnyPlayer(room)) return false;
@@ -975,6 +987,8 @@ function hiddenTiles(seat: number, count: number): Tile[] {
 export function viewFor(room: Room, token: string | null, now = Date.now()): RoomView {
   const you = identify(room, token);
   const state = room.state;
+  // Every clock a screen counts down reads as it stood when the table paused.
+  const clock = room.paused?.at ?? now;
 
   // Before the deal an unclaimed seat is genuinely open; after it, it is the
   // computer's, though still claimable by a latecomer.
@@ -1005,7 +1019,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       const extended = claimExtended(room, asked.seat);
       claim = {
         options: asked.options,
-        deadlineIn: Math.max(0, (room.claimDeadline ?? now + CLAIM_WINDOW_MS) - now),
+        deadlineIn: Math.max(0, (room.claimDeadline ?? clock + CLAIM_WINDOW_MS) - clock),
         allowance: CLAIM_WINDOW_MS + (extended ? CLAIM_MORE_TIME_MS : 0),
         canExtend: !extended && choosingBetweenSets(asked.options),
         declared: state.claimedWins ?? [],
@@ -1062,18 +1076,18 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       state.phase === "action" &&
       state.lastDiscard === null &&
       isHumanSeat(room, state.turn, now)
-        ? Math.max(0, room.lastStepAt + turnAllowanceMs(room) - now)
+        ? Math.max(0, room.lastStepAt + turnAllowanceMs(room) - clock)
         : null,
     turnExtended: turnExtended(room),
     turnAllowance: turnAllowanceMs(room),
     openingLeft:
       room.started && room.table !== null && isOpeningTurn(state)
-        ? Math.max(0, room.lastStepAt - now)
+        ? Math.max(0, room.lastStepAt - clock)
         : 0,
     hurry:
       room.hurry &&
-      now - room.hurry.at < HURRY_FLASH_MS &&
-      actingHumanSeat(room, now) === room.hurry.seat
+      clock - room.hurry.at < HURRY_FLASH_MS &&
+      actingHumanSeat(room, clock) === room.hurry.seat
         ? {
             seat: room.hurry.seat,
             by: occupantSummary(room.seats[room.hurry.by], room.hurry.by, playing, now).name ?? SEAT_NAMES[room.hurry.by],
@@ -1081,13 +1095,42 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
           }
         : null,
     hurryCooldown:
-      room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS
-        ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - now }
+      room.hurry && clock - room.hurry.at < HURRY_COOLDOWN_MS
+        ? { seat: room.hurry.seat, by: room.hurry.by, left: room.hurry.at + HURRY_COOLDOWN_MS - clock }
         : null,
-    hurryGraceLeft: hurryGraceLeft(room, now),
+    hurryGraceLeft: hurryGraceLeft(room, clock),
     stoodIn: you.role === "player" && you.seat !== null ? room.stoodIn[you.seat] : 0,
     takeBackIn: you.seat !== null && takeBackRefusal(room, you.seat, now) === null ? room.takeBack!.until - now : 0,
+    paused: room.paused !== null,
   };
+}
+
+/**
+ * Stop the hand where it stands — for food, a phone call, a question about the
+ * rules — or say why not. Only a hand in play can be paused.
+ */
+export function pauseTable(room: Room, now = Date.now()): string | null {
+  if (room.paused) return "The table is already paused";
+  const phase = room.state.phase;
+  if (!room.started || (phase !== "action" && phase !== "claiming")) return "There is no hand in play to pause";
+  room.paused = { at: now };
+  return null;
+}
+
+/**
+ * Pick the hand up where it was paused. Every clock moves on by however long
+ * the pause lasted, so nobody's turn, claim or take-back lost time to it.
+ */
+export function resumeTable(room: Room, now = Date.now()): void {
+  if (!room.paused) return;
+  const away = Math.max(0, now - room.paused.at);
+  room.paused = null;
+  room.lastStepAt += away;
+  if (room.claimDeadline !== null) room.claimDeadline += away;
+  if (room.takeBack) room.takeBack = { ...room.takeBack, until: room.takeBack.until + away, lastStepAt: room.takeBack.lastStepAt + away };
+  if (room.moreTime) room.moreTime = { ...room.moreTime, from: room.moreTime.from + away };
+  if (room.acting) room.acting = { ...room.acting, since: room.acting.since + away };
+  if (room.hurry) room.hurry = { ...room.hurry, at: room.hurry.at + away };
 }
 
 /**
@@ -1097,6 +1140,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
  */
 export function takeBackRefusal(room: Room, seat: Seat, now = Date.now()): string | null {
   const hold = room.takeBack;
+  if (room.paused) return "The table is paused";
   if (!room.settings.takeBack) return "This table does not take discards back";
   if (!hold || hold.seat !== seat || room.state.lastDiscard?.tile.id !== hold.tileId) {
     return "There is no discard of yours to take back";

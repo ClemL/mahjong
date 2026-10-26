@@ -79,12 +79,16 @@ export interface TabletDisplay {
   /** The wall of tiles still to be drawn, faint under everything else. */
   wall: OnOff;
   setWall: (value: OnOff) => void;
+  /** Claims and wins called out loud, as the players would at a real table. */
+  callouts: OnOff;
+  setCallouts: (value: OnOff) => void;
 }
 
 export function useTabletDisplay(): TabletDisplay {
   const [turnGlow, setTurnGlow] = useLocalSetting<OnOff>("hk-mahjong.turn-glow", "on", ON_OFF);
   const [wall, setWall] = useLocalSetting<OnOff>("hk-mahjong.wall", "on", ON_OFF);
-  return { turnGlow, setTurnGlow, wall, setWall };
+  const [callouts, setCallouts] = useLocalSetting<OnOff>("hk-mahjong.callouts", "on", ON_OFF);
+  return { turnGlow, setTurnGlow, wall, setWall, callouts, setCallouts };
 }
 
 /** The panes beside a squared felt, each of which the tablet can close. */

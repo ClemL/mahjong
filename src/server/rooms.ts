@@ -24,6 +24,8 @@ import {
   noteDiscard,
   openClaimWindow,
   openTable,
+  pauseTable,
+  resumeTable,
   resetRoom,
   returnToLobby,
   beginHand,
@@ -53,8 +55,9 @@ import {
 } from "@/game/engine";
 import { ROUND_CHOICES } from "@/game/rules";
 import { DIFFICULTIES, type Difficulty } from "@/game/ai";
-import type { Seat } from "@/game/tiles";
+import { SEAT_NAMES, type Seat } from "@/game/tiles";
 import { TABLES, findTable } from "@/game/tables";
+import { type GameRecord, gameRecord } from "@/game/history";
 import { RoomError } from "./errors";
 import { roomStore } from "./store";
 
@@ -198,6 +201,9 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     r.stoodIn[seat] = 0;
     syncSeats(r);
 
+    // Paused, the hand waits for the table: nothing is played, asked for or nudged.
+    if (r.paused && action.type !== "leave") throw new RoomError("The table is paused", 409);
+
     // Getting up mid-hand hands the chair to the computer, which carries on
     // from exactly where the person left it; in the lobby it is simply free.
     if (action.type === "leave") {
@@ -308,7 +314,8 @@ export type TableCommand =
   | { type: "replaceWithComputer"; seat: Seat }
   | { type: "rename"; seat: Seat; name: string }
   | { type: "moveSeat"; seat: Seat; step: 1 | -1 }
-  | { type: "forcePass" };
+  | { type: "forcePass" }
+  | { type: "pause"; value: boolean };
 
 /**
  * Commands the table device issues. A seated player may only rename their own
@@ -319,7 +326,12 @@ export async function control(
   token: string,
   command: TableCommand,
 ): Promise<RoomView> {
+  // A game that ends on this command is kept for the table's history, once the
+  // room itself has been written.
+  let finished: GameRecord | null = null;
   const room = await mutate(id, (r, now) => {
+    finished = null;
+    const wasOver = r.state.phase === "gameOver";
     const isTable = r.table !== null && r.table.token === token;
     if (isTable) r.table!.lastSeen = now;
     else if (
@@ -328,7 +340,15 @@ export async function control(
     ) {
       throw new RoomError("Not the table", 403);
     }
+    // Moving the hand on, or ending it, picks a paused table back up first.
+    if (["nextHand", "redeal", "endGame", "skipOpening"].includes(command.type)) resumeTable(r, now);
     switch (command.type) {
+      case "pause":
+        if (command.value === true) {
+          const refused = pauseTable(r, now);
+          if (refused) throw new RoomError(refused, 409);
+        } else resumeTable(r, now);
+        break;
       case "deal":
         if (r.started) throw new RoomError("The hand is already dealt", 409);
         if (!hasAnyPlayer(r)) throw new RoomError("Nobody has taken a seat yet", 409);
@@ -462,8 +482,33 @@ export async function control(
         for (const seat of pendingHumanClaimants(r, now)) r.claimResponses[String(seat)] = null;
         break;
     }
+    if (!wasOver && r.state.phase === "gameOver" && r.state.history.length > 0) finished = finishedGame(r, now);
   });
+  if (finished) await roomStore().addGame(room.id, finished);
   return viewFor(room, token);
+}
+
+/** The game just over, as the table's history will keep it. */
+function finishedGame(room: Room, now: number): GameRecord {
+  const seen = viewFor(room, null, now);
+  return gameRecord({
+    // A new game is dealt from a new seed, so the seed names the game.
+    id: `g${room.state.rngSeed}`,
+    endedAt: now,
+    endedEarly: room.state.dealership < 4,
+    history: room.state.history,
+    players: seen.players.map((p) => ({
+      name: p.occupant.name ?? SEAT_NAMES[p.seat],
+      human: p.occupant.kind === "human",
+    })),
+  });
+}
+
+/** The games this table has finished, newest first. Names and scores only: nothing about any hand. */
+export async function listGames(id: string): Promise<GameRecord[]> {
+  const table = findTable(id);
+  if (!table) throw new RoomError("No such table", 404);
+  return roomStore().games(table.id);
 }
 
 export { RoomError };

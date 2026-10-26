@@ -564,6 +564,11 @@ function finishAddedKong(state: GameState, seat: Seat, tile: Tile): void {
   state.robbingKongTile = null;
   state.lastDiscard = null;
   state.pendingClaims = [];
+  // Noted as a play, as an unrobbable added kong is, so a replay of the hand has the set.
+  log(state, seat, `${SEAT_NAMES[seat]} completes the kong of ${tileName(tile.code)}`, {
+    kind: "kong",
+    tiles: pung.tiles.map((t) => t.code),
+  });
   drawTile(state, seat, true);
 }
 

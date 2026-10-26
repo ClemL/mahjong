@@ -5,7 +5,7 @@ import { DEFAULT_ROOM_SETTINGS, turnMs } from "@/game/room";
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, passwordRequired, readRoom, resetTable } =
+const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, listGames, passwordRequired, readRoom, resetTable } =
   await import("../rooms");
 const { roomStore } = await import("../store");
 
@@ -349,6 +349,62 @@ describe("taking the table over", () => {
     expect(old.tableTakenOver).toBe(true);
     await expect(control(id, table, { type: "skipOpening" })).rejects.toMatchObject({ status: 403 });
     await control(id, token, { type: "skipOpening" });
+  });
+});
+
+describe("pausing the table", () => {
+  it("holds every move until the table picks the hand back up", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    await control(id, table, { type: "skipOpening" });
+    await expect(control(id, tokens[0], { type: "pause", value: true })).rejects.toMatchObject({ status: 403 });
+    expect((await control(id, table, { type: "pause", value: true })).paused).toBe(true);
+
+    const view = await readRoom(id, tokens[0]);
+    expect(view.paused).toBe(true);
+    const tileId = view.players[0].hand.find((t) => !t.code.startsWith("f"))!.id;
+    await expect(act(id, tokens[0], { type: "discard", tileId })).rejects.toMatchObject({ status: 409 });
+
+    expect((await control(id, table, { type: "pause", value: false })).paused).toBe(false);
+    const thrown = await act(id, tokens[0], { type: "discard", tileId });
+    expect(thrown.players[0].discards.some((t) => t.id === tileId)).toBe(true);
+  });
+
+  it("is picked back up when the table ends the game", async () => {
+    const { id, table } = await dealtRoom([0]);
+    await control(id, table, { type: "pause", value: true });
+    const over = await control(id, table, { type: "endGame" });
+    expect(over.phase).toBe("gameOver");
+    expect(over.paused).toBe(false);
+  });
+});
+
+describe("the table's finished games", () => {
+  it("keeps a game that ended after a hand, with who played it, and leaves out one that never got going", async () => {
+    const { id, table, tokens } = await dealtRoom([0]);
+    await control(id, table, { type: "endGame" });
+    expect(await listGames(id)).toEqual([]);
+
+    await control(id, table, { type: "restart" });
+    await control(id, tokens[0], { type: "rename", seat: 0, name: "Kris" });
+    await control(id, table, { type: "deal" });
+    await control(id, table, { type: "redeal" });
+    // A hand settled: a washout is enough, and the quickest to arrange.
+    const stored = (await roomStore().get(id))!;
+    stored.state.phase = "handOver";
+    stored.state.result = { type: "washout", winner: null, from: null, score: null, payments: [0, 0, 0, 0], dealerKeeps: true };
+    stored.state.history = [
+      { handNumber: 1, roundWind: "we", dealer: 0, type: "washout", winner: null, from: null, faan: null, value: null, payments: [0, 0, 0, 0], scores: [0, 0, 0, 0] },
+    ];
+    expect(await roomStore().compareAndSet(stored, stored.version)).toBe(true);
+    await control(id, table, { type: "endGame" });
+
+    const games = await listGames(id);
+    expect(games).toHaveLength(1);
+    expect(games[0].hands).toBe(1);
+    expect(games[0].endedEarly).toBe(true);
+    expect(games[0].players.find((p) => p.seat === 0)).toMatchObject({ name: "Kris", human: true });
+    expect(games[0].players.filter((p) => !p.human)).toHaveLength(3);
+    await expect(listGames("NOPE")).rejects.toMatchObject({ status: 404 });
   });
 });
 
