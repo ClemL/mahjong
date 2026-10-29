@@ -3,6 +3,19 @@
    separate axis so any tile coloring works on any table.
    ====================================================================== */
 
+/* Jade's surface tokens live on :root. They are named here too so an element
+   inside a page dressed in another theme — a swatch on the start page — can
+   ask for Jade's felt and back by name. */
+[data-theme="jade"] {
+  --rim: #3d2716;
+  --felt: #0d3b2e;
+  --felt-light: #14503d;
+  --felt-edge: #072a20;
+  --gold: #e8c46a;
+  --tile-back: #1f7a5c;
+  --tile-back-2: #14503d;
+}
+
 [data-theme="slate"] {
   --rim: #0e1013;
   --rack: #1a1d22;

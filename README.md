@@ -146,15 +146,25 @@ on one device alone, and no upright layout: phones play sideways, and a phone
 held upright turns its controller on its side.
 
 1. Everyone opens the same table — chosen on the start page, opened the first
-   time somebody arrives, so there are no room codes to pass around. The tablet
-   puts that address on screen as a QR code for anyone who would rather scan it.
+   time somebody arrives, so there are no room codes to pass around. The start
+   page is a workbench: the three tables (with who is at each) and the two ways
+   in — **Be Table N on this screen** and **Sit down at Table N** — on the left,
+   and the settings on the right under a live preview of the table's look, in
+   three tabs: House rules, Table & tiles, and This phone. A tablet opens on the
+   look and a phone on its own layout; the tab left open is remembered.
 2. The tablet takes the **Table** seat. A tablet that has lost its claim — a
    different browser, cleared storage, a replacement tablet — opens the table
    again and is offered **Take over the table**: the game carries on there as it
    stands, and the device that had it is told another one took over. **Reset
    table** is only for starting over.
-3. Everyone else taps the seat they want and sits down. A name is already in the
-   box, so sitting down is one tap.
+3. Everyone else scans in. The tablet's lobby puts up **one large QR code**, for
+   the next open chair, beside the list of chairs; once somebody sits there it
+   moves on to the next. A name typed under the code goes with it, and tapping
+   **Show code** on any chair puts that chair's code up instead — a taken
+   chair's code lets a new phone take it over. A seated phone shows the chairs
+   and a code to bring someone else in. Opening the table's address without a
+   code, people tap the seat they want; a name is already in the box, so
+   sitting down is one tap.
 4. **Nothing is dealt until the table deals**, so four people arriving one at a
    time all start the same hand. Only the tablet deals; phones on their own are
    told to open one. Waiting alone, you can play the computer in the meantime;

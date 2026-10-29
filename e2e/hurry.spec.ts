@@ -58,7 +58,7 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   const kris = await open(browser, true);
   await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
   // Phones alone never deal: there is no table screen yet, so Kris is told to open one.
-  await expect(kris.page.getByText(/Open Tablet mode on a tablet to deal/)).toBeVisible();
+  await expect(kris.page.getByText(/On a tablet, open “Be Table \d on this screen” to deal/)).toBeVisible();
   await expect(kris.page.getByRole("button", { name: /^(Deal|Play the computer)$/ })).toHaveCount(0);
 
   const zaid = await open(browser);
