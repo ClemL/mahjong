@@ -39,7 +39,8 @@ test("players swap chairs in the lobby, and a taken chair's code takes it over",
     await kris.page.screenshot({ path: `${SHOTS}/phone-lobby.png`, fullPage: true });
   }
 
-  // The taken chair still has its code; a new phone scanning it puts Kris out.
+  // A taken chair's code is one tap away; a new phone scanning it puts Kris out.
+  await table.page.getByRole("button", { name: "Show the code for seat 2, South" }).click();
   const code = table.page.getByRole("img", { name: /take over seat 2, South, from Kris/ });
   await expect(code).toBeVisible();
   const james = await open(browser, PHONE_PORTRAIT, true);

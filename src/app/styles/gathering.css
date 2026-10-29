@@ -1,58 +1,21 @@
 /* ------------------------------------------------------- gathering screen */
 
-/* The tablet before a hand exists. Two jobs only: how to join, and who has. */
+/* Before a hand exists. On the tablet, one large code for the next open chair
+   beside the list of who has sat where; on a phone, the list with its own
+   chair marked and a code to bring somebody in. */
 .gather {
   display: flex;
-  flex-direction: column;
-  gap: clamp(14px, 2.5cqh, 28px);
+  gap: clamp(14px, 2.2cqw, 24px);
   width: 100%;
-  /* Fills the tablet: this is read from across a table, not from arm's length,
-     so the code and the seats get all the room the screen has. .app already
-     supplies the side and bottom insets. */
+  /* Fills the screen: the tablet is read from across a table, not from arm's
+     length. .app already supplies the side and bottom insets. */
   flex: 1;
+  min-height: 0;
   padding-top: env(safe-area-inset-top);
 }
 
-.gather__head {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 20px;
-}
-
-.gather__home {
-  flex: 0 0 auto;
-  text-decoration: none;
-}
-
-.gather__lead {
-  margin: 0;
-  flex: 1 1 240px;
-  color: var(--ink-dim);
-  line-height: 1.5;
-}
-
-.gather__body {
-  display: grid;
-  grid-template-columns: minmax(220px, 26%) 1fr;
-  gap: clamp(14px, 2cqw, 26px);
-  align-items: stretch;
-  flex: 1;
-  min-height: 0;
-}
-
-.gather__join {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: clamp(12px, 2cqh, 22px);
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--raise-0);
-}
-
+/* The base of every code on a page: black on white, never scaled past what a
+   phone can read. Each place that shows one sizes it with its own class. */
 .qr {
   width: 100%;
   max-width: min(300px, 34cqh);
@@ -61,109 +24,225 @@
   display: block;
 }
 
-.gather__url {
-  display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  word-break: break-all;
-  color: var(--ink-dim);
-}
+/* ---- the code for the next chair ---- */
 
-/* A chair's own code sits inside its card, so it is sized to the card rather
-   than to the screen the single table-wide code used to have to itself. */
-.qr--seat {
-  width: min(190px, 22cqh);
-  max-width: 100%;
-  flex: 0 0 auto;
-}
-
-/* A taken chair's code is still there for a takeover, but it should not be
-   what draws the eye from across the table. */
-.qr--taken {
-  opacity: 0.55;
-}
-
-/* Move one chair round, either way. */
-.gather__move {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-}
-
-.gather__seatinfo {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-
-/* The tablet types a name into the chair before anyone scans it. It has to be
-   legible from across the table, like everything else on this screen. */
-.gather__nameinput {
-  width: min(100%, 220px);
-  padding: 6px 10px;
-  border: 1px solid var(--line-strong);
-  border-radius: 8px;
-  background: var(--raise-1);
-  color: var(--ink);
-  font: inherit;
-  font-weight: 700;
-  font-size: clamp(15px, 2.2cqh, 22px);
-  text-align: center;
-}
-
-.gather__nameinput::placeholder {
-  font-weight: 400;
-  font-size: 0.8em;
-  color: var(--ink-dim);
-}
-
-.gather__hint {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--ink-dim);
-  text-align: center;
-}
-
-.gather__seats {
-  display: grid;
-  /* Two by two, so each card is big enough to read at table distance rather
-     than four thin columns strung across the top of the screen. */
-  grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: 1fr;
-  gap: clamp(10px, 1.6cqw, 18px);
-}
-
-.gather__seat {
+.spot {
+  flex: 0 0 clamp(300px, 36%, 440px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: clamp(10px, 1.6cqh, 18px) 10px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
-  background: var(--raise-0);
-  text-align: center;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.gather__seat--here {
-  border-color: var(--gold);
+  gap: clamp(8px, 1.6cqh, 16px);
+  padding: clamp(14px, 2.6cqh, 26px);
+  border-radius: 22px;
+  border: 2px solid var(--gold);
   background: var(--accent-wash);
+  text-align: center;
 }
 
-.gather__wind {
-  font-size: clamp(24px, 3.4cqh, 40px);
+.spot__kicker {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.spot__title {
+  margin: -6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: clamp(22px, 3.6cqh, 30px);
+}
+
+.spot__title--done {
+  margin: 0;
+}
+
+.spot__wind {
+  font-size: 1.45em;
   line-height: 1;
   color: var(--gold);
 }
 
-.gather__seatname {
+/* Large enough to scan from across the table: as much of the panel as the
+   screen's height allows, on its own white card. */
+.qr--spot {
+  width: min(320px, 40cqh, 100%);
+  max-width: none;
+  padding: 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  box-sizing: content-box;
+}
+
+.spot__note {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.spot__name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.spot__name-label {
+  font-size: 11px;
   font-weight: 700;
-  font-size: clamp(16px, 2.6cqh, 26px);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* Legible from across the table, like everything else on this screen. */
+.spot__name-input {
+  width: min(100%, 260px);
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--shade-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.spot__name-input::placeholder {
+  font-weight: 400;
+  font-size: 0.85em;
+  color: var(--ink-dim);
+}
+
+.spot__url {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+}
+
+.spot__url-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
+/* ---- the list of chairs, the rules and the deal ---- */
+
+.gather__side,
+.gather__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.6cqh, 14px);
+}
+
+.gather__head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.gather__home {
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
+.gather__title {
+  margin: 0;
+  font-size: clamp(18px, 2.8cqh, 22px);
+}
+
+.gather__sub {
+  font-size: 14px;
+  color: var(--ink-dim);
+}
+
+.gather__spacer {
+  flex: 1;
+}
+
+.gather__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1.2cqh, 10px);
+}
+
+.gather__row {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.4cqw, 16px);
+  min-height: clamp(56px, 11cqh, 96px);
+  padding: 4px clamp(10px, 1.6cqw, 18px);
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--raise-0);
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.gather__row--here {
+  border-color: color-mix(in srgb, var(--gold) 45%, var(--line));
+}
+
+/* The chair whose code is up, and on a phone its own chair. */
+.gather__row--spot,
+.gather__row--mine {
+  border: 2px solid var(--gold);
+  background: var(--accent-wash);
+}
+
+/* Each chair's wind on a tile, as the wind tiles are drawn to seat a table. */
+.gather__tile {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: clamp(32px, 6.4cqh, 52px);
+  height: clamp(42px, 8.4cqh, 68px);
+  border-radius: 7px;
+  background: linear-gradient(180deg, var(--tile-face), var(--tile-face-2));
+  box-shadow:
+    inset 0 0 0 1px var(--tile-edge),
+    0 4px 0 var(--tile-shadow);
+  color: var(--honor, #1e2732);
+  font-size: clamp(20px, 4.2cqh, 34px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.gather__tile--open {
+  opacity: 0.6;
+}
+
+.gather__who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gather__nameline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.gather__seatname {
+  font-weight: 800;
+  font-size: clamp(16px, 2.6cqh, 20px);
 }
 
 /* The name a chair goes by until somebody sits in it: greyed, like a placeholder. */
@@ -174,20 +253,34 @@
   font-style: italic;
 }
 
+/* A name typed on the tablet for whoever scans this chair next. */
+.gather__seatname--typed {
+  font-weight: 700;
+}
+
 .gather__namerow {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+}
+
+.gather__rename {
+  min-width: 36px;
+}
+
+.gather__you {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold);
 }
 
 .gather__seatmeta {
-  font-size: clamp(11px, 1.4cqh, 13px);
+  font-size: 12px;
   color: var(--ink-dim);
 }
 
 /* Arrival is marked by a word as well as a colour, so it reads the same to
-   anyone who cannot tell the two card treatments apart. */
+   anyone who cannot tell the two row treatments apart. */
 .gather__state {
   font-size: 11px;
   font-weight: 700;
@@ -199,30 +292,143 @@
   color: var(--ink-dim);
 }
 
-.gather__seat--here .gather__state {
+.gather__state--here {
   background: var(--chip-pos);
   color: var(--ink);
 }
 
-.gather__foot {
-  display: flex;
+.gather__showing {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding-top: 4px;
-  border-top: 1px solid var(--line-soft);
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--on-gold);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.gather__count {
-  flex: 1 1 auto;
-  font-size: 13px;
+.gather__show {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  color: var(--gold);
+}
+
+/* A taken chair's code is still there for a takeover, but it should not be
+   what draws the eye. */
+.gather__show--quiet {
+  border-color: var(--line-strong);
   color: var(--ink-dim);
 }
 
+/* Move one chair round, either way. */
+.gather__move {
+  display: inline-flex;
+  gap: 6px;
+}
+
+/* A seated chair being renamed. */
+.gather__nameinput {
+  width: min(100%, 220px);
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--raise-1);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: clamp(15px, 2.2cqh, 20px);
+}
+
+.gather__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+  text-align: center;
+}
+
+/* The rules in force in one line; Change opens them out. */
+.gather__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--shade-2);
+  border: 1px solid var(--line-soft);
+}
+
+.gather__rules-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gather__rules-label {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.gather__rules-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.gather__rules-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+/* Who the computer plays sits over the buttons it explains, so a long line
+   never pushes Deal onto a row of its own. */
+.gather__foot {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: "count count count" "reset . deal";
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: auto;
+}
+
+.gather__foot .btn--reset {
+  grid-area: reset;
+}
+
+.gather__foot .btn--deal {
+  grid-area: deal;
+}
+
+.gather__count {
+  grid-area: count;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-dim);
+  text-align: right;
+}
+
+.gather__count:empty {
+  display: none;
+}
+
 .btn--deal {
-  font-size: 17px;
-  padding: 12px 34px;
-  border-radius: 10px;
+  font-size: 18px;
+  padding: 14px 40px;
+  border-radius: 12px;
 }
 
 /* Wipes the room, so it is quieter than Deal and set apart from it. */
@@ -235,23 +441,90 @@
   background: color-mix(in srgb, var(--danger) 22%, transparent);
 }
 
-/* On a phone the seats matter more than the QR — you are already in. */
-@media (orientation: landscape) and (max-width: 760px), (orientation: portrait) and (max-height: 760px) {
-  .gather__body {
-    grid-template-columns: 1fr;
-    align-items: start;
+/* ---- a phone already in a chair ---- */
+
+.gather--phone .gather__row {
+  min-height: 52px;
+  padding-block: 2px;
+}
+
+.gather--phone .gather__seatmeta {
+  font-size: 11px;
+}
+
+.gather__wait {
+  margin: auto 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.gather__wait-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 4px var(--accent-wash-2);
+}
+
+.gather__invite {
+  flex: 0 0 clamp(200px, 28%, 260px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--shade-2);
+  text-align: center;
+}
+
+.gather__invite-title {
+  margin: 0;
+  font-size: 14px;
+}
+
+.qr--invite {
+  width: min(160px, 42cqh, 100%);
+  max-width: none;
+  padding: 6px;
+  background: #ffffff;
+  box-sizing: content-box;
+}
+
+.qr--pending {
+  aspect-ratio: 1;
+  background: var(--raise-1);
+}
+
+.gather__leave {
+  width: 100%;
+  min-height: 44px;
+  margin-top: auto;
+}
+
+/* A tablet held close to square, or a small one: the code goes over the list
+   rather than beside it, so neither is squeezed. */
+@media (orientation: landscape) and (max-width: 900px) and (min-height: 600px),
+  (orientation: portrait) and (max-height: 900px) and (min-width: 600px) {
+  .gather--table {
+    flex-direction: column;
   }
 
-  .gather__join {
-    order: 2;
+  .gather--table .spot {
+    flex: none;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
   }
+}
 
-  .qr {
-    max-width: 200px;
-  }
-
-  .gather__seats {
-    grid-auto-rows: auto;
+@media (prefers-reduced-motion: reduce) {
+  .gather__row {
+    transition: none;
   }
 }
 
@@ -289,44 +562,6 @@
   margin: 0;
   line-height: 1.5;
   color: var(--ink-dim);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .gather__seat {
-    transition: none;
-  }
-}
-
-/* A tablet lying flat in landscape has width to spare and no height at all.
-   Stacked, four cards carrying a code push the Deal button off the bottom, so
-   there the code goes beside the chair's details rather than under them. */
-@media (orientation: landscape) and (min-width: 900px) and (max-height: 950px),
-  (orientation: portrait) and (min-height: 900px) and (max-width: 950px) {
-  .gather__seat {
-    flex-direction: row;
-    gap: clamp(10px, 1.4cqw, 20px);
-  }
-
-  .qr--seat {
-    width: min(165px, 23cqh);
-  }
-}
-
-/* A phone belongs to someone already seated: the seats get the screen, and the
-   join code folds away until they actually want to invite somebody. */
-.gather__body--seats {
-  grid-template-columns: 1fr;
-}
-
-.gather__invite > summary {
-  cursor: pointer;
-  padding: 8px 2px;
-  font-size: 13px;
-  color: var(--ink-dim);
-}
-
-.gather__invite[open] > summary {
-  margin-bottom: 8px;
 }
 
 /* An input with a small action beside it — the name box and its re-roll. */

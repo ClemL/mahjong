@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_APPEARANCE } from "@/game/appearance";
 import { TableLobby } from "../TableLobby";
-import { fakeApi, lobby, playerView, sound, tableView } from "./fixtures";
+import { fakeApi, lobby, playerView, sit, sound, tableView } from "./fixtures";
 
 // The real code is SVG path data; the link it encodes is what matters here.
 vi.mock("../QrCode", () => ({
@@ -12,35 +12,78 @@ vi.mock("../QrCode", () => ({
   ),
 }));
 
-const seatCode = (seat: number) =>
-  screen.getByRole("img", { name: new RegExp(`take seat ${seat}`) }).getAttribute("data-value");
+/** The one large code on the table, and the link it carries. */
+const spotCode = () => screen.getAllByRole("img").find((el) => /^Scan to /.test(el.getAttribute("aria-label") ?? ""))!;
+const showCode = (seat: number, wind: string) =>
+  fireEvent.click(screen.getByRole("button", { name: `Show the code for seat ${seat}, ${wind}` }));
 
 describe("TableLobby on the table", () => {
-  it("gives each open chair its own code carrying the name typed for it", () => {
+  it("puts up one large code, for the next open chair, carrying the name typed for it", () => {
     const view = tableView(lobby([0]));
     render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
 
-    // Seat 1 is taken; its code takes it over rather than asking for a name.
-    expect(
-      screen.getByRole("img", { name: /take over seat 1, East, from Kris/ }).getAttribute("data-value"),
-    ).toMatch(/\/room\/TEST\?seat=0&replace=1$/);
-    expect(seatCode(2)).toMatch(/\/room\/TEST\?seat=1$/);
+    // Seat 1 is taken, so the code is for seat 2, the next open chair.
+    expect(screen.getAllByRole("img").filter((el) => /^Scan to /.test(el.getAttribute("aria-label") ?? ""))).toHaveLength(1);
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 2, South");
+    expect(spotCode().getAttribute("data-value")).toMatch(/\/room\/TEST\?seat=1$/);
+    expect(screen.getByText("Code showing")).toBeTruthy();
 
     fireEvent.change(screen.getByLabelText("Name for seat 2"), { target: { value: "Srini" } });
-    expect(seatCode(2)).toMatch(/\/room\/TEST\?seat=1&name=Srini$/);
-    expect(screen.getByText("1 of 4 seated", { exact: false })).toBeTruthy();
+    expect(spotCode().getAttribute("data-value")).toMatch(/\/room\/TEST\?seat=1&name=Srini$/);
+    // The typed name shows in the chair's row until somebody scans it.
+    expect(screen.getByRole("list", { name: "Seats" }).textContent).toContain("Srini");
+    expect(screen.getByText("1 of 4 seated")).toBeTruthy();
   });
 
-  it("greys in each empty chair's own name, without Robot, and offers the flowers rule", () => {
+  it("moves the code to whichever chair is tapped, a taken one's to take it over", () => {
+    const view = tableView(lobby([0]));
+    render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
+
+    showCode(4, "North");
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 4, North");
+    expect((screen.getByLabelText("Name for seat 4") as HTMLInputElement).placeholder).toBe("Clem");
+
+    showCode(1, "East");
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take over seat 1, East, from Kris");
+    expect(spotCode().getAttribute("data-value")).toMatch(/\/room\/TEST\?seat=0&replace=1$/);
+    // A taken chair asks for no name: whoever scans names themselves.
+    expect(screen.queryByLabelText(/^Name for seat/)).toBeNull();
+  });
+
+  it("moves on to the next open chair once somebody sits in the one showing", () => {
+    const room = lobby([0]);
+    const before = tableView(room);
+    const { rerender } = render(<TableLobby api={fakeApi(before)} view={before} sound={sound} />);
+    showCode(3, "West");
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 3, West");
+
+    sit(room, 2);
+    const after = tableView(room);
+    rerender(<TableLobby api={fakeApi(after)} view={after} sound={sound} />);
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 2, South");
+
+    sit(room, 1);
+    sit(room, 3);
+    const full = tableView(room);
+    rerender(<TableLobby api={fakeApi(full)} view={full} sound={sound} />);
+    expect(screen.getByRole("heading", { name: /All four seated/ })).toBeTruthy();
+  });
+
+  it("greys in each empty chair's own name, and opens the house rules out to change them", () => {
     const view = tableView(lobby([0]));
     const api = fakeApi(view);
     render(<TableLobby api={api} view={view} sound={sound} />);
 
     expect((screen.getByLabelText("Name for seat 2") as HTMLInputElement).placeholder).toBe("Louis");
-    expect((screen.getByLabelText("Name for seat 4") as HTMLInputElement).placeholder).toBe("Clem");
+    const rules = screen.getByRole("region", { name: "House rules" });
+    expect(rules.textContent).toContain("Min 1 faan");
+    expect(screen.queryByLabelText("Flowers")).toBeNull();
 
+    fireEvent.click(screen.getByRole("button", { name: "Change" }));
     fireEvent.change(screen.getByLabelText("Flowers"), { target: { value: "off" } });
     expect(api.control).toHaveBeenCalledWith({ type: "flowers", value: false });
+    fireEvent.change(screen.getByLabelText("Game length"), { target: { value: "2" } });
+    expect(api.control).toHaveBeenCalledWith({ type: "rounds", value: 2 });
   });
 
   it("resets the table and clears the typed names once confirmed", () => {
@@ -50,14 +93,18 @@ describe("TableLobby on the table", () => {
     vi.stubGlobal("confirm", confirm);
     render(<TableLobby api={api} view={view} sound={sound} />);
 
+    showCode(3, "West");
     const input = screen.getByLabelText("Name for seat 3") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Steven" } });
     fireEvent.click(screen.getByRole("button", { name: "Reset table" }));
 
     expect(confirm).toHaveBeenCalledOnce();
     expect(api.control).toHaveBeenCalledWith({ type: "reset" });
-    expect(input.value).toBe("");
-    expect(seatCode(3)).not.toContain("name=");
+    // Back to the next open chair, with nothing typed for anyone.
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 2, South");
+    showCode(3, "West");
+    expect((screen.getByLabelText("Name for seat 3") as HTMLInputElement).value).toBe("");
+    expect(spotCode().getAttribute("data-value")).not.toContain("name=");
   });
 
   it("does nothing when the reset is cancelled", () => {
@@ -66,6 +113,7 @@ describe("TableLobby on the table", () => {
     vi.stubGlobal("confirm", vi.fn(() => false));
     render(<TableLobby api={api} view={view} sound={sound} />);
 
+    showCode(3, "West");
     const input = screen.getByLabelText("Name for seat 3") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Steven" } });
     fireEvent.click(screen.getByRole("button", { name: "Reset table" }));
@@ -140,12 +188,16 @@ describe("renaming a seated chair", () => {
 });
 
 describe("TableLobby on a phone", () => {
-  it("offers no reset and no per-seat codes to a seated player", () => {
+  it("offers no reset and no chair's code to a seated player, only a code to bring someone in", () => {
     const view = playerView(lobby([0, 1]), 1);
     render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
 
     expect(screen.queryByRole("button", { name: "Reset table" })).toBeNull();
     expect(screen.queryByRole("img", { name: /take seat/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Show the code/ })).toBeNull();
+    expect(screen.getByRole("img", { name: "Join TEST" }).getAttribute("data-value")).toMatch(/\/room\/TEST$/);
+    expect(screen.getByText("You're in as South")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Leave seat" })).toBeTruthy();
     // With a tablet present, dealing is the table's job.
     expect(screen.queryByRole("button", { name: "Deal" })).toBeNull();
     expect(screen.getByText("The table deals when everyone is ready.")).toBeTruthy();
@@ -156,7 +208,7 @@ describe("TableLobby on a phone", () => {
     render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
 
     expect(screen.queryByRole("button", { name: /^(Deal|Play the computer)$/ })).toBeNull();
-    expect(screen.getByText(/Open Tablet mode on a tablet/)).toBeTruthy();
+    expect(screen.getByText(/On a tablet, open “Be TEST on this screen”/)).toBeTruthy();
   });
 });
 

@@ -72,7 +72,7 @@ const DENSITY_OPTIONS: SegmentOption<TabletDensity>[] = [
   },
 ];
 
-const MIN_FAAN: SegmentOption<`${number}`>[] = MIN_FAAN_CHOICES.map((n) => ({
+export const MIN_FAAN: SegmentOption<`${number}`>[] = MIN_FAAN_CHOICES.map((n) => ({
   value: `${n}` as `${number}`,
   label: String(n),
   sub: n === 0 ? "chicken" : n === 1 ? "easy" : n === 3 ? "HK standard" : "hard",

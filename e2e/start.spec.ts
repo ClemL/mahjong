@@ -9,9 +9,11 @@ for (const [label, viewport] of [
     const errors = watchErrors(page);
     await page.setViewportSize(viewport);
     await page.goto("/");
-    for (const mode of ["Multiplayer", "Tablet mode"]) {
-      await expect(page.getByRole("link", { name: new RegExp(mode) })).toBeVisible();
+    for (const way of [/^Sit down at Table \d$/, /^Be Table \d on this screen$/]) {
+      await expect(page.getByRole("link", { name: way })).toBeVisible();
     }
+    // The table and the way in fit in one screen, without scrolling to reach them.
+    await expect(page.getByRole("navigation", { name: "Ways in" })).toBeInViewport({ ratio: 1 });
     // No game on this device alone: a game is a tablet and phones.
     await expect(page.getByRole("link", { name: /solo/i })).toHaveCount(0);
     await expectNoSidewaysScroll(page);
@@ -22,6 +24,8 @@ for (const [label, viewport] of [
     const errors = watchErrors(page);
     await page.setViewportSize(viewport);
     await page.goto("/");
+    // A phone opens on its own layout; the tiles are a tab away.
+    await page.getByRole("tab", { name: "Table & tiles" }).click();
     await page.getByRole("button", { name: "Show every tile" }).click();
     const sheet = page.getByRole("dialog", { name: "Every tile" });
     // One of each of the 42 faces, and the back they all share.

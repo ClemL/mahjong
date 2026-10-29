@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StartPage } from "../StartPage";
 import { normalizePreferences, readPreferences } from "@/hooks/usePreferences";
@@ -31,19 +31,55 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
+const href = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
+/** A table's row, status line and all. */
+const tableRow = (name: RegExp) => screen.getByRole("radio", { name }).closest("label")!;
+
 describe("StartPage", () => {
   it("offers the two ways in, both at a table, and no game on this device alone", () => {
     render(<StartPage />);
-    const href = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
-    expect(href(/Multiplayer/)).toBe("/room/TABLE");
-    expect(href(/Tablet mode/)).toBe("/room/TABLE?seat=table");
+    expect(href(/^Sit down at Table 1$/)).toBe("/room/TABLE");
+    expect(href(/^Be Table 1 on this screen$/)).toBe("/room/TABLE?seat=table");
     expect(screen.getAllByRole("link").map((a) => a.getAttribute("href"))).not.toContain("/solo");
   });
 
   it("remembers the house minimum for the next game", () => {
     render(<StartPage />);
-    fireEvent.change(screen.getByLabelText(/Min faan/), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("tab", { name: "House rules" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Min faan" })).getByRole("button", { name: /^3/ }));
     expect(readPreferences().minFaan).toBe(3);
+  });
+
+  it("opens a tablet on the look, a phone on its layout, and then whichever tab was open last", () => {
+    const { unmount } = render(<StartPage />);
+    expect(screen.getByRole("tab", { name: "Table & tiles" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tabpanel").textContent).toContain("Tile faces");
+    unmount();
+
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-height: 560px") }));
+    const phone = render(<StartPage />);
+    expect(screen.getByRole("tab", { name: "This phone" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(within(screen.getByRole("group", { name: "Phone layout" })).getByRole("button", { name: /Compact/ }));
+    expect(window.localStorage.getItem("hk-mahjong.compact")).toBe("1");
+
+    // The arrow keys walk the tabs, and the one left open is the one that opens next time.
+    fireEvent.keyDown(screen.getByRole("tab", { name: "This phone" }), { key: "ArrowLeft" });
+    expect(screen.getByRole("tab", { name: "Table & tiles" }).getAttribute("aria-selected")).toBe("true");
+    phone.unmount();
+    render(<StartPage />);
+    expect(screen.getByRole("tab", { name: "Table & tiles" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("sets the look from swatches, each named and marked when chosen", () => {
+    render(<StartPage />);
+    const themes = screen.getByRole("group", { name: "Table color" });
+    fireEvent.click(within(themes).getByRole("button", { name: "Midnight" }));
+    expect(document.documentElement.dataset.theme).toBe("midnight");
+    expect(within(themes).getByRole("button", { name: "Midnight" }).getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(within(screen.getByRole("group", { name: "Tile backs" })).getByRole("button", { name: "Crimson" }));
+    expect(document.documentElement.dataset.backs).toBe("crimson");
+    expect(screen.getByRole("img", { name: /^Preview of the Midnight table/ })).toBeTruthy();
   });
 
   it("resets the chosen table only once confirmed", async () => {
@@ -55,7 +91,7 @@ describe("StartPage", () => {
     render(<StartPage />);
     const posts = () => fetch.mock.calls.filter(([, init]) => init?.method === "POST");
 
-    const reset = screen.getByRole("button", { name: "Reset Table 1" });
+    const reset = screen.getByRole("button", { name: /^Reset Table 1/ });
     fireEvent.click(reset);
     expect(posts()).toEqual([]);
 
@@ -66,7 +102,7 @@ describe("StartPage", () => {
     expect(window.localStorage.getItem("hk-mahjong.room.TABLE")).toBeNull();
   });
 
-  it("points Multiplayer, Tablet mode and Reset at the chosen table", async () => {
+  it("points both ways in and Reset at the chosen table", async () => {
     const fetch = tableStatuses({ TABLE: EMPTY, TABLE2: EMPTY, TABLE3: EMPTY });
     vi.stubGlobal("fetch", fetch);
     vi.stubGlobal("confirm", () => true);
@@ -74,13 +110,12 @@ describe("StartPage", () => {
     window.localStorage.setItem("hk-mahjong.room.TABLE2", "tok-two");
     render(<StartPage />);
 
-    fireEvent.click(screen.getByRole("button", { name: /^Table 2/ }));
-    const href = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
-    expect(href(/Multiplayer/)).toBe("/room/TABLE2");
-    expect(href(/Tablet mode/)).toBe("/room/TABLE2?seat=table");
+    fireEvent.click(screen.getByRole("radio", { name: "Table 2" }));
+    expect(href(/^Sit down at Table 2$/)).toBe("/room/TABLE2");
+    expect(href(/^Be Table 2 on this screen$/)).toBe("/room/TABLE2?seat=table");
     expect(window.localStorage.getItem("hk-mahjong.table")).toBe("TABLE2");
 
-    fireEvent.click(screen.getByRole("button", { name: "Reset Table 2" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Reset Table 2/ }));
     await waitFor(() => expect(screen.getByRole("status").textContent).toMatch(/Table 2 is empty/));
     expect(fetch).toHaveBeenCalledWith("/api/rooms/TABLE2/reset", { method: "POST" });
     // Only the seat at the table that was reset is forgotten.
@@ -91,8 +126,8 @@ describe("StartPage", () => {
   it("comes back to the table this device chose last", () => {
     window.localStorage.setItem("hk-mahjong.table", "TABLE3");
     render(<StartPage />);
-    expect(screen.getByRole("link", { name: /Multiplayer/ }).getAttribute("href")).toBe("/room/TABLE3");
-    expect(screen.getByRole("button", { name: /^Table 3/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(href(/^Sit down at/)).toBe("/room/TABLE3");
+    expect((screen.getByRole("radio", { name: "Table 3" }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("says who is already at each table", async () => {
@@ -105,10 +140,12 @@ describe("StartPage", () => {
       }),
     );
     render(<StartPage />);
-    const status = (name: RegExp) => screen.getByRole("button", { name }).textContent;
-    await waitFor(() => expect(status(/^Table 1/)).toMatch(/In play · 3 players/));
-    await waitFor(() => expect(status(/^Table 2/)).toMatch(/1 player waiting/));
-    await waitFor(() => expect(status(/^Table 3/)).toMatch(/Empty/));
+    await waitFor(() => expect(tableRow(/^Table 1/).textContent).toMatch(/In play · 3 players/));
+    await waitFor(() => expect(tableRow(/^Table 2/).textContent).toMatch(/1 player waiting · no table screen/));
+    await waitFor(() => expect(tableRow(/^Table 3/).textContent).toMatch(/Empty/));
+    // The status is read out with the radio, not only shown beside it.
+    expect(screen.getByRole("radio", { name: "Table 1" }).getAttribute("aria-describedby")).toBeTruthy();
+    expect(screen.getByRole("radio", { name: "Table 1" })).toHaveProperty("checked", true);
   });
 });
 
