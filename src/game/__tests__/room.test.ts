@@ -43,6 +43,9 @@ import {
   alwaysTakesBack,
   setTakeBackAssist,
   markReady,
+  moveSeat,
+  openSeatName,
+  seatedNames,
   everyoneReady,
   readyWaiting,
   takeBackDiscard,
@@ -337,6 +340,76 @@ describe("lobby", () => {
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("open");
     startPlay(room);
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("ai");
+  });
+});
+
+describe("changing chairs", () => {
+  const names = (room: Room) => viewFor(room, null).players.map((p) => p.occupant.name);
+
+  it("takes each person's name with them, a chair's default name included", () => {
+    const room = newRoom("TEST", undefined, 1);
+    // Sitting down without typing a name: South's own, Louis.
+    sitDown(room, 1, { token: "tok-louis" });
+    sitDown(room, 2, { token: "tok-kris", name: "Kris" });
+    expect(names(room)).toEqual([null, "Louis", "Kris", null]);
+
+    // Louis and Kris trade places; neither is renamed after the chair.
+    expect(moveSeat(room, 1, 1)).toBeNull();
+    expect(names(room)).toEqual([null, "Kris", "Louis", null]);
+    expect(identify(room, "tok-louis")).toEqual({ role: "player", seat: 2 });
+    // On into the empty chair, and back round the end of the table to East.
+    moveSeat(room, 2, 1);
+    moveSeat(room, 3, 1);
+    expect(names(room)).toEqual(["Louis", "Kris", null, null]);
+    expect(identify(room, "tok-louis")).toEqual({ role: "player", seat: 0 });
+  });
+
+  it("goes all the way round with everyone seated, and every name stays its owner's", () => {
+    const room = newRoom("TEST", undefined, 1);
+    for (const s of [0, 1, 2, 3] as Seat[]) sitDown(room, s, { token: `tok-${s}` });
+    expect(names(room)).toEqual(["Calvin", "Louis", "Hanna", "Clem"]);
+    // Calvin swaps one chair on at a time, three times: everyone else shuffles back one.
+    for (const from of [0, 1, 2] as Seat[]) moveSeat(room, from, 1);
+    expect(names(room)).toEqual(["Louis", "Hanna", "Clem", "Calvin"]);
+    // And each phone follows its own person: Calvin sat down at East, Louis at South, and so on.
+    expect([0, 1, 2, 3].map((first) => identify(room, `tok-${first}`).seat)).toEqual([3, 0, 1, 2]);
+  });
+
+  it("offers an empty chair a name nobody is using, and seats a newcomer under it", () => {
+    const room = newRoom("TEST", undefined, 1);
+    sitDown(room, 1, { token: "tok-louis" });
+    moveSeat(room, 1, 1);
+    // Louis is at West now, so South cannot offer "Louis" too: it offers West's own name.
+    expect(openSeatName(seatedNames(room.seats), 1)).toBe("Hanna");
+    sitDown(room, 1, { token: "tok-new" });
+    expect(names(room)).toEqual([null, "Hanna", "Louis", null]);
+    // Once the game is on, the computer plays an empty chair under that same name.
+    startPlay(room);
+    expect(viewFor(room, null).players[0].occupant.name).toBe(robotName(0));
+  });
+
+  it("shares the spare names out in seat order when several chairs' own are taken", () => {
+    // Calvin and Louis both moved down to the far end of the table.
+    expect(openSeatName([null, null, "Calvin", "Louis"], 0)).toBe("Hanna");
+    expect(openSeatName([null, null, "Calvin", "Louis"], 1)).toBe("Clem");
+    // A typed name that happens to be a default counts too, whatever its case.
+    expect(openSeatName([null, " louis ", null, null], 1)).toBe("Louis");
+    expect(openSeatName([null, null, "LOUIS", null], 1)).toBe("Hanna");
+    // A computer's chair counts as empty.
+    expect(seatedNames([{ kind: "ai", name: "Robot Kris" }, { kind: "human", name: "Kris" }, { kind: "open" }])).toEqual([
+      null,
+      "Kris",
+      null,
+    ]);
+  });
+
+  it("moves the turns the computer finished for someone along with them", () => {
+    const room = newRoom("TEST", undefined, 1);
+    sitDown(room, 0, { token: "tok-0", name: "Kris" });
+    room.stoodIn[0] = 3;
+    moveSeat(room, 0, -1);
+    expect(viewFor(room, "tok-0").stoodIn).toBe(3);
+    expect(room.stoodIn[0]).toBe(0);
   });
 });
 

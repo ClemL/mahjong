@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_APPEARANCE } from "@/game/appearance";
+import { moveSeat } from "@/game/room";
 import { TableLobby } from "../TableLobby";
 import { fakeApi, lobby, playerView, sit, sound, tableView } from "./fixtures";
 
@@ -224,6 +225,23 @@ describe("moving between chairs", () => {
     expect(api.control).toHaveBeenCalledWith({ type: "moveSeat", seat: 0, step: 1 });
     fireEvent.click(screen.getByRole("button", { name: "Move Kris to seat 4, North" }));
     expect(api.control).toHaveBeenCalledWith({ type: "moveSeat", seat: 0, step: -1 });
+  });
+
+  it("keeps Louis as Louis after a move, and the empty chair offers a name nobody has", () => {
+    const room = lobby([0]);
+    sit(room, 1, "Louis");
+    moveSeat(room, 1, 1);
+    const view = tableView(room);
+    render(<TableLobby api={fakeApi(view)} view={view} sound={sound} />);
+
+    const seats = screen.getByRole("list", { name: "Seats" });
+    const row = (n: number) => within(seats).getAllByRole("listitem")[n].textContent;
+    expect(row(2)).toContain("Louis");
+    // South is empty again, but Louis is sitting at West: South offers West's own name.
+    expect(row(1)).toContain("Hanna");
+    expect(row(1)).not.toContain("Louis");
+    expect(spotCode().getAttribute("aria-label")).toBe("Scan to take seat 2, South");
+    expect((screen.getByLabelText("Name for seat 2") as HTMLInputElement).placeholder).toBe("Hanna");
   });
 
   it("only offers a phone its own player's buttons", () => {

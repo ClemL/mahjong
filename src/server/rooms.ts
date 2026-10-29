@@ -491,7 +491,7 @@ export async function control(
       case "rename": {
         const occupant = r.seats[command.seat];
         if (occupant?.kind !== "human") throw new RoomError("Nobody is sitting there", 409);
-        occupant.name = seatName(command.name, command.seat);
+        occupant.name = seatName(r, command.seat, command.name);
         break;
       }
       case "moveSeat": {

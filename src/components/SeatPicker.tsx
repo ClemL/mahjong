@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DEFAULT_NAMES, type RoomView, robotName } from "@/game/room";
+import { type RoomView, openSeatName, robotName, seatedNames } from "@/game/room";
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
@@ -21,6 +21,9 @@ interface Props {
 /** Pick a seat and sit down. There is nothing else to get past. */
 export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error }: Props) {
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
+  // What a chair is called if nobody types a name. People keep theirs when
+  // they change chairs, so this is a default nobody is already using.
+  const openName = (seat: Seat) => openSeatName(seatedNames(view.players.map((p) => p.occupant)), seat);
   // Somebody may have sat down there between the code being shown and scanned.
   const arrived = picked !== null && picked !== "table" && !taken(picked) ? picked : null;
   const [choice, setChoice] = useState<Seat | "table" | null>(picked === "table" ? "table" : arrived);
@@ -38,8 +41,8 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
     .filter((n): n is string => n !== null);
 
   // The box starts empty and sitting down is still one tap: a chair nobody
-  // names goes by its own default (Calvin, Louis, Hanna, Clem), shown as the
-  // placeholder. The dice button offers a suggestion instead.
+  // names goes by a default (Calvin, Louis, Hanna, Clem) nobody else is using,
+  // shown as the placeholder. The dice button offers a suggestion instead.
   const [name, setName] = useState("");
   const reroll = useMemo(
     () => () => setName(suggestName([...namesInUse, name])),
@@ -97,7 +100,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
               <span className="seat-card__state seat-card__state--open">
                 {view.players[seat].occupant.kind === "ai"
                   ? `${view.players[seat].occupant.name ?? robotName(seat)} — sit in`
-                  : DEFAULT_NAMES[seat]}
+                  : openName(seat)}
               </span>
             )}
           </button>
@@ -145,7 +148,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
                 value={name}
                 ref={nameBox}
                 maxLength={16}
-                placeholder={DEFAULT_NAMES[choice as Seat]}
+                placeholder={openName(choice as Seat)}
                 onChange={(e) => setName(e.target.value)}
               />
               <button

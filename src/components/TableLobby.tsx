@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DEFAULT_NAMES, type RoomView, neighbourSeat } from "@/game/room";
+import { type RoomView, neighbourSeat, openSeatName, seatedNames } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCompactLayout } from "@/hooks/useCompactLayout";
@@ -42,6 +42,14 @@ function CodeIcon() {
       <path d="M14 14h3v3h-3zM20 20h1" />
     </svg>
   );
+}
+
+/**
+ * The name an empty chair offers: the one the server gives whoever sits in it
+ * without typing, worked out from the same view so the two always agree.
+ */
+function openName(view: RoomView, seat: Seat): string {
+  return openSeatName(seatedNames(view.players.map((p) => p.occupant)), seat);
 }
 
 /**
@@ -261,9 +269,9 @@ export function TableLobby({
                     className="spot__name-input"
                     value={names[spot] ?? ""}
                     maxLength={16}
-                    // The chair's own name until somebody types one. It only
-                    // becomes Robot <name> if the deal finds nobody sitting here.
-                    placeholder={DEFAULT_NAMES[spot]}
+                    // The name the chair offers until somebody types one. It
+                    // only becomes Robot <name> if the deal finds nobody here.
+                    placeholder={openName(view, spot)}
                     aria-label={`Name for seat ${spot + 1}`}
                     autoComplete="off"
                     spellCheck={false}
@@ -381,7 +389,7 @@ function SeatRow({
   const occupant = view.players[seat].occupant;
   const here = occupant.kind === "human";
   const mine = view.you.seat === seat;
-  const name = occupant.name ?? DEFAULT_NAMES[seat];
+  const name = occupant.name ?? openName(view, seat);
   // The table can move anybody; a phone only its own player.
   const canMove = here && (isTable || mine);
   const where = `${SEAT_NAMES[seat]} · seat ${seat + 1} · ${EDGES[positionOf(seat, view.settings.rotation)]} edge`;
@@ -412,7 +420,7 @@ function SeatRow({
           ) : typed.trim() ? (
             <span className="gather__seatname gather__seatname--typed">{typed.trim()}</span>
           ) : (
-            <span className="gather__seatname gather__seatname--open">{DEFAULT_NAMES[seat]}</span>
+            <span className="gather__seatname gather__seatname--open">{name}</span>
           )}
           {mine ? <span className="gather__you">you</span> : null}
           {/* Joined state must not rest on the colour of the row alone. */}
@@ -627,7 +635,7 @@ function SeatRename({
       value={draft}
       maxLength={16}
       autoFocus
-      placeholder={DEFAULT_NAMES[seat]}
+      placeholder={name}
       aria-label={`New name for seat ${seat + 1}`}
       autoComplete="off"
       spellCheck={false}
