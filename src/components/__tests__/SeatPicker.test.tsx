@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { openTable, replaceWithComputer, robotName, viewFor } from "@/game/room";
+import { moveSeat, openTable, replaceWithComputer, robotName, viewFor } from "@/game/room";
 import { SeatPicker } from "../SeatPicker";
-import { NAMES, dealt } from "./fixtures";
+import { NAMES, dealt, lobby, sit } from "./fixtures";
 
 /** How a phone that has not sat down yet sees a game already under way. */
 const spectating = (seats = [0, 2] as const) => viewFor(dealt([...seats]), null);
@@ -21,6 +21,16 @@ describe("SeatPicker", () => {
     fireEvent.change(box, { target: { value: "Srini" } });
     fireEvent.click(screen.getByRole("button", { name: "Sit down" }));
     expect(onClaim).toHaveBeenCalledWith(1, "Srini", false);
+  });
+
+  it("names an empty chair after a default nobody is using once someone has moved", () => {
+    const room = lobby([]);
+    sit(room, 0, "Calvin");
+    moveSeat(room, 0, 1);
+    render(<SeatPicker view={viewFor(room, null)} picked={0} onClaim={vi.fn()} onReset={() => {}} busy={false} error={null} />);
+    // Calvin is at South now, so East offers South's own name rather than a second Calvin.
+    expect(screen.getByRole("button", { name: "東EastLouis" })).toBeTruthy();
+    expect((screen.getByRole("textbox") as HTMLInputElement).placeholder).toBe("Louis");
   });
 
   it("does not choose a chair somebody sat in after the code was shown", () => {

@@ -26,7 +26,7 @@ import {
 } from "./engine";
 import { needsTurnAdvance, stepAiTurn } from "./controller";
 import { type Difficulty, greedyAi, strategyFor } from "./ai";
-import { SEAT_NAMES, type Seat, type Tile, type TileCode, isFlower } from "./tiles";
+import { SEATS, SEAT_NAMES, type Seat, type Tile, type TileCode, isFlower } from "./tiles";
 import type { Meld } from "./melds";
 import type { RuleConfig } from "./rules";
 import { createRng } from "./rng";
@@ -705,9 +705,49 @@ export function hurriedThisWait(room: Room, now = Date.now()): { seat: Seat; by:
   return hurry.at >= since ? { seat, by: hurry.by } : null;
 }
 
-/** The name a chair shows: what was typed, trimmed to fit a seat card, or the chair's default. */
-export function seatName(name: string | undefined, seat: Seat): string {
-  return (name ?? "").trim().slice(0, 16) || DEFAULT_NAMES[seat];
+/** Who is in each chair by name, or null where no person is. A computer's chair counts as empty: anyone can sit in. */
+export function seatedNames(occupants: readonly { kind: string; name?: string | null }[]): (string | null)[] {
+  return occupants.map((o) => (o.kind === "human" ? (o.name ?? null) : null));
+}
+
+/**
+ * The name an empty chair goes by: its own default, unless somebody sitting
+ * down already goes by it — people keep their name when they change chairs,
+ * so Louis moved from South to West is still Louis. Then the chair takes the
+ * default of the chair Louis moved into, as if the two had swapped names, or
+ * failing that any default nobody is using, so no two chairs say the same name.
+ *
+ * `names` is who is in each chair, as `seatedNames` gives it.
+ */
+export function openSeatName(names: readonly (string | null)[], seat: Seat): string {
+  const key = (name: string) => name.trim().toLowerCase();
+  const held = new Set(names.flatMap((n) => (n === null ? [] : [key(n)])));
+  const free = (s: number) => !held.has(key(DEFAULT_NAMES[s]));
+  if (free(seat)) return DEFAULT_NAMES[seat];
+  // Empty chairs whose own default is free keep it. What is left over is the
+  // default of each chair somebody else is sitting in; hand those out in seat
+  // order, so every screen works out the same names.
+  const given = new Set<number>();
+  const spare = (s: number) => names[s] !== null && free(s) && !given.has(s);
+  for (const s of SEATS) {
+    if (names[s] !== null || free(s)) continue;
+    const holder = names.findIndex((n) => n !== null && key(n) === key(DEFAULT_NAMES[s]));
+    const pick = holder >= 0 && spare(holder) ? holder : SEATS.find(spare);
+    if (pick !== undefined) given.add(pick);
+    if (s === seat) return DEFAULT_NAMES[pick ?? seat];
+  }
+  return DEFAULT_NAMES[seat];
+}
+
+/**
+ * The name a person sits down or renames themselves under: what was typed,
+ * trimmed to fit a seat card, or the name the chair offers when it is empty.
+ */
+export function seatName(room: Room, seat: Seat, name: string | undefined): string {
+  const names = seatedNames(room.seats);
+  // Whoever is in the chair now is renaming themselves or being put out.
+  names[seat] = null;
+  return (name ?? "").trim().slice(0, 16) || openSeatName(names, seat);
 }
 
 /** How many taken-over tokens a room remembers; older ones just see the seat picker. */
@@ -752,7 +792,7 @@ export function sitDown(
     if (!input.replace) return "That seat is taken";
     room.displaced = [...room.displaced, { token: occupant.token, seat }].slice(-DISPLACED_KEPT);
   }
-  room.seats[seat] = { kind: "human", name: seatName(input.name, seat), token: input.token, lastSeen: now };
+  room.seats[seat] = { kind: "human", name: seatName(room, seat, input.name), token: input.token, lastSeen: now };
   room.stoodIn[seat] = 0;
   syncSeats(room, now);
   return null;
@@ -779,21 +819,17 @@ export function neighbourSeat(seat: Seat, step: 1 | -1): Seat {
 
 /**
  * Move a seated person one chair over before the deal. If the chair is taken
- * the two trade places. A name that was only ever the chair's default follows
- * the chair, so nobody ends up called after the seat they just left.
+ * the two trade places. Each person takes everything that is theirs with
+ * them — their name above all, even one that started as a chair's default —
+ * and an empty chair left behind offers a name nobody is using.
  */
 export function moveSeat(room: Room, seat: Seat, step: 1 | -1): string | null {
   if (room.started) return "Seats can only be swapped before the deal";
   const from = room.seats[seat];
   if (from.kind !== "human") return "Nobody is sitting there";
   const to = neighbourSeat(seat, step);
-  const other = room.seats[to];
-  const rename = (occupant: Occupant, was: Seat, now: Seat): Occupant =>
-    occupant.kind === "human" && occupant.name === DEFAULT_NAMES[was]
-      ? { ...occupant, name: DEFAULT_NAMES[now] }
-      : occupant;
-  room.seats[to] = rename(from, seat, to);
-  room.seats[seat] = rename(other, to, seat);
+  [room.seats[seat], room.seats[to]] = [room.seats[to], from];
+  [room.stoodIn[seat], room.stoodIn[to]] = [room.stoodIn[to], room.stoodIn[seat]];
   syncSeats(room);
   return null;
 }
@@ -1077,19 +1113,15 @@ export function openClaimWindow(room: Room, now = Date.now()): void {
  * because that is what it is — but it stays claimable, so a latecomer can sit
  * down and take it over.
  */
-function occupantSummary(
-  occupant: Occupant,
-  seat: Seat,
-  playing: boolean,
-  now: number,
-): PublicPlayer["occupant"] {
+function occupantSummary(room: Room, seat: Seat, playing: boolean, now: number): PublicPlayer["occupant"] {
+  const occupant = room.seats[seat];
   if (occupant.kind === "human") {
     return { kind: "human", name: occupant.name, away: isAway(occupant, now) };
   }
   // Handed to the computer by the table: the computer's whether or not a hand is dealt.
   if (occupant.kind === "ai" && occupant.name) return { kind: "ai", name: occupant.name, away: false };
   return playing
-    ? { kind: "ai", name: robotName(seat), away: false }
+    ? { kind: "ai", name: robotVersion(openSeatName(seatedNames(room.seats), seat)), away: false }
     : { kind: "open", name: null, away: false };
 }
 
@@ -1126,7 +1158,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       flowers: p.flowers,
       discards: p.discards,
       taken: p.taken ?? [],
-      occupant: occupantSummary(room.seats[p.seat], p.seat, playing, now),
+      occupant: occupantSummary(room, p.seat, playing, now),
     };
   });
 
@@ -1211,7 +1243,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
       actingHumanSeat(room, clock) === room.hurry.seat
         ? {
             seat: room.hurry.seat,
-            by: occupantSummary(room.seats[room.hurry.by], room.hurry.by, playing, now).name ?? SEAT_NAMES[room.hurry.by],
+            by: occupantSummary(room, room.hurry.by, playing, now).name ?? SEAT_NAMES[room.hurry.by],
             id: room.hurry.at,
           }
         : null,

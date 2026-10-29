@@ -165,6 +165,12 @@ held upright turns its controller on its side.
    and a code to bring someone else in. Opening the table's address without a
    code, people tap the seat they want; a name is already in the box, so
    sitting down is one tap.
+
+   Before the deal the ‹ › buttons beside a seated person move them one chair
+   round, trading places with whoever is there. People keep their names
+   wherever they sit, a chair's default name included: Louis moved from South
+   to West is still Louis. An empty chair offers a default (Calvin, Louis,
+   Hanna or Clem) that nobody is using, so no two chairs say the same name.
 4. **Nothing is dealt until the table deals**, so four people arriving one at a
    time all start the same hand. Only the tablet deals; phones on their own are
    told to open one. Waiting alone, you can play the computer in the meantime;

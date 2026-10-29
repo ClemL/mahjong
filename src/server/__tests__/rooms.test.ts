@@ -597,11 +597,15 @@ describe("table control", () => {
     expect(view.players[3].occupant.name).toBe("Srini");
   });
 
-  it("lets a chair's default name follow the chair", async () => {
+  it("keeps a person's name when they move, even one that was the chair's default", async () => {
     const id = await room();
     const me = (await claimSeat(id, { seat: 0 })).token;
-    const view = await control(id, me, { type: "moveSeat", seat: 0, step: 1 });
-    expect(view.players[1].occupant.name).toBe("Louis");
+    let view = await control(id, me, { type: "moveSeat", seat: 0, step: 1 });
+    expect(view.players[1].occupant.name).toBe("Calvin");
+    // The chair left empty does not offer Calvin a second time.
+    await claimSeat(id, { seat: 0 });
+    view = await readRoom(id, me);
+    expect(view.players.map((p) => p.occupant.name)).toEqual(["Louis", "Calvin", null, null]);
   });
 
   it("only moves a player's own seat, and only before the deal", async () => {

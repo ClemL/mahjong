@@ -56,6 +56,51 @@ test("players swap chairs in the lobby, and a taken chair's code takes it over",
   }
 });
 
+test("people keep their names as they move round the chairs, a chair's default name included", async ({
+  browser,
+  request,
+}) => {
+  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
+  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.2" } });
+  expect(reset.ok()).toBe(true);
+
+  const table = await open(browser, TABLET, false);
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  // Nobody types a name for South, so whoever scans it sits as South's own: Louis.
+  const louis = await open(browser, PHONE_PORTRAIT, true);
+  await louis.page.goto(`/room/${ROOM}?seat=1`);
+  await expect(table.page.getByText("1 of 4 seated")).toBeVisible();
+  const seats = table.page.getByRole("list", { name: "Seats" });
+  const chair = (n: number) => seats.getByRole("listitem").nth(n);
+
+  // Once round the table, a chair at a time: still Louis wherever he sits.
+  for (const [seat, wind] of [
+    [2, "West"],
+    [3, "North"],
+    [0, "East"],
+    [1, "South"],
+  ] as const) {
+    await table.page.getByRole("button", { name: `Move Louis to seat ${seat + 1}, ${wind}` }).click();
+    await expect(chair(seat)).toContainText("Louis");
+    await expect(louis.page.getByText(`You're in as ${wind}`)).toBeVisible();
+  }
+
+  // At West, the empty South chair offers West's own name rather than a second Louis.
+  await table.page.getByRole("button", { name: "Move Louis to seat 3, West" }).click();
+  await expect(chair(2)).toContainText("Louis");
+  await expect(chair(1)).toContainText("Hanna");
+  const newcomer = await open(browser, PHONE_PORTRAIT, true);
+  await newcomer.page.goto(`/room/${ROOM}?seat=1`);
+  await expect(table.page.getByText("2 of 4 seated")).toBeVisible();
+  await expect(chair(1)).toContainText("Hanna");
+  await expect(chair(2)).toContainText("Louis");
+
+  for (const side of [table, louis, newcomer]) {
+    expect(side.errors).toEqual([]);
+    await side.context.close();
+  }
+});
+
 test("the table can step back to the start page and pick its lobby up again", async ({
   browser,
   request,
