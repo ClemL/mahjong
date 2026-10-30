@@ -10,8 +10,11 @@ interface Props {
   view: RoomView;
   /** The chair a scanned code asked for, if it is still free to sit in, or the table a tablet came to open. */
   picked?: Seat | "table" | null;
-  /** `replace` takes over a table already open on another device. */
-  onClaim: (seat: Seat | "table", name: string, replace?: boolean) => Promise<void>;
+  /**
+   * `replace` takes over a table already open on another device. Resolves
+   * true once seated, false if refused — the reason then comes in `error`.
+   */
+  onClaim: (seat: Seat | "table", name: string, replace?: boolean) => Promise<boolean>;
   /** Empty the room, table included. */
   onReset: () => void;
   busy: boolean;
@@ -26,7 +29,14 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
   const openName = (seat: Seat) => openSeatName(seatedNames(view.players.map((p) => p.occupant)), seat);
   // Somebody may have sat down there between the code being shown and scanned.
   const arrived = picked !== null && picked !== "table" && !taken(picked) ? picked : null;
-  const [choice, setChoice] = useState<Seat | "table" | null>(picked === "table" ? "table" : arrived);
+  const [chosen, setChoice] = useState<Seat | "table" | null>(picked === "table" ? "table" : arrived);
+  // From the tap until the chair is ours, so the chair filling with this
+  // phone in it does not read as somebody else beating it there.
+  const [sitting, setSitting] = useState(false);
+  // Or while this phone was still typing a name: the chair is gone, and
+  // sitting down would only be refused.
+  const lost = !sitting && typeof chosen === "number" && taken(chosen) ? chosen : null;
+  const choice = lost === null ? chosen : null;
   const takingOver = choice === "table" && view.tablePresent;
 
   // Arriving from a chair's code, naming yourself is all that is left to do.
@@ -73,6 +83,11 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
             ? `You are taking over ${view.players[arrived].occupant.name} at seat ${arrived + 1}, ${SEAT_NAMES[arrived]}, hand and all.`
             : `Seat ${arrived + 1}, ${SEAT_NAMES[arrived]}, is yours.`}{" "}
           Type your name and sit down.
+        </p>
+      ) : null}
+      {lost !== null ? (
+        <p className="lobby__warn" role="status">
+          {view.players[lost].occupant.name} just sat down at {SEAT_NAMES[lost]}. Pick another seat.
         </p>
       ) : null}
       <p className="lobby__lead">
@@ -127,7 +142,11 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
         className="lobby__form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (choice !== null) void onClaim(choice, name, takingOver);
+          if (choice === null) return;
+          setSitting(true);
+          void onClaim(choice, name, takingOver).then((sat) => {
+            if (!sat) setSitting(false);
+          });
         }}
       >
         {takingOver ? (
@@ -148,7 +167,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
                 value={name}
                 ref={nameBox}
                 maxLength={16}
-                placeholder={openName(choice as Seat)}
+                placeholder={openName(choice)}
                 onChange={(e) => setName(e.target.value)}
               />
               <button
@@ -163,7 +182,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
             </span>
           </label>
         ) : null}
-        <button type="submit" className="btn btn--primary" disabled={choice === null || busy}>
+        <button type="submit" className="btn btn--primary" disabled={choice === null || busy || sitting}>
           {takingOver ? "Take over the table" : choice === "table" ? "Open the table" : "Sit down"}
         </button>
       </form>

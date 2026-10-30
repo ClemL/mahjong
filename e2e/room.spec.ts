@@ -115,6 +115,16 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
     .toContainEqual([35]);
   await expect(table.page.locator('.rack[data-seat="0"] .rack__clock')).toBeVisible();
 
+  // On your move a gold frame is drawn just inside the edge, and nothing is
+  // written under it: not the prompt, nor the play log down the left.
+  await expect(phone.page.locator(".phone--acting")).toHaveCount(1);
+  const clearance = await phone.page.evaluate(() => {
+    const frame = document.querySelector(".phone--acting")!;
+    const inside = frame.getBoundingClientRect().left + parseFloat(getComputedStyle(frame).outlineWidth);
+    return [".phone__status > *", ".playlog"].map((q) => document.querySelector(q)!.getBoundingClientRect().left - inside);
+  });
+  expect(Math.min(...clearance), `clearance from the frame: ${clearance}`).toBeGreaterThan(0);
+
   // First tap arms the tile, the second throws it.
   const tile = live.first();
   await tile.tap();

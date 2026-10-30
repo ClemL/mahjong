@@ -247,6 +247,11 @@ export interface Room {
    */
   look: (TableLook & { id: number }) | null;
   /**
+   * When this game was dealt, 0 before the first. Hand numbers start again at
+   * 1 every game, so this is what tells one game's hand 1 from the last one's.
+   */
+  gameId: number;
+  /**
    * A person's discard that can still be taken back: the table as it was
    * before the throw, kept here on the server and never sent to anyone.
    */
@@ -399,6 +404,8 @@ export interface RoomView {
   readyWaiting: Seat[];
   /** The look the table was dealt with, for phones to take on once per deal. */
   look: (TableLook & { id: number }) | null;
+  /** Which game this is, for what a phone keeps per hand: hand numbers repeat from game to game. */
+  gameId: number;
 }
 
 const HIDDEN: TileCode = "back";
@@ -436,6 +443,7 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     stoodIn: [0, 0, 0, 0],
     ready: [],
     look: null,
+    gameId: 0,
     takeBack: null,
     paused: null,
   };
@@ -454,6 +462,7 @@ export function normalizeRoom(room: Room): Room {
   room.stoodIn ??= [0, 0, 0, 0];
   room.ready ??= [];
   room.look ??= null;
+  room.gameId ??= 0;
   room.takeBack ??= null;
   room.paused ??= null;
   return room;
@@ -473,6 +482,7 @@ export function notePlayed(room: Room): void {
  */
 export function startPlay(room: Room, now = Date.now()): void {
   room.started = true;
+  room.gameId = now;
   room.warmup = seatedCount(room) < 2;
   room.claimResponses = {};
   room.claimDeadline = null;
@@ -1263,6 +1273,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     ready: room.started && state.phase === "handOver" ? room.ready : [],
     readyWaiting: readyWaiting(room, now),
     look: room.look,
+    gameId: room.gameId,
   };
 }
 

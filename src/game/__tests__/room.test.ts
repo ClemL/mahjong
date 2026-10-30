@@ -334,6 +334,22 @@ describe("lobby", () => {
     expect(mayRegroup(room, "tok-0")).toBe(false);
   });
 
+  it("tells every view which game it is, since the next game numbers its hands from 1 again", () => {
+    const room = newRoom("TEST", undefined, 5);
+    seat(room, 0, "tok-0");
+    expect(viewFor(room, "tok-0").gameId).toBe(0);
+    startPlay(room, 1_000);
+    const first = viewFor(room, "tok-0");
+    expect(first.gameId).toBe(1_000);
+    expect(viewFor(room, null).gameId).toBe(1_000);
+
+    returnToLobby(room, newRoom("TEST", undefined, 9).state);
+    startPlay(room, 5_000);
+    const next = viewFor(room, "tok-0");
+    expect(next.handNumber).toBe(first.handNumber);
+    expect(next.gameId).toBe(5_000);
+  });
+
   it("reports open seats as open until the deal, and computer-played after", () => {
     const room = newRoom("TEST", undefined, 5);
     seat(room, 0, "tok-0");

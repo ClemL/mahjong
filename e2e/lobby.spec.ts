@@ -5,8 +5,18 @@ import { PHONE_PORTRAIT, TABLET, presetPreferences, watchErrors } from "./helper
 const ROOM = "TABLE1";
 const SHOTS = process.env.LOBBY_SHOTS;
 
-async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean) {
-  const context = await browser.newContext({ viewport, hasTouch: touch, isMobile: touch });
+/**
+ * `address` is the one the server counts this device's requests under. Sitting
+ * down is rate-limited per address, and every other spec sits down from the
+ * default one.
+ */
+async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean, address?: string) {
+  const context = await browser.newContext({
+    viewport,
+    hasTouch: touch,
+    isMobile: touch,
+    extraHTTPHeaders: address ? { "x-forwarded-for": address } : undefined,
+  });
   const page = await context.newPage();
   await presetPreferences(page, {});
   return { context, page, errors: watchErrors(page) };
@@ -99,6 +109,53 @@ test("people keep their names as they move round the chairs, a chair's default n
     expect(side.errors).toEqual([]);
     await side.context.close();
   }
+});
+
+test("a phone beaten to a chair is told so, and sits in another", async ({ browser, request }) => {
+  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
+  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.3" } });
+  expect(reset.ok()).toBe(true);
+
+  const kris = await open(browser, PHONE_PORTRAIT, true, "10.0.5.3");
+  const srini = await open(browser, PHONE_PORTRAIT, true, "10.0.5.3");
+  for (const side of [kris, srini]) {
+    await side.page.goto(`/room/${ROOM}`);
+    await side.page.getByRole("button", { name: /^東\s?East/ }).click();
+  }
+  await kris.page.getByRole("textbox").fill("Kris");
+  await srini.page.getByRole("textbox").fill("Srini");
+
+  // Srini's phone hears nothing from the table for a moment, so it cannot
+  // know Kris got there first: the refusal is the first it hears of it.
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  await srini.page.route(
+    (url) => url.pathname === `/api/rooms/${ROOM}`,
+    async (route) => {
+      await held;
+      await route.continue();
+    },
+  );
+  await srini.page.waitForTimeout(1500);
+  await kris.page.getByRole("button", { name: "Sit down" }).click();
+  await expect(kris.page.getByText("You're in as East")).toBeVisible();
+
+  await srini.page.getByRole("button", { name: "Sit down" }).click();
+  await expect(srini.page.getByText("That seat is taken")).toBeVisible();
+
+  // Once it hears, it lets go of the chair and says who has it.
+  release();
+  await expect(srini.page.getByRole("status")).toHaveText("Kris just sat down at East. Pick another seat.");
+  await expect(srini.page.getByRole("button", { name: "Sit down" })).toBeDisabled();
+  await srini.page.getByRole("button", { name: /^南\s?South/ }).click();
+  await expect(srini.page.getByRole("textbox")).toHaveValue("Srini");
+  await srini.page.getByRole("button", { name: "Sit down" }).click();
+  await expect(srini.page.getByText("You're in as South")).toBeVisible();
+
+  expect(kris.errors).toEqual([]);
+  // The refused claim is logged by the browser itself; nothing else may be.
+  expect(srini.errors.filter((e) => !/status of 409/.test(e))).toEqual([]);
+  for (const side of [kris, srini]) await side.context.close();
 });
 
 test("the table can step back to the start page and pick its lobby up again", async ({
