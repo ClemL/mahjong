@@ -175,11 +175,15 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
           onReset={() => void api.resetTable()}
           error={joinError ?? api.error}
           onClaim={async (seat, name, replace) => {
+            setJoinError(null);
             try {
               await claim(seat, name, replace);
+              return true;
             } catch (error) {
-              // Surfaced by the picker through the hook's error channel.
-              console.error(error);
+              // A chair taken a moment before the tap is refused here, before
+              // any poll has said so; without this the button just does nothing.
+              setJoinError((error as Error).message);
+              return false;
             }
           }}
         />

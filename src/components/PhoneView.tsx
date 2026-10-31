@@ -166,7 +166,7 @@ export function PhoneView({
   // Nor is anybody hurried in the first moments of their turn.
   const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null, !view.paused);
   const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null);
-  const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.handNumber}`);
+  const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.gameId}:${view.handNumber}`);
   const compact = layout.compact;
   // A tile is armed by the first tap or click and thrown by the second, so a
   // double-click or double-tap discards and a single stray touch never does.

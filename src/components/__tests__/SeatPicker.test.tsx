@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { moveSeat, openTable, replaceWithComputer, robotName, viewFor } from "@/game/room";
 import { SeatPicker } from "../SeatPicker";
@@ -10,7 +10,7 @@ const spectating = (seats = [0, 2] as const) => viewFor(dealt([...seats]), null)
 
 describe("SeatPicker", () => {
   it("opens on the computer chair a code was scanned for, ready for a name", () => {
-    const onClaim = vi.fn(async () => {});
+    const onClaim = vi.fn(async () => true);
     render(<SeatPicker view={spectating()} picked={1} onClaim={onClaim} onReset={() => {}} busy={false} error={null} />);
 
     expect(screen.getByRole("status").textContent).toContain(
@@ -43,9 +43,53 @@ describe("SeatPicker", () => {
     expect(screen.getByText(NAMES[2])).toBeTruthy();
   });
 
+  it("lets go of a chair somebody else sits in first, and says who", () => {
+    const room = lobby([]);
+    const onClaim = vi.fn(async () => true);
+    const props = { onClaim, onReset: () => {}, busy: false, error: null };
+    const { rerender } = render(<SeatPicker view={viewFor(room, null)} {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /^東East/ }));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Srini" } });
+
+    sit(room, 0, "Kris");
+    rerender(<SeatPicker view={viewFor(room, null)} {...props} />);
+    expect(screen.getByRole("status").textContent).toBe("Kris just sat down at East. Pick another seat.");
+    expect(screen.getByRole("button", { name: "Sit down" })).toHaveProperty("disabled", true);
+    expect(screen.queryByRole("textbox")).toBeNull();
+
+    // Another chair, and the name typed for the first one is still there.
+    fireEvent.click(screen.getByRole("button", { name: /^南South/ }));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("Srini");
+    fireEvent.click(screen.getByRole("button", { name: "Sit down" }));
+    expect(onClaim).toHaveBeenCalledWith(1, "Srini", false);
+  });
+
+  it("does not mistake its own chair filling for somebody else's, and opens again if refused", async () => {
+    const room = lobby([]);
+    let refuse: (sat: boolean) => void = () => {};
+    const onClaim = vi.fn(() => new Promise<boolean>((resolve) => (refuse = resolve)));
+    const props = { onClaim, onReset: () => {}, busy: false, error: null };
+    const { rerender } = render(<SeatPicker view={viewFor(room, null)} {...props} />);
+    fireEvent.click(screen.getByRole("button", { name: /^東East/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Sit down" }));
+    expect(screen.getByRole("button", { name: "Sit down" })).toHaveProperty("disabled", true);
+
+    // A poll lands with the chair filled before the claim has answered.
+    sit(room, 0, "Calvin");
+    rerender(<SeatPicker view={viewFor(room, null)} {...props} />);
+    expect(screen.queryByRole("status")).toBeNull();
+
+    // Refused after all: the chair is somebody else's.
+    await act(async () => refuse(false));
+    rerender(<SeatPicker view={viewFor(room, null)} {...props} error="That seat is taken" />);
+    expect(screen.getByRole("status").textContent).toBe("Calvin just sat down at East. Pick another seat.");
+    expect(screen.getByText("That seat is taken")).toBeTruthy();
+  });
+
   it("offers to take over a table open on another device, game and all", () => {
     const room = dealt([0, 2]);
-    const onClaim = vi.fn(async () => {});
+    const onClaim = vi.fn(async () => true);
     render(
       <SeatPicker view={viewFor(room, null)} picked="table" onClaim={onClaim} onReset={() => {}} busy={false} error={null} />,
     );

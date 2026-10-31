@@ -7,6 +7,7 @@ export type SortMode = "suits" | "honors" | "manual";
 
 const MODE_KEY = "hk-mahjong.sort";
 const ORDER_KEY = "hk-mahjong.order";
+const NO_ORDER: string[] = [];
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -52,16 +53,31 @@ export interface HandOrder {
  * Manual order is kept per hand: tiles the player has placed keep their
  * places, tiles that arrive later join at the right, and the order survives a
  * reload. Read during the first render — the hand only renders in the browser.
+ *
+ * `handKey` names the hand, and it must name the game too. Tile ids belong to
+ * the physical tile, so an order carried into another hand would still find
+ * some of its tiles there and put them first, out of any sort.
  */
 export function useHandOrder(hand: Tile[], drawnId: string | null, handKey: string): HandOrder {
   const [mode, setModeState] = useState<SortMode>(() =>
     typeof window === "undefined" ? "suits" : read<SortMode>(MODE_KEY, "suits"),
   );
-  const [manual, setManual] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
+  // Held with the hand it was made in, so a new deal starts from nothing
+  // without waiting a render for an effect to clear it.
+  const [kept, setKept] = useState<{ key: string; ids: string[] }>(() => {
+    const none = { key: handKey, ids: NO_ORDER };
+    if (typeof window === "undefined") return none;
     const stored = read<{ key: string; ids: string[] } | null>(ORDER_KEY, null);
-    return stored?.key === handKey ? stored.ids : [];
+    return stored?.key === handKey ? stored : none;
   });
+  const manual = kept.key === handKey ? kept.ids : NO_ORDER;
+  const setManual = useCallback(
+    (ids: string[]) => {
+      setKept({ key: handKey, ids });
+      write(ORDER_KEY, { key: handKey, ids });
+    },
+    [handKey],
+  );
 
   const setMode = useCallback((next: SortMode) => {
     setModeState(next);
@@ -75,11 +91,11 @@ export function useHandOrder(hand: Tile[], drawnId: string | null, handKey: stri
       return { tiles: mode === "honors" ? honorsFirst(rest) : sortTiles(rest), drawn: drawnTile };
     }
     const byId = new Map(hand.map((t) => [t.id, t]));
-    const kept = manual.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
-    const keptIds = new Set(kept.map((t) => t.id));
-    const placed = drawnTile !== undefined && keptIds.has(drawnTile.id);
-    const fresh = sortTiles(hand.filter((t) => !keptIds.has(t.id) && t.id !== drawnId));
-    return { tiles: [...kept, ...fresh], drawn: placed ? undefined : drawnTile };
+    const ordered = manual.filter((id) => byId.has(id)).map((id) => byId.get(id)!);
+    const orderedIds = new Set(ordered.map((t) => t.id));
+    const placed = drawnTile !== undefined && orderedIds.has(drawnTile.id);
+    const fresh = sortTiles(hand.filter((t) => !orderedIds.has(t.id) && t.id !== drawnId));
+    return { tiles: [...ordered, ...fresh], drawn: placed ? undefined : drawnTile };
   }, [hand, drawnId, mode, manual]);
 
   // Fold newly arrived tiles into the manual order once they are part of the
@@ -89,8 +105,7 @@ export function useHandOrder(hand: Tile[], drawnId: string | null, handKey: stri
     const ids = tiles.map((t) => t.id);
     if (ids.join() === manual.join()) return;
     setManual(ids);
-    write(ORDER_KEY, { key: handKey, ids });
-  }, [mode, tiles, manual, handKey]);
+  }, [mode, tiles, manual, setManual]);
 
   const arrange = useCallback(
     (ids: string[]) => {
@@ -98,10 +113,9 @@ export function useHandOrder(hand: Tile[], drawnId: string | null, handKey: stri
       // spot apart, marked as the new arrival.
       const placed = drawnId !== null && ids[ids.length - 1] === drawnId ? ids.slice(0, -1) : ids;
       setManual(placed);
-      write(ORDER_KEY, { key: handKey, ids: placed });
       setMode("manual");
     },
-    [drawnId, handKey, setMode],
+    [drawnId, setManual, setMode],
   );
 
   return { mode, setMode, tiles, drawn, arrange };
