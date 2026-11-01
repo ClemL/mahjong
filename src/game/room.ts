@@ -31,6 +31,8 @@ import type { Meld } from "./melds";
 import type { RuleConfig } from "./rules";
 import { createRng } from "./rng";
 import { HEARTBEAT_WRITE_MS, SEAT_IDLE_MS } from "./presence";
+import { type GameStats, type PublicStats, addTurn, countPlays, emptyStats, noteHurry, publicStats, uncountTurn } from "./gameStats";
+import { type Earned, newlyEarned } from "./achievements";
 
 /** How long a seat has to answer a claim before it is treated as a pass. */
 export const CLAIM_WINDOW_MS = 20_000;
@@ -132,6 +134,8 @@ export interface RoomSettings {
   difficulty: Difficulty;
   /** Whether a person may take back a discard in the moment after throwing it. */
   takeBack: boolean;
+  /** Whether the people at the table earn achievements, and see them pop up as they do. */
+  achievements: boolean;
 }
 
 export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
@@ -140,6 +144,7 @@ export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
   rotation: 0,
   difficulty: "normal",
   takeBack: true,
+  achievements: true,
 };
 
 export function turnMs(speed: SpeedLevel): number {
@@ -251,6 +256,10 @@ export interface Room {
    * 1 every game, so this is what tells one game's hand 1 from the last one's.
    */
   gameId: number;
+  /** This game's turn times, hurry-ups and claimed sets. */
+  stats: GameStats;
+  /** The achievements people have earned this game, oldest first. */
+  achievements: Earned[];
   /**
    * A person's discard that can still be taken back: the table as it was
    * before the throw, kept here on the server and never sent to anyone.
@@ -408,6 +417,10 @@ export interface RoomView {
   gameId: number;
   /** Whether the seat picker may empty the table: not while a game is being played round a table that is still there. */
   canReset: boolean;
+  /** This game's turn times, hurry-ups and claimed sets, for the final scores. */
+  stats: PublicStats;
+  /** Achievements earned this game, oldest first; each device pops up the new ones. */
+  achievements: Earned[];
 }
 
 const HIDDEN: TileCode = "back";
@@ -446,6 +459,8 @@ export function newRoom(id: string, config?: RuleConfig, seed = Date.now()): Roo
     ready: [],
     look: null,
     gameId: 0,
+    stats: emptyStats(),
+    achievements: [],
     takeBack: null,
     paused: null,
   };
@@ -465,6 +480,8 @@ export function normalizeRoom(room: Room): Room {
   room.ready ??= [];
   room.look ??= null;
   room.gameId ??= 0;
+  room.stats ??= emptyStats();
+  room.achievements ??= [];
   room.takeBack ??= null;
   room.paused ??= null;
   return room;
@@ -485,6 +502,8 @@ export function notePlayed(room: Room): void {
 export function startPlay(room: Room, now = Date.now()): void {
   room.started = true;
   room.gameId = now;
+  room.stats = emptyStats();
+  room.achievements = [];
   room.warmup = seatedCount(room) < 2;
   room.claimResponses = {};
   room.claimDeadline = null;
@@ -701,7 +720,20 @@ export function hurryUp(room: Room, by: Seat, now = Date.now()): string | null {
   if (hurryGraceLeft(room, now) > 0) return "Their turn has only just started";
   if (room.hurry && now - room.hurry.at < HURRY_COOLDOWN_MS) return "They have just been hurried";
   room.hurry = { seat, by, at: now };
+  noteHurry(room.stats, by, seat);
   return null;
+}
+
+/**
+ * Time a person's move: from when the table started waiting on them — or the
+ * deal, or a claimed tile crossing the table, finished — to now. A pause is
+ * already left out, since resuming moves the stamp on by it. Called before the
+ * move, while the turn is still the one the stamp was taken for.
+ */
+export function noteTurnTime(room: Room, seat: Seat, endsTurn: boolean, now = Date.now()): void {
+  const key = actingKey(room.state, seat);
+  const since = room.acting?.key === key ? room.acting.since : now;
+  addTurn(room.stats, seat, now - Math.max(since, room.lastStepAt), endsTurn);
 }
 
 /**
@@ -1002,6 +1034,27 @@ function autoDiscardChoice(state: GameState, seat: Seat, rng: ReturnType<typeof 
  * for a later call — every poll is one.
  */
 export function drain(room: Room, now = Date.now()): boolean {
+  const advanced = advance(room, now);
+  return noteGame(room) || advanced;
+}
+
+/**
+ * Bring the game's counts up to date with what has been played, and award
+ * whatever has been earned by it. True when somebody earned something.
+ */
+export function noteGame(room: Room): boolean {
+  if (!room.started) return false;
+  countPlays(room.stats, room.state.log);
+  if (room.settings.achievements === false) return false;
+  const people = room.seats.map((o) => (o.kind === "human" ? o.name : null));
+  const fresh = newlyEarned(room.state, room.stats, room.achievements, people);
+  if (fresh.length === 0) return false;
+  room.achievements = [...room.achievements, ...fresh];
+  return true;
+}
+
+/** Play the table forward to `now`: computer turns, lapsed claims, turns run out. True when anything moved. */
+function advance(room: Room, now: number): boolean {
   syncSeats(room, now);
   // Nothing is dealt until somebody deals, so there is nothing to advance.
   // This is what lets four people arrive one at a time and still start the
@@ -1320,6 +1373,8 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     look: room.look,
     gameId: room.gameId,
     canReset: resetRefusal(room, now) === null,
+    stats: publicStats(room.stats),
+    achievements: room.achievements,
   };
 }
 
@@ -1413,6 +1468,8 @@ export function takeBackDiscard(room: Room, seat: Seat, now = Date.now()): strin
   const refused = takeBackRefusal(room, seat, now);
   if (refused) return refused;
   const hold = room.takeBack!;
+  // The turn is not over after all: it is counted again when the tile goes out.
+  uncountTurn(room.stats, seat);
   room.state = hold.before;
   room.lastStepAt = hold.lastStepAt;
   room.lastPlayed = hold.lastPlayed;

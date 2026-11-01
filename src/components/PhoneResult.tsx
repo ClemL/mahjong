@@ -8,6 +8,7 @@ import { chipsOf } from "./TableEffects";
 import { WinningHand, isLastHand, joinNames, signed, winnersOf, winningTile, youFirst } from "./TableResult";
 import { endedEarly } from "./scoreCard";
 import { ShareScores } from "./ShareScores";
+import { YourGame } from "./GameStats";
 
 const SEATS: Seat[] = [0, 1, 2, 3];
 
@@ -93,6 +94,7 @@ export function PhoneResult({
             {top.length === 1 ? `${nameOf(top[0])} takes the table.` : "A shared win at the top."} The table
             can start a new game with everyone seated.
           </span>
+          <YourGame view={view} seat={seat} />
         </div>
         <div className="phone-result__table">
           <div className="phone-result__head">

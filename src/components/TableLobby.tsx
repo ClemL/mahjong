@@ -503,7 +503,9 @@ function RulesRow({ api, view }: { api: RoomApi; view: RoomView }) {
     <section className="gather__rules" aria-label="House rules">
       <div className="gather__rules-line">
         <span className="gather__rules-label">House rules</span>
-        <span className="gather__rules-text">{rulesInForce(config).join(" · ")}</span>
+        <span className="gather__rules-text">
+          {[...rulesInForce(config), view.settings.achievements !== false ? "Achievements on" : "Achievements off"].join(" · ")}
+        </span>
         <button
           type="button"
           className="btn btn--ghost btn--sm"
@@ -591,6 +593,18 @@ function RulesRow({ api, view }: { api: RoomApi; view: RoomView }) {
             >
               <option value="off">First only 截糊</option>
               <option value="on">Both paid 雙響</option>
+            </select>
+          </label>
+          <label className="field">
+            <span className="field__label">Achievements</span>
+            <select
+              className="field__select"
+              value={view.settings.achievements !== false ? "on" : "off"}
+              disabled={api.busy}
+              onChange={(e) => void api.control({ type: "achievements", value: e.target.value === "on" })}
+            >
+              <option value="on">On</option>
+              <option value="off">Off</option>
             </select>
           </label>
         </div>

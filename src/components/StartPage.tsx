@@ -9,7 +9,7 @@ import type { TileCode } from "@/game/tiles";
 import { TABLES, type TableInfo, findTable } from "@/game/tables";
 import { GAME_LENGTHS } from "./gameLength";
 import { MIN_FAAN } from "./TableSettings";
-import { Segmented } from "./SettingControls";
+import { type SegmentOption, Segmented } from "./SettingControls";
 import { Choice } from "./Choice";
 import { TileReference } from "./TileReference";
 import { TileBack, TileFace } from "./TileView";
@@ -370,6 +370,11 @@ function Preview({ api }: { api: AppearanceApi }) {
   );
 }
 
+const ACHIEVEMENT_CHOICES: SegmentOption<"on" | "off">[] = [
+  { value: "on", label: "On", hint: "Small pop-ups as people earn them, and every one listed on the final scores" },
+  { value: "off", label: "Off", hint: "No pop-ups; the final scores still show turn times, hurry-ups and sets" },
+];
+
 function RulesTab({ api }: { api: GameSettings }) {
   return (
     <div className="bench__rules">
@@ -384,6 +389,12 @@ function RulesTab({ api }: { api: GameSettings }) {
         options={GAME_LENGTHS}
         value={`${api.rounds}` as `${number}`}
         onChange={(value) => api.setRounds(Number(value))}
+      />
+      <Segmented
+        label="Achievements"
+        options={ACHIEVEMENT_CHOICES}
+        value={api.achievements ? "on" : "off"}
+        onChange={(value) => api.setAchievements(value === "on")}
       />
       <p className="bench__note">
         A table starts with these when this device opens it as the table. Once a table is up, its house rules are

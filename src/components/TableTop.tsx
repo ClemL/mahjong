@@ -44,6 +44,7 @@ import { flowersInPlay } from "@/game/rules";
 import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
 import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
 import { TableSide } from "./TableSide";
+import { AchievementToasts } from "./AchievementToasts";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import { useCallouts } from "@/hooks/useCallouts";
 import {
@@ -165,7 +166,7 @@ function Rack({
   const deciding = view.awaitingClaimSeats.includes(seat);
   const score = view.scores[seat];
   // Only the seat to play has a clock running, and only when the table set one.
-  const left = useCountdown(active ? view.turnDeadlineIn : null, !view.paused);
+  const left = useCountdown(active ? view.turnDeadlineIn : null, !view.paused, view.version);
   const status = deciding
     ? "deciding…"
     : active
@@ -1035,6 +1036,9 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
           fullscreen={fullscreen}
         />
       ) : null}
+
+      {/* Everyone's, named: the table is what the whole group is looking at. */}
+      <AchievementToasts view={view} />
     </div>
   );
 }

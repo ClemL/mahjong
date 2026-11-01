@@ -486,6 +486,23 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
   deal after winning (連莊); a loss or a washout passes it on.
 - **Difficulty** — Easy, Normal or Hard — is how well the computer plays the
   seats nobody has taken; the table sets it with the pace.
+- **Achievements** are on unless the table turns them off: on the start page's
+  House rules tab (for a table this device opens), in the lobby's house rules,
+  or under Pace & turns in the table's settings. A small pop-up comes up on the
+  phone of whoever earns one, and on the table with their name: 🎯 Off the
+  Mark (win a hand), ✋ Self-Made 自摸 (win off your own draw), 🐟 Big Fish (a
+  win of 5 faan or more), 🎩 Hat Trick (three wins in a game), 🥋 Pung Fu
+  (three pungs), 🍜 Chow Hound (four chows), 🔔 Kong Gong (a kong), 🌸 Flower
+  Garden (four flowers held at once), ⚡ Quick Draw (ten throws within three
+  seconds), 🐢 Take Your Time (hurried three times), 📣 Backseat Driver
+  (hurrying others three times) and 🏆 Top of the Table (most chips at the
+  end). Each is earned once a game, and only by people, not the computer.
+- **The final scores** have a **Players** view: how long each person spent on
+  their turns (in all, and on average), the hurry-ups they sent and got, the
+  pungs and chows everyone claimed with who claimed the most, and every
+  achievement earned. Each phone's own final result says the same for its
+  player in a line. The computer's turns are not timed, and a pause is left out
+  of anybody's.
 - **Sound** is each device's own. The tablet also calls claims and wins aloud —
   碰, 上, 槓, 食糊, 自摸 — in Cantonese where the device has a voice for it and in
   English where not; **Spoken calls**, under **This tablet**, turns that off, and

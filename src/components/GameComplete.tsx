@@ -9,6 +9,7 @@ import { ChipsChart, ChipsTable, LineKey } from "./ChipsChart";
 import { signed } from "./TableResult";
 import { scoreCard } from "./scoreCard";
 import { ShareScores } from "./ShareScores";
+import { PlayerStats } from "./GameStats";
 
 function Stat({ label, value, note }: { label: string; value: string; note: string }) {
   return (
@@ -38,7 +39,7 @@ export function GameComplete({
   onNewGame: () => void;
   busy: boolean;
 }) {
-  const [mode, setMode] = useState<"chart" | "table">("chart");
+  const [mode, setMode] = useState<"chart" | "table" | "players">("chart");
   const summary = summarizeGame(view.history);
   const { standings, place, chips, wins } = summary;
   const final = (seat: Seat) => chips[seat][chips[seat].length - 1];
@@ -110,35 +111,37 @@ export function GameComplete({
           <section className="result-sheet__panel game-over__chart" aria-labelledby="game-chart">
             <div className="result-sheet__panel-head">
               <h3 id="game-chart" className="result-sheet__heading">
-                Chips after each hand
+                {mode === "players" ? "How everyone played" : "Chips after each hand"}
               </h3>
-              {summary.hands === 0 ? null : (
-                <div
-                  className="seg seg--inline"
-                  role="group"
-                  aria-label="View"
-                  style={{ "--seg-count": 2 } as CSSProperties}
-                >
-                  {(
-                    [
-                      ["chart", "Chart"],
-                      ["table", "Hand by hand"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      className={`seg__btn${mode === value ? " seg__btn--on" : ""}`}
-                      aria-pressed={mode === value}
-                      onClick={() => setMode(value)}
-                    >
-                      <span className="seg__label">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div
+                className="seg seg--inline"
+                role="group"
+                aria-label="View"
+                style={{ "--seg-count": 3 } as CSSProperties}
+              >
+                {(
+                  [
+                    ["chart", "Chart"],
+                    ["table", "Hand by hand"],
+                    ["players", "Players"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`seg__btn${mode === value ? " seg__btn--on" : ""}`}
+                    aria-pressed={mode === value}
+                    onClick={() => setMode(value)}
+                  >
+                    <span className="seg__label">{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-            {summary.hands === 0 ? (
+            {/* Turn times and hurry-ups are kept whether or not a hand was finished. */}
+            {mode === "players" ? (
+              <PlayerStats view={view} name={name} />
+            ) : summary.hands === 0 ? (
               <p className="game-over__empty">
                 The game ended before a hand was finished, so everyone keeps the chips they sat down with.
               </p>

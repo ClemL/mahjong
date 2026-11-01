@@ -1,0 +1,194 @@
+/* ============================================ achievements and game stats == */
+
+/* Achievement pop-ups, top centre, over everything and in the way of nothing:
+   a tap goes straight through to whatever is underneath. */
+.toasts {
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  translate: -50% 0;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 8px 10px;
+  border-radius: 12px;
+  background: var(--tooltip-bg);
+  border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  /* In, and out again just before it is taken away. */
+  animation:
+    toast-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+    toast-out 300ms ease-in 4200ms forwards;
+}
+
+.toast__icon {
+  flex: none;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.toast__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.toast__kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.toast__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.toast__detail {
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    translate: 0 -12px;
+    scale: 0.96;
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    translate: 0 -8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}
+
+/* The final scores' Players view. */
+.game-stats {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.game-stats__leaders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.game-stats__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-stats__table th,
+.game-stats__table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.game-stats__table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+
+.game-stats__table .game-stats__num {
+  text-align: right;
+}
+
+.game-stats__sub {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-dim);
+}
+
+.game-stats__heading {
+  margin: 4px 0 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.game-stats__none {
+  margin: 0;
+  color: var(--ink-dim);
+}
+
+.achievements {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.achievements__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+}
+
+.achievements__who {
+  min-width: 6em;
+  font-weight: 700;
+}
+
+.achievements__list,
+.your-game__achievements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.achievement-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--gold) 45%, transparent);
+  background: var(--accent-wash);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* The phone's own line under its place at the end of the game. */
+.your-game {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+}

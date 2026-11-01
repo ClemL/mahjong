@@ -47,6 +47,7 @@ import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 import { intoFrame, screenAngle } from "./screenFrame";
 import { MiniPonds } from "./MiniPonds";
+import { AchievementToasts } from "./AchievementToasts";
 import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
@@ -182,10 +183,10 @@ export function PhoneView({
   const [helperOpen, setHelperOpen] = useState(false);
   // The table resting after anyone's hurry-up: every button waits it out,
   // rather than inviting presses the server will refuse.
-  const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null, !view.paused);
+  const hurryLeft = useCountdown(view.hurryCooldown?.left ?? null, !view.paused, view.version);
   // Nor is anybody hurried in the first moments of their turn.
-  const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null, !view.paused);
-  const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null);
+  const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null, !view.paused, view.version);
+  const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null, true, view.version);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.gameId}:${view.handNumber}`);
   const compact = layout.compact;
   // A tile is armed by the first tap or click and thrown by the second, so a
@@ -301,7 +302,7 @@ export function PhoneView({
   // Paused, the turn is still yours and its clock still shows, stopped, but
   // nothing can be played until the table picks the hand up.
   const yourTurn = toPlay && !view.paused;
-  const turnLeft = useCountdown(toPlay ? view.turnDeadlineIn : null, !view.paused);
+  const turnLeft = useCountdown(toPlay ? view.turnDeadlineIn : null, !view.paused, view.version);
 
   // ---- dragging tiles into your own order, or flicking one away ---------
   const handRef = useRef<HTMLDivElement>(null);
@@ -1030,6 +1031,7 @@ export function PhoneView({
                 options={view.claim.options}
                 discard={view.lastDiscard.tile.code}
                 deadlineIn={view.claim.deadlineIn}
+                fresh={view.version}
                 allowance={view.claim.allowance}
                 onMoreTime={view.claim.canExtend ? () => void api.act({ type: "moreTime" }) : undefined}
                 busy={api.busy || view.paused}
@@ -1179,6 +1181,7 @@ export function PhoneView({
           style={{ left: "50%", top: "45%" }}
         />
       ) : null}
+      <AchievementToasts view={view} mine={seat} />
       {forming && !forming.landed ? (
         <FormingMeld key={forming.key} meld={forming.meld} onDone={forming.land} />
       ) : null}

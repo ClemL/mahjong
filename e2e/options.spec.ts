@@ -6,6 +6,7 @@ import {
   expectNoSidewaysScroll,
   presetPreferences,
   resetTable,
+  settleHand,
   watchErrors,
 } from "./helpers";
 
@@ -204,15 +205,7 @@ test("a foldable keeps everyone's discards beside the hand, and a phone swipes r
   const live = kris.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");
   const tile = live.first();
   await expect(tile).toBeVisible();
-  // Tapped once the hand has finished turning up, not while it tips over.
-  await kris.page.evaluate(() =>
-    Promise.all(
-      document
-        .querySelector(".phone__hand")!
-        .getAnimations({ subtree: true })
-        .map((a) => a.finished.catch(() => undefined)),
-    ),
-  );
+  await settleHand(kris.page);
   await tile.tap();
   await expect(kris.page.getByRole("status").filter({ hasText: /^Discard / })).toBeVisible();
   await tile.tap();

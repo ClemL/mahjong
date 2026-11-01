@@ -64,3 +64,17 @@ export async function resetTable(request: APIRequestContext, room: string): Prom
   });
   expect(response.ok(), await response.text()).toBe(true);
 }
+
+/**
+ * Wait for a phone's hand to finish turning up and dealing in. A tap while the
+ * row is still tipping over lands where the tile is about to be, not on it.
+ */
+export async function settleHand(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      (document.querySelector(".phone__hand")?.getAnimations({ subtree: true }) ?? []).map((a) =>
+        a.finished.catch(() => undefined),
+      ),
+    ),
+  );
+}

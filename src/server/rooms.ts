@@ -31,6 +31,7 @@ import {
   resumeTable,
   resetRoom,
   resetRefusal,
+  noteTurnTime,
   returnToLobby,
   beginHand,
   startPlay,
@@ -291,6 +292,8 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
     if (r.state.turn !== seat || r.state.phase !== "action") {
       throw new RoomError("It is not your turn", 409);
     }
+    // Timed while the turn is still the one the table has been waiting on.
+    noteTurnTime(r, seat, action.type !== "kong", now);
     switch (action.type) {
       case "discard": {
         const before = r.state;
@@ -352,6 +355,7 @@ export type TableCommand =
   | { type: "othersPayHalf"; value: boolean }
   | { type: "multipleWinners"; value: boolean }
   | { type: "takeBack"; value: boolean }
+  | { type: "achievements"; value: boolean }
   | { type: "speed"; value: number }
   | { type: "difficulty"; value: string }
   | { type: "turnLimit"; value: number }
@@ -484,6 +488,9 @@ export async function control(
       case "takeBack":
         r.settings.takeBack = command.value === true;
         if (!r.settings.takeBack) r.takeBack = null;
+        break;
+      case "achievements":
+        r.settings.achievements = command.value === true;
         break;
       case "turnLimit":
         if (!(TURN_LIMITS as readonly number[]).includes(command.value)) {

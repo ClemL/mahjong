@@ -794,6 +794,20 @@ describe("getting up", () => {
   });
 });
 
+describe("the game's stats", () => {
+  it("times a person's turn when they discard, and the table can switch achievements off", async () => {
+    const { id, tokens, table } = await dealtRoom([0]);
+    await control(id, table, { type: "skipOpening" });
+    const view = await readRoom(id, tokens[0]);
+    expect(view.settings.achievements).toBe(true);
+    const tile = view.players[0].hand.find((t) => !t.code.startsWith("f"))!;
+    const after = await act(id, tokens[0], { type: "discard", tileId: tile.id });
+    expect(after.stats.turns).toEqual([1, 0, 0, 0]);
+    expect(after.stats.turnMs[0]).toBeGreaterThanOrEqual(0);
+    expect((await control(id, table, { type: "achievements", value: false })).settings.achievements).toBe(false);
+  });
+});
+
 describe("resetting from the seat picker", () => {
   it("empties every chair and frees a table not seen lately, so a new device can take it", async () => {
     const { id, tokens, table } = await dealtRoom([0, 2]);
