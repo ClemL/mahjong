@@ -1,5 +1,5 @@
-import { type APIRequestContext, type Browser, expect, test } from "@playwright/test";
-import { PHONE_LANDSCAPE, PHONE_PORTRAIT, TABLET, presetPreferences, watchErrors } from "./helpers";
+import { type Browser, expect, test } from "@playwright/test";
+import { PHONE_LANDSCAPE, PHONE_PORTRAIT, TABLET, deviceAddress, presetPreferences, resetTable, watchErrors } from "./helpers";
 
 /** Shared with the hurry spec; specs run one at a time and each resets it first. */
 const ROOM = "TABLE3";
@@ -7,23 +7,13 @@ const ROOM = "TABLE3";
 /** A OnePlus Open opened out, in Chrome: close to square. */
 const FOLDABLE = { width: 930, height: 780 };
 
-/**
- * Seats and resets are rate-limited per address, and every other spec spends
- * the same local allowance. Each device here gets an address of its own, as
- * it would at a real table.
- */
-let address = 0;
-const nextAddress = () => `10.0.3.${++address}`;
-const reset = (request: APIRequestContext) =>
-  request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": nextAddress() } });
-
 async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean) {
   const context = await browser.newContext({
     viewport,
     hasTouch: touch,
     isMobile: touch,
     reducedMotion: "reduce",
-    extraHTTPHeaders: { "x-forwarded-for": nextAddress() },
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
   });
   const page = await context.newPage();
   await presetPreferences(page, {});
@@ -34,7 +24,7 @@ test("a widescreen tablet squares the felt, and a latecomer names themselves int
   browser,
   request,
 }) => {
-  expect((await reset(request)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const table = await open(browser, TABLET, false);
   await table.page.goto(`/room/${ROOM}?seat=table`);
@@ -102,7 +92,7 @@ test("a widescreen tablet squares the felt, and a latecomer names themselves int
 });
 
 test("held upright, the table and a phone's seat picker are turned on their side", async ({ browser, request }) => {
-  expect((await reset(request)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   // A tablet stood upright is still laid out landscape, and wide enough to split.
   const table = await open(browser, { width: TABLET.height, height: TABLET.width }, true);

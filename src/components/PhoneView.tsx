@@ -2,8 +2,10 @@
 
 import {
   type CSSProperties,
+  type KeyboardEvent,
   type PointerEvent,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -456,6 +458,30 @@ export function PhoneView({
     void api.act({ type: "discard", tileId });
   };
 
+  // Alt and an arrow move the focused tile one place along the hand: the way
+  // to arrange it without a finger or a mouse. The tile is focused again once
+  // it has moved, since moving a focused element drops its focus.
+  const keysHint = useId();
+  const [refocus, setRefocus] = useState<string | null>(null);
+  useLayoutEffect(() => {
+    if (refocus === null) return;
+    handRef.current?.querySelector<HTMLElement>(`[data-tile-id="${refocus}"]`)?.focus();
+    setRefocus(null);
+  }, [refocus]);
+  const onHandKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!e.altKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    const id = (e.target as Element).closest<HTMLElement>("[data-tile-id]")?.dataset.tileId;
+    if (!id) return;
+    e.preventDefault();
+    const ids = displayIds();
+    const from = ids.indexOf(id);
+    const to = from + (e.key === "ArrowLeft" ? -1 : 1);
+    if (from < 0 || to < 0 || to >= ids.length) return;
+    [ids[from], ids[to]] = [ids[to], ids[from]];
+    order.arrange(ids);
+    setRefocus(id);
+  };
+
   const tapTile = (tileId: string) => {
     if (justDragged.current || !yourTurn || api.busy) return;
     if (armed === tileId) {
@@ -736,11 +762,11 @@ export function PhoneView({
         className={tileClass(t.id)}
         inactive={!yourTurn || api.busy}
         onClick={() => tapTile(t.id)}
-        ariaLabel={
-          mark
-            ? `Discard ${tileName(t.code)}, ${SET_SPOKEN[mark.kind]}${mark.faan > 0 ? ` ${mark.faan} faan` : ""}`
-            : undefined
-        }
+        // "Discard" only when a press would throw it; otherwise the tile is
+        // just a tile, there to be read or moved along the hand.
+        ariaLabel={`${yourTurn ? "Discard " : ""}${tileName(t.code)}${
+          mark ? `, ${SET_SPOKEN[mark.kind]}${mark.faan > 0 ? ` ${mark.faan} faan` : ""}` : ""
+        }`}
       >
         {mark ? (
           <span
@@ -916,6 +942,7 @@ export function PhoneView({
                 }}
                 onPreview={setPreview}
                 faan={faanToggle}
+                concealed={hidden}
               />
             ) : (
               <>
@@ -942,9 +969,12 @@ export function PhoneView({
                     onClick={() => void api.act({ type: "kong", kind: kong.kind, code: kong.code })}
                   >
                     {kong.kind === "concealed" ? "Kong" : "Add to kong"}
-                    <span className="btn__preview">
-                      <TileFace code={kong.code} size="sm" />
-                    </span>
+                    {/* Which four you hold is the hand's business while it is face down. */}
+                    {hidden ? null : (
+                      <span className="btn__preview">
+                        <TileFace code={kong.code} size="sm" />
+                      </span>
+                    )}
                   </button>
                 ))}
               </>
@@ -952,6 +982,9 @@ export function PhoneView({
           </div>
         </div>
 
+        <span id={keysHint} className="sr-only">
+          Alt and the left or right arrow move a tile along your hand.
+        </span>
         {showHelper ? (
           <HelperPanel
             hand={me.hand}
@@ -989,10 +1022,14 @@ export function PhoneView({
               .filter(Boolean)
               .join(" ")}
             style={handFill(order.tiles.length + (order.drawn ? 1 : 0), order.drawn !== undefined)}
+            role="group"
+            aria-label="Your hand"
+            aria-describedby={keysHint}
             onPointerDown={onHandPointerDown}
             onPointerMove={onHandPointerMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onKeyDown={onHandKeyDown}
           >
             {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
             {order.drawn ? (

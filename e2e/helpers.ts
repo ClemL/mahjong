@@ -1,4 +1,5 @@
-import { type Page, expect } from "@playwright/test";
+import { type APIRequestContext, type Page, expect } from "@playwright/test";
+import { RESET_KEY } from "./resetKey";
 
 /** Phone held upright, and the landscape controller a seated phone becomes. */
 export const PHONE_PORTRAIT = { width: 390, height: 844 };
@@ -38,4 +39,28 @@ export async function expectNoSidewaysScroll(page: Page): Promise<void> {
     return root.scrollWidth - root.clientWidth;
   });
   expect(overflow, "page is wider than the viewport").toBeLessThanOrEqual(1);
+}
+
+/**
+ * Seats and resets are rate-limited per address, and on a local run every
+ * request arrives from the same one. Each device a spec opens gets an address
+ * of its own, as it would at a real table, so no spec spends another's
+ * allowance and a new test cannot push an old one over the limit.
+ */
+let devices = 0;
+export function deviceAddress(): string {
+  devices += 1;
+  return `10.1.${Math.floor(devices / 256) % 256}.${devices % 256}`;
+}
+
+/**
+ * Empty a table, whatever an earlier spec left on it. A game still being played
+ * there can only be reset by its table or by whoever holds the deployment's
+ * reset key, which the test server is started with.
+ */
+export async function resetTable(request: APIRequestContext, room: string): Promise<void> {
+  const response = await request.post(`/api/rooms/${room}/reset`, {
+    headers: { "x-forwarded-for": deviceAddress(), "x-reset-key": RESET_KEY },
+  });
+  expect(response.ok(), await response.text()).toBe(true);
 }

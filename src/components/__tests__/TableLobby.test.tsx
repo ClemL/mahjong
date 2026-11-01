@@ -70,6 +70,24 @@ describe("TableLobby on the table", () => {
     expect(screen.getByRole("heading", { name: /All four seated/ })).toBeTruthy();
   });
 
+  it("forgets a chair's typed name once somebody sits there, so it never greets the next one", () => {
+    const room = lobby([0]);
+    const before = tableView(room);
+    const { rerender } = render(<TableLobby api={fakeApi(before)} view={before} sound={sound} />);
+    fireEvent.change(screen.getByLabelText("Name for seat 2"), { target: { value: "Teja" } });
+
+    sit(room, 1, "Teja");
+    const seated = tableView(room);
+    rerender(<TableLobby api={fakeApi(seated)} view={seated} sound={sound} />);
+    // Teja gets up again: the chair is South's own, and its code carries no name.
+    room.seats[1] = { kind: "open" };
+    const left = tableView(room);
+    rerender(<TableLobby api={fakeApi(left)} view={left} sound={sound} />);
+    expect(spotCode().getAttribute("data-value")).toMatch(/\/room\/TEST\?seat=1$/);
+    expect((screen.getByLabelText("Name for seat 2") as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("list", { name: "Seats" }).textContent).not.toContain("Teja");
+  });
+
   it("greys in each empty chair's own name, and opens the house rules out to change them", () => {
     const view = tableView(lobby([0]));
     const api = fakeApi(view);
@@ -132,7 +150,12 @@ describe("TableLobby on the table", () => {
   it("will not deal to an empty table, and names a solo deal for what it is", () => {
     const empty = tableView(lobby([]));
     const { unmount } = render(<TableLobby api={fakeApi(empty)} view={empty} sound={sound} />);
-    expect((screen.getByRole("button", { name: "Deal" }) as HTMLButtonElement).disabled).toBe(true);
+    const deal = screen.getByRole("button", { name: "Deal" }) as HTMLButtonElement;
+    expect(deal.disabled).toBe(true);
+    // And says why, rather than leaving a grey button to puzzle over.
+    expect(document.getElementById(deal.getAttribute("aria-describedby")!)!.textContent).toBe(
+      "Deal opens once somebody sits down",
+    );
     unmount();
 
     const solo = tableView(lobby([0]));

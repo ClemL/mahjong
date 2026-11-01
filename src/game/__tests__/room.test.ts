@@ -33,12 +33,14 @@ import {
   robotVersion,
   shouldRegroup,
   sitDown,
+  seatName,
   startPlay,
   pauseTable,
   resumeTable,
   TABLE_IDLE_MS,
   openTable,
   TAKE_BACK_MS,
+  PLAYS_SENT_TO_PHONES,
   noteDiscard,
   alwaysTakesBack,
   setTakeBackAssist,
@@ -50,11 +52,12 @@ import {
   readyWaiting,
   takeBackDiscard,
   takeBackRefusal,
+  resetRefusal,
   syncSeats,
   touch,
   viewFor,
 } from "../room";
-import { createGame, discard } from "../engine";
+import { createGame, discard, endGame } from "../engine";
 import type { Seat } from "../tiles";
 
 function seat(room: Room, index: Seat, token: string, name = "Someone"): void {
@@ -158,6 +161,24 @@ describe("redaction", () => {
       }
       expect(JSON.stringify(view)).not.toContain('"wall"');
     }
+  });
+
+  it("sends a phone only the newest plays of this hand, and the table the whole log", () => {
+    // Let the clock run until the hand has more plays than a phone is sent;
+    // the people at the table time out and the computer plays for them.
+    const plays = () => room.state.log.filter((e) => e.play?.hand === room.state.handNumber && e.seat !== null);
+    let now = Date.now();
+    for (let i = 0; i < 400 && plays().length <= PLAYS_SENT_TO_PHONES; i++) {
+      now += 5_000;
+      drain(room, now);
+    }
+    expect(plays().length).toBeGreaterThan(PLAYS_SENT_TO_PHONES);
+    expect(room.state.log.length).toBeGreaterThan(plays().length);
+
+    const phone = viewFor(room, "tok-0", now).log;
+    expect(phone).toEqual(plays().slice(-PLAYS_SENT_TO_PHONES));
+    expect(viewFor(room, null, now).log).toEqual(phone);
+    expect(viewFor(room, "tok-table", now).log).toEqual(room.state.log);
   });
 
   it("never sends the wall", () => {
@@ -356,6 +377,71 @@ describe("lobby", () => {
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("open");
     startPlay(room);
     expect(viewFor(room, "tok-0").players[1].occupant.kind).toBe("ai");
+  });
+});
+
+describe("resetting from the seat picker", () => {
+  const playing = (now: number) => {
+    const room = dealt("TEST", 5, [0]);
+    room.table = { token: "tok-table", lastSeen: now };
+    return room;
+  };
+
+  it("leaves a game being played round a table that is still there to the table", () => {
+    const now = 1_000_000;
+    const room = playing(now);
+    expect(resetRefusal(room, now)).toMatch(/only the table can reset it/);
+    expect(viewFor(room, null, now).canReset).toBe(false);
+  });
+
+  it("allows it once the table has not been seen lately, or has gone", () => {
+    const now = 1_000_000;
+    const room = playing(now);
+    expect(resetRefusal(room, now + TABLE_IDLE_MS)).not.toBeNull();
+    expect(resetRefusal(room, now + TABLE_IDLE_MS + 1)).toBeNull();
+    room.table = null;
+    expect(resetRefusal(room, now)).toBeNull();
+  });
+
+  it("allows it before the deal and after the game, which is already kept", () => {
+    const now = 1_000_000;
+    const gathering = newRoom("TEST", undefined, 5);
+    seat(gathering, 0, "tok-0");
+    gathering.table = { token: "tok-table", lastSeen: now };
+    expect(viewFor(gathering, null, now).canReset).toBe(true);
+
+    const over = playing(now);
+    over.state = endGame(over.state);
+    expect(resetRefusal(over, now)).toBeNull();
+  });
+});
+
+describe("typed names", () => {
+  const sat = (room: Room, s: Seat, name: string) => {
+    expect(sitDown(room, s, { token: `tok-${s}`, name })).toBeNull();
+    return viewFor(room, null).players[s].occupant.name;
+  };
+
+  it("numbers a name somebody else at the table already goes by, whatever its case", () => {
+    const room = newRoom("TEST", undefined, 5);
+    expect(sat(room, 0, "Srini")).toBe("Srini");
+    expect(sat(room, 1, "srini")).toBe("srini 2");
+    expect(sat(room, 2, "Srini")).toBe("Srini 3");
+  });
+
+  it("numbers a name a chair's default already holds, and keeps it inside a seat card", () => {
+    const room = newRoom("TEST", undefined, 5);
+    sitDown(room, 1, { token: "tok-1" });
+    expect(viewFor(room, null).players[1].occupant.name).toBe("Louis");
+    expect(sat(room, 0, "Louis")).toBe("Louis 2");
+    expect(sat(room, 2, "Christopherson12")).toBe("Christopherson12");
+    expect(sat(room, 3, "Christopherson12")).toBe("Christopherson 2");
+  });
+
+  it("leaves a person renaming themselves to their own name alone", () => {
+    const room = newRoom("TEST", undefined, 5);
+    sat(room, 0, "Teja");
+    expect(seatName(room, 0, "teja")).toBe("teja");
   });
 });
 

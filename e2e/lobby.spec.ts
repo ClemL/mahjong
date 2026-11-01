@@ -1,21 +1,16 @@
 import { type Browser, expect, test } from "@playwright/test";
-import { PHONE_PORTRAIT, TABLET, presetPreferences, watchErrors } from "./helpers";
+import { PHONE_PORTRAIT, TABLET, deviceAddress, presetPreferences, resetTable, watchErrors } from "./helpers";
 
 /** The one table no other spec sits at. */
 const ROOM = "TABLE1";
 const SHOTS = process.env.LOBBY_SHOTS;
 
-/**
- * `address` is the one the server counts this device's requests under. Sitting
- * down is rate-limited per address, and every other spec sits down from the
- * default one.
- */
-async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean, address?: string) {
+async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean) {
   const context = await browser.newContext({
     viewport,
     hasTouch: touch,
     isMobile: touch,
-    extraHTTPHeaders: address ? { "x-forwarded-for": address } : undefined,
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
   });
   const page = await context.newPage();
   await presetPreferences(page, {});
@@ -26,7 +21,7 @@ test("players swap chairs in the lobby, and a taken chair's code takes it over",
   browser,
   request,
 }) => {
-  expect((await request.post(`/api/rooms/${ROOM}/reset`)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const table = await open(browser, TABLET, false);
   await table.page.goto(`/room/${ROOM}?seat=table`);
@@ -70,9 +65,7 @@ test("people keep their names as they move round the chairs, a chair's default n
   browser,
   request,
 }) => {
-  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
-  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.2" } });
-  expect(reset.ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const table = await open(browser, TABLET, false);
   await table.page.goto(`/room/${ROOM}?seat=table`);
@@ -112,12 +105,10 @@ test("people keep their names as they move round the chairs, a chair's default n
 });
 
 test("a phone beaten to a chair is told so, and sits in another", async ({ browser, request }) => {
-  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
-  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.3" } });
-  expect(reset.ok()).toBe(true);
+  await resetTable(request, ROOM);
 
-  const kris = await open(browser, PHONE_PORTRAIT, true, "10.0.5.3");
-  const srini = await open(browser, PHONE_PORTRAIT, true, "10.0.5.3");
+  const kris = await open(browser, PHONE_PORTRAIT, true);
+  const srini = await open(browser, PHONE_PORTRAIT, true);
   for (const side of [kris, srini]) {
     await side.page.goto(`/room/${ROOM}`);
     await side.page.getByRole("button", { name: /^東\s?East/ }).click();
@@ -158,11 +149,38 @@ test("a phone beaten to a chair is told so, and sits in another", async ({ brows
   for (const side of [kris, srini]) await side.context.close();
 });
 
+test("somebody with only the link cannot wipe a game in progress", async ({ browser, request }) => {
+  await resetTable(request, ROOM);
+  const table = await open(browser, TABLET, false);
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  const kris = await open(browser, PHONE_PORTRAIT, true);
+  await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
+  await expect(table.page.getByText("1 of 4 seated")).toBeVisible();
+  await table.page.getByRole("button", { name: /^(Deal|Play the computer)$/ }).click();
+  await expect(kris.page.getByRole("button", { name: /Hand hidden/ })).toBeVisible();
+
+  // A passer-by opening the table's address reaches the seat picker, and is
+  // pointed at the table instead of offered the reset.
+  const stranger = await open(browser, PHONE_PORTRAIT, true);
+  await stranger.page.goto(`/room/${ROOM}`);
+  await expect(stranger.page.getByText(/Only the table can reset it/)).toBeVisible();
+  await expect(stranger.page.getByRole("button", { name: "Reset table" })).toHaveCount(0);
+  // Nor does asking the server directly get round it.
+  const refused = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.2.0.1" } });
+  expect(refused.status()).toBe(409);
+  await expect(kris.page.getByRole("button", { name: /Hand hidden/ })).toBeVisible();
+
+  for (const side of [table, kris, stranger]) {
+    expect(side.errors).toEqual([]);
+    await side.context.close();
+  }
+});
+
 test("the table can step back to the start page and pick its lobby up again", async ({
   browser,
   request,
 }) => {
-  expect((await request.post(`/api/rooms/${ROOM}/reset`)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const table = await open(browser, TABLET, false);
   await table.page.goto(`/room/${ROOM}?seat=table`);
@@ -191,9 +209,7 @@ test("the table can step back to the start page and pick its lobby up again", as
 });
 
 test("another tablet takes the table over mid-game, and the first is told why", async ({ browser, request }) => {
-  // Resets are rate-limited per address, and the other specs spend the default one's allowance.
-  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": "10.0.5.1" } });
-  expect(reset.ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const first = await open(browser, TABLET, false);
   await first.page.goto(`/room/${ROOM}?seat=table`);

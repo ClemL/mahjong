@@ -38,6 +38,8 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
   const lost = !sitting && typeof chosen === "number" && taken(chosen) ? chosen : null;
   const choice = lost === null ? chosen : null;
   const takingOver = choice === "table" && view.tablePresent;
+  // Somebody is here, or was: something to start over from.
+  const occupied = view.tablePresent || view.seatedCount > 0 || view.started;
 
   // Arriving from a chair's code, naming yourself is all that is left to do.
   // Focused without scrolling, so the line saying whose chair it is stays in view.
@@ -190,7 +192,15 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
       {/* For a new group sitting down to what is left of the last one's game.
           A table stuck on a device that has gone is taken over above instead,
           which keeps the game. */}
-      {view.tablePresent || view.seatedCount > 0 || view.started ? (
+      {occupied && !view.canReset ? (
+        // Anyone with the link gets this far, so a game in progress is the
+        // table's to end; a phone is told where that is instead of a button.
+        <div className="lobby__reset">
+          <span className="seat__meta">
+            A game is being played here. Only the table can reset it — choose Table to take it over first.
+          </span>
+        </div>
+      ) : occupied ? (
         <div className="lobby__reset">
           <span className="seat__meta">Starting over with new people?</span>
           <button

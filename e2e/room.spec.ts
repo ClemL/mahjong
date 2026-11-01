@@ -1,5 +1,5 @@
 import { type Browser, type Page, expect, test } from "@playwright/test";
-import { PHONE_LANDSCAPE, TABLET, presetPreferences, watchErrors } from "./helpers";
+import { PHONE_LANDSCAPE, TABLET, deviceAddress, presetPreferences, resetTable, watchErrors } from "./helpers";
 
 /** Its own table, so another spec's game can never be sitting in this one. */
 const ROOM = "TABLE2";
@@ -15,6 +15,7 @@ async function open(
     hasTouch: touch,
     isMobile: touch,
     reducedMotion: still ? "reduce" : "no-preference",
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
   });
   const page = await context.newPage();
   await presetPreferences(page, {});
@@ -27,7 +28,7 @@ const tableDiscards = (table: Page, seat: number) =>
 
 test("a phone's discard lands on the table, once", async ({ browser, request }) => {
   // Whatever an earlier run left behind, the table starts empty.
-  expect((await request.post(`/api/rooms/${ROOM}/reset`)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const table = await open(browser, TABLET, false);
   await table.page.goto(`/room/${ROOM}?seat=table`);
@@ -166,7 +167,7 @@ test("a phone's discard lands on the table, once", async ({ browser, request }) 
 
 test("a table that does not animate the deal does not hold play for it", async ({ browser, request }) => {
   const room = "TABLE3";
-  expect((await request.post(`/api/rooms/${room}/reset`)).ok()).toBe(true);
+  await resetTable(request, room);
 
   const table = await open(browser, TABLET, false, true);
   await table.page.goto(`/room/${room}?seat=table`);

@@ -1,22 +1,23 @@
 import { type Browser, expect, test } from "@playwright/test";
-import { PHONE_LANDSCAPE, TABLET, expectNoSidewaysScroll, presetPreferences, watchErrors } from "./helpers";
+import {
+  PHONE_LANDSCAPE,
+  TABLET,
+  deviceAddress,
+  expectNoSidewaysScroll,
+  presetPreferences,
+  resetTable,
+  watchErrors,
+} from "./helpers";
 
 /** Shared with the room spec; specs run one at a time and each resets it first. */
 const ROOM = "TABLE2";
-
-/**
- * Seats and resets are rate-limited per address, and every other spec spends
- * the same local allowance, so each device here has an address of its own.
- */
-let address = 0;
-const nextAddress = () => `10.0.4.${++address}`;
 
 async function open(browser: Browser, viewport: { width: number; height: number }, touch: boolean, stored = {}) {
   const context = await browser.newContext({
     viewport,
     hasTouch: touch,
     isMobile: touch,
-    extraHTTPHeaders: { "x-forwarded-for": nextAddress() },
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
   });
   const page = await context.newPage();
   await presetPreferences(page, {});
@@ -27,8 +28,7 @@ async function open(browser: Browser, viewport: { width: number; height: number 
 }
 
 test("a phone stretches its hand to the edges, and the table can end the game early", async ({ browser, request }) => {
-  const reset = await request.post(`/api/rooms/${ROOM}/reset`, { headers: { "x-forwarded-for": nextAddress() } });
-  expect(reset.ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   const kris = await open(browser, PHONE_LANDSCAPE, true, {
     "hk-mahjong.hand-stretch": "on",
