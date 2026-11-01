@@ -153,3 +153,74 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await kris.context.close();
   await table.context.close();
 });
+
+test("a foldable keeps everyone's discards beside the hand, and a phone swipes right for them", async ({
+  browser,
+  request,
+}) => {
+  await resetTable(request, ROOM);
+  const FOLDABLE = { width: 930, height: 780 };
+  const kris = await open(browser, FOLDABLE, true, { "hk-mahjong.ponds": "on" });
+  await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
+  const srini = await open(browser, PHONE_LANDSCAPE, true);
+  await srini.page.goto(`/room/${ROOM}?seat=1&name=Srini`);
+  const table = await open(browser, TABLET, false);
+  await table.page.goto(`/room/${ROOM}?seat=table`);
+  await expect(table.page.getByText("2 of 4 seated")).toBeVisible();
+  await table.page.getByRole("button", { name: "Deal" }).click();
+  await table.page.getByRole("button", { name: "Skip the deal" }).click();
+  await expect(kris.page.getByText("Your turn — discard a tile.")).toBeVisible();
+
+  // Opened out, the discards sit in the middle right, between the header and the hand.
+  const ponds = (page: typeof kris.page) => page.getByRole("region", { name: "Everyone's discards" });
+  await expect(ponds(kris.page)).toBeVisible();
+  const box = (await ponds(kris.page).boundingBox())!;
+  const bar = (await kris.page.locator(".phone__bar").boundingBox())!;
+  const hand = (await kris.page.locator(".phone__hand").boundingBox())!;
+  expect(box.x).toBeGreaterThan(FOLDABLE.width / 2);
+  expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+  expect(box.y + box.height).toBeLessThanOrEqual(hand.y);
+  await expect(kris.page.getByRole("button", { name: "Show everyone's discards" })).toHaveCount(0);
+
+  // A phone keeps them out of the way until a swipe right across the middle.
+  await expect(ponds(srini.page)).toHaveCount(0);
+  const middle = (await srini.page.locator(".phone__controls").boundingBox())!;
+  const sweep = async (from: number, to: number) => {
+    const y = middle.y + middle.height / 2;
+    await srini.page.mouse.move(from, y);
+    await srini.page.mouse.down();
+    for (let step = 1; step <= 8; step++) await srini.page.mouse.move(from + ((to - from) * step) / 8, y + 3);
+    await srini.page.mouse.up();
+  };
+  await sweep(middle.x + 60, middle.x + 260);
+  await expect(ponds(srini.page)).toBeVisible();
+  await srini.page.getByRole("button", { name: "By suit" }).click();
+  await expect(srini.page.getByRole("button", { name: "By suit" })).toHaveAttribute("aria-pressed", "true");
+  await sweep(middle.x + 300, middle.x + 100);
+  await expect(ponds(srini.page)).toHaveCount(0);
+
+  // Kris throws, and his own pond shows it, ringed as the newest.
+  await kris.page.getByRole("button", { name: /Hand hidden/ }).tap();
+  const live = kris.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");
+  const tile = live.first();
+  await expect(tile).toBeVisible();
+  // Tapped once the hand has finished turning up, not while it tips over.
+  await kris.page.evaluate(() =>
+    Promise.all(
+      document
+        .querySelector(".phone__hand")!
+        .getAnimations({ subtree: true })
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+  await tile.tap();
+  await expect(kris.page.getByRole("status").filter({ hasText: /^Discard / })).toBeVisible();
+  await tile.tap();
+  await expect(ponds(kris.page).locator(".minipond__row--mine .minipond__tile")).toHaveCount(1);
+  await expect(ponds(kris.page).locator(".minipond__tile--newest")).toHaveCount(1);
+
+  for (const side of [kris, srini, table]) {
+    expect(side.errors).toEqual([]);
+    await side.context.close();
+  }
+});

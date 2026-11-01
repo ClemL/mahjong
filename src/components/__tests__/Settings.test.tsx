@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, renderHook, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { DEFAULT_APPEARANCE } from "@/game/appearance";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import { type PhoneDisplay, type TabletDisplay, usePhoneDisplay } from "@/hooks/useLocalSetting";
@@ -44,6 +44,10 @@ function phoneDisplay(): PhoneDisplay {
     takeBack: "off",
     setTakeBack: vi.fn(),
     takeBackLocked: false,
+    ponds: "off",
+    setPonds: vi.fn(),
+    pondOrder: "thrown",
+    setPondOrder: vi.fn(),
   };
 }
 
@@ -164,6 +168,30 @@ describe("this tablet's size", () => {
 });
 
 describe("a phone's settings", () => {
+  it("offers the discards beside the hand only where the screen has room, and their order everywhere", () => {
+    const config = tableView(lobby([0])).config;
+    const display = phoneDisplay();
+    const height = window.innerHeight;
+    onTestFinished(() => {
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+    });
+
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 390 });
+    const { unmount } = render(<PhoneSettings sound={sound} config={config} appearance={appearance} display={display} />);
+    expect(screen.getByRole("switch", { name: "Discards beside your hand" })).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Swipe right across the middle of the screen to see them/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "By suit" }));
+    expect(display.setPondOrder).toHaveBeenCalledWith("sorted");
+    unmount();
+
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 780 });
+    render(<PhoneSettings sound={sound} config={config} appearance={appearance} display={display} />);
+    const beside = screen.getByRole("switch", { name: "Discards beside your hand" });
+    expect(beside).toHaveProperty("disabled", false);
+    fireEvent.click(beside);
+    expect(display.setPonds).toHaveBeenCalledWith("on");
+  });
+
   it("groups the phone's own settings, each a switch or a choice", () => {
     const display = phoneDisplay();
     render(

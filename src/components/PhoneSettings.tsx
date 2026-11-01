@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { CompactLayout } from "@/hooks/useCompactLayout";
-import type { PhoneDisplay, PhoneSize } from "@/hooks/useLocalSetting";
+import type { PhoneDisplay, PhoneSize, PondOrder } from "@/hooks/useLocalSetting";
+import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
 import { canVibrate } from "@/hooks/useHaptics";
 import type { FullscreenApi } from "@/hooks/useFullscreen";
@@ -37,6 +38,11 @@ const SORT: SegmentOption<SortMode>[] = [
     label: "My order",
     hint: "Your own order — drag a tile to move it. New tiles join at the right",
   },
+];
+
+const POND_ORDER: SegmentOption<PondOrder>[] = [
+  { value: "thrown", label: "As thrown", hint: "Each person's discards in the order they went out, with a space where one was claimed" },
+  { value: "sorted", label: "By suit", hint: "Each person's discards by suit and number, to count what has gone" },
 ];
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -86,6 +92,7 @@ export function PhoneSettings({
   onLeave?: () => void;
 }) {
   const vibrates = canVibrate();
+  const roomy = useRoomyScreen();
   return (
     <>
       <Group title="On this phone">
@@ -163,6 +170,23 @@ export function PhoneSettings({
                 hint="The last four plays beside your buttons: discards, chows, pungs and kongs"
                 checked={display.playLog === "on"}
                 onChange={(on) => display.setPlayLog(on ? "on" : "off")}
+              />
+              <SwitchRow
+                label="Discards beside your hand"
+                hint={
+                  roomy
+                    ? "Everyone's discards, small, in the middle right of the screen"
+                    : "A phone has no room to keep them there. Swipe right across the middle of the screen to see them, or tap Discards"
+                }
+                checked={roomy && display.ponds === "on"}
+                disabled={!roomy}
+                onChange={(on) => display.setPonds(on ? "on" : "off")}
+              />
+              <Segmented
+                label="Discard order"
+                options={POND_ORDER}
+                value={display.pondOrder}
+                onChange={display.setPondOrder}
               />
             </>
           ) : null}

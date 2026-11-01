@@ -147,6 +147,9 @@ export function useHiddenPanes(): {
 
 export type PhoneSize = "compact" | "standard" | "comfy";
 
+/** How the phone lays out everyone's discards: in the order thrown, or by suit and number. */
+export type PondOrder = "thrown" | "sorted";
+
 /** What the phone shows besides the hand and its choices. */
 export interface PhoneDisplay {
   playLog: OnOff;
@@ -176,6 +179,11 @@ export interface PhoneDisplay {
   setTakeBack: (value: OnOff) => void;
   /** Take back is on whatever is chosen: the seat is Louis's. */
   takeBackLocked: boolean;
+  /** Everyone's discards kept small in the middle right, on a screen with room for them. */
+  ponds: OnOff;
+  setPonds: (value: OnOff) => void;
+  pondOrder: PondOrder;
+  setPondOrder: (value: PondOrder) => void;
 }
 
 /** Players whose seat has the assists on until they say otherwise, lower-cased. */
@@ -201,6 +209,8 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
   const [keepAwake, setKeepAwake] = useLocalSetting<OnOff>("hk-mahjong.keep-awake", "off", ON_OFF);
   const [stretch, setStretch] = useLocalSetting<OnOff>("hk-mahjong.hand-stretch", "off", ON_OFF);
+  const [ponds, setPonds] = useLocalSetting<OnOff>("hk-mahjong.ponds", "off", ON_OFF);
+  const [pondOrder, setPondOrder] = useLocalSetting<PondOrder>("hk-mahjong.pond-order", "thrown", ["thrown", "sorted"]);
   const [setHintsChoice, setSetHints] = useStoredChoice<OnOff>("hk-mahjong.set-hints", ON_OFF);
   const [hurryChoice, setHurry] = useStoredChoice<OnOff>("hk-mahjong.hurry", ON_OFF);
   const [helperChoice, setHelper] = useStoredChoice<OnOff>("hk-mahjong.helper", ON_OFF);
@@ -230,5 +240,9 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     takeBack,
     setTakeBack,
     takeBackLocked,
+    ponds,
+    setPonds,
+    pondOrder,
+    setPondOrder,
   };
 }
