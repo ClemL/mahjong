@@ -155,12 +155,16 @@ describe("normalizePreferences", () => {
     expect(normalizePreferences({ version: 4, minFaan: 5, speed: "warp", opponents: "random" })).toEqual({
       minFaan: 5,
       rounds: 4,
+      achievements: true,
     });
+    // Achievements start on; switched off, they stay off.
+    expect(normalizePreferences({ version: 4, achievements: false }).achievements).toBe(false);
+    expect(normalizePreferences({ version: 4, achievements: "nope" }).achievements).toBe(true);
     expect(normalizePreferences(null).minFaan).toBe(1);
     // Older builds saved their default minimum with every change — 0, later 3.
     // That is not a choice to keep, so the current default replaces it.
     expect(normalizePreferences({ minFaan: 0, muted: true }).minFaan).toBe(1);
-    expect(normalizePreferences({ version: 3, minFaan: 3, rounds: 2 })).toEqual({ minFaan: 1, rounds: 2 });
+    expect(normalizePreferences({ version: 3, minFaan: 3, rounds: 2 })).toEqual({ minFaan: 1, rounds: 2, achievements: true });
     expect(normalizePreferences({ version: 4, minFaan: 0 }).minFaan).toBe(0);
     expect(normalizePreferences({ version: 4, minFaan: 4 }).minFaan).toBe(1);
     // A game runs one, two or four wind rounds; anything else is the all-four default.

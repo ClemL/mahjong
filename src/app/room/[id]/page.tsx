@@ -102,9 +102,10 @@ export default function RoomPage({ params }: { params: Promise<{ id: string }> }
         // the ones to use.
         .then(async () => {
           if (view.started) return;
-          const { minFaan, rounds } = readPreferences();
+          const { minFaan, rounds, achievements } = readPreferences();
           await api.control({ type: "minFaan", value: minFaan });
           await api.control({ type: "rounds", value: rounds });
+          await api.control({ type: "achievements", value: achievements });
         })
         .catch((error: Error) => setJoinError(error.message))
         .finally(() => setJoiningTable(false));

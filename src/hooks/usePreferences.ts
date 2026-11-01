@@ -11,11 +11,14 @@ export interface Preferences {
   minFaan: number;
   /** Wind rounds in a game: 1, 2 or 4. */
   rounds: number;
+  /** Whether people at the table earn achievements, with a pop-up as they do. */
+  achievements: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
   minFaan: DEFAULT_RULES.minFaan,
   rounds: DEFAULT_RULES.rounds,
+  achievements: true,
 };
 
 const STORAGE_KEY = "hk-mahjong.prefs";
@@ -46,6 +49,8 @@ export function normalizePreferences(raw: unknown): Preferences {
       typeof r.version === "number" && r.version >= 3
         ? pick(r.rounds, ROUND_CHOICES as readonly number[], d.rounds)
         : d.rounds,
+    // Added after version 4 with no default to replace: absent means on.
+    achievements: typeof r.achievements === "boolean" ? r.achievements : d.achievements,
   };
 }
 
@@ -72,6 +77,8 @@ export interface GameSettings {
   setMinFaan: (value: number) => void;
   rounds: number;
   setRounds: (value: number) => void;
+  achievements: boolean;
+  setAchievements: (value: boolean) => void;
 }
 
 export function usePreferences(): GameSettings {
@@ -94,5 +101,6 @@ export function usePreferences(): GameSettings {
     ...prefs,
     setMinFaan: useCallback((value: number) => set("minFaan", value), [set]),
     setRounds: useCallback((value: number) => set("rounds", value), [set]),
+    setAchievements: useCallback((value: boolean) => set("achievements", value), [set]),
   };
 }

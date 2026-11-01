@@ -536,6 +536,13 @@ export function TableSettings({
                 disabled={api.busy}
                 onChange={(value) => void api.control({ type: "takeBack", value })}
               />
+              <SwitchRow
+                label="Achievements"
+                hint="A small pop-up when somebody earns one — a self-draw, three pungs, a hat trick of wins — and every one listed on the final scores"
+                checked={view.settings.achievements !== false}
+                disabled={api.busy}
+                onChange={(value) => void api.control({ type: "achievements", value })}
+              />
             </Card>
           </div>
         ) : null}

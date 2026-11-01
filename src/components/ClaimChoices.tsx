@@ -47,6 +47,7 @@ export function ClaimChoices({
   onMoreTime,
   faan,
   running = true,
+  fresh,
   concealed = false,
 }: {
   options: ClaimOption[];
@@ -63,13 +64,15 @@ export function ClaimChoices({
   faan?: ReactNode;
   /** False while the table is paused: the window holds where it is. */
   running?: boolean;
+  /** The version of the view `deadlineIn` came from, so a fresh one always restarts the count. */
+  fresh?: number;
   /**
    * The hand is face down: each claim says what it is and shows the discard
    * it takes, but not the tiles it would use from the hand.
    */
   concealed?: boolean;
 }) {
-  const left = useCountdown(deadlineIn, running) ?? 0;
+  const left = useCountdown(deadlineIn, running, fresh) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
     "--left": Math.min(1, left / allowance),
   };

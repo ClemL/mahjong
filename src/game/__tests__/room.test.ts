@@ -53,6 +53,9 @@ import {
   takeBackDiscard,
   takeBackRefusal,
   resetRefusal,
+  noteGame,
+  dealNextHand,
+  noteTurnTime,
   syncSeats,
   touch,
   viewFor,
@@ -907,6 +910,79 @@ describe("more time on a claim", () => {
     expect(extendClaim(room, 1)).toBeNull();
     room.state = { ...room.state, lastDiscard: { tile: { id: "next-m4", code: "m4" }, from: 0 } };
     expect(viewFor(room, "tok-1").claim?.canExtend).toBe(true);
+  });
+});
+
+describe("the game's stats and achievements", () => {
+  it("times a person's turn from when the table started waiting on them, leaving out a pause", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    expect(room.state.turn).toBe(0);
+    const t0 = underway(room);
+    const since = room.acting!.since;
+    pauseTable(room, t0 + 1_000);
+    resumeTable(room, t0 + 61_000);
+    noteTurnTime(room, 0, true, t0 + 5_000 + 60_000);
+    expect(room.stats.turnMs[0]).toBe(t0 + 5_000 - since);
+    expect(room.stats.turns).toEqual([1, 0, 0, 0]);
+  });
+
+  it("counts the turn again only when a discard taken back goes out again", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    setTakeBackAssist(room, 0, true);
+    const t0 = underway(room);
+    noteTurnTime(room, 0, true, t0);
+    const before = room.state;
+    room.state = discard(before, 0, before.players[0].hand.find((t) => !t.code.startsWith("f"))!.id);
+    noteDiscard(room, 0, before, t0);
+    expect(takeBackDiscard(room, 0, t0 + 500)).toBeNull();
+    expect(room.stats.turns[0]).toBe(0);
+  });
+
+  it("counts hurry-ups sent and received", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    expect(hurryUp(room, 2, underway(room))).toBeNull();
+    expect(room.stats.hurriesSent).toEqual([0, 0, 1, 0]);
+    expect(room.stats.hurriesReceived).toEqual([1, 0, 0, 0]);
+  });
+
+  it("awards achievements as they are earned, only at a table that has them on, and afresh each game", () => {
+    const room = dealt("TEST", 5, [0, 2]);
+    room.state.history = [
+      { handNumber: 1, roundWind: "we", dealer: 0, type: "win", winner: 0, from: 1, faan: 2, value: 8, payments: [8, -8, 0, 0], scores: [108, 92, 100, 100] },
+    ];
+    room.settings.achievements = false;
+    expect(noteGame(room)).toBe(false);
+    expect(room.achievements).toEqual([]);
+
+    room.settings.achievements = true;
+    expect(noteGame(room)).toBe(true);
+    expect(room.achievements.map((e) => e.id)).toEqual(["offTheMark"]);
+    expect(noteGame(room)).toBe(false);
+    const view = viewFor(room, "tok-2");
+    expect(view.achievements).toEqual(room.achievements);
+    expect(view.stats).not.toHaveProperty("logSeen");
+
+    returnToLobby(room, newRoom("TEST", undefined, 9).state);
+    startPlay(room);
+    expect(room.achievements).toEqual([]);
+    expect(room.stats.hurriesSent).toEqual([0, 0, 0, 0]);
+  });
+
+  it("counts every seat's claimed sets as the table plays", () => {
+    const room = dealt("TEST", 7, [0]);
+    let now = Date.now();
+    for (let i = 0; i < 2_000 && room.state.phase !== "gameOver"; i++) {
+      now += 5_000;
+      drain(room, now);
+      if (room.state.phase === "handOver") dealNextHand(room, now);
+    }
+    // Every set on the table at the end of the last hand was counted when it was made.
+    const claimed = room.state.players.map((p) => p.melds.filter((m) => !m.concealed));
+    for (const seat of [0, 1, 2, 3] as Seat[]) {
+      const pungs = claimed[seat].filter((m) => m.type === "pung").length;
+      expect(room.stats.pungs[seat]).toBeGreaterThanOrEqual(pungs);
+    }
+    expect(room.stats.pungs.reduce((a, b) => a + b, 0) + room.stats.chows.reduce((a, b) => a + b, 0)).toBeGreaterThan(0);
   });
 });
 
