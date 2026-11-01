@@ -858,3 +858,77 @@ describe("PhoneView's play log", () => {
     expect(PLAYS_SENT_TO_PHONES).toBeGreaterThanOrEqual(PLAY_LOG_LINES);
   });
 });
+
+describe("PhoneView — everyone's discards", () => {
+  /** A screen of this size, for as long as the test runs. */
+  function screenOf(width: number, height: number) {
+    const before = { width: window.innerWidth, height: window.innerHeight };
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: height });
+    onTestFinished(() => {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: before.width });
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: before.height });
+    });
+  }
+  const ponds = () => screen.queryByRole("region", { name: "Everyone's discards" });
+  const swipe = (container: HTMLElement, dx: number) => {
+    const middle = container.querySelector(".phone__controls")!;
+    fireEvent.pointerDown(middle, { pointerId: 7, clientX: 200, clientY: 200 });
+    fireEvent.pointerMove(middle, { pointerId: 7, clientX: 200 + dx / 2, clientY: 202 });
+    fireEvent.pointerMove(middle, { pointerId: 7, clientX: 200 + dx, clientY: 204 });
+    fireEvent.pointerUp(middle, { pointerId: 7, clientX: 200 + dx, clientY: 204 });
+  };
+
+  it("keeps them beside the hand on a foldable or tablet that asked for them", () => {
+    screenOf(930, 780);
+    window.localStorage.setItem("hk-mahjong.ponds", "on");
+    const { view } = onTurn();
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(ponds()).toBeTruthy();
+    expect(container.querySelector(".phone")!.className).toContain("phone--ponds");
+    expect(screen.queryByRole("button", { name: "Show everyone's discards" })).toBeNull();
+  });
+
+  it("brings them in on a phone with a swipe right across the middle, and a swipe left puts them away", () => {
+    screenOf(844, 390);
+    window.localStorage.setItem("hk-mahjong.ponds", "on");
+    const { room, seat } = onTurn();
+    const view = playerView(room, ((seat + 1) % 4) as Seat);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    expect(ponds()).toBeNull();
+
+    // Mostly up and down is not a swipe for them, and nor is a short nudge.
+    swipe(container, 20);
+    expect(ponds()).toBeNull();
+    swipe(container, 120);
+    expect(ponds()).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Put away everyone's discards" }).getAttribute("aria-pressed")).toBe("true");
+    swipe(container, -120);
+    expect(ponds()).toBeNull();
+
+    // The header button and Escape do the same, for anyone not swiping.
+    fireEvent.click(screen.getByRole("button", { name: "Show everyone's discards" }));
+    expect(ponds()).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(ponds()).toBeNull();
+  });
+
+  it("puts them away when a discard is offered to claim, since they cover the buttons", () => {
+    screenOf(844, 390);
+    const { room, claimer } = claimable();
+    const before = playerView(room, claimer);
+    // As the phone stood a moment before the discard: nothing to answer yet.
+    const quiet = { ...before, claim: null, lastDiscard: null };
+    const { rerender } = render(<PhoneView api={fakeApi(quiet)} view={quiet} sound={sound} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show everyone's discards" }));
+    expect(ponds()).toBeTruthy();
+    rerender(<PhoneView api={fakeApi(before)} view={before} sound={sound} />);
+    expect(ponds()).toBeNull();
+    expect(screen.getByRole("group", { name: /^Claim / })).toBeTruthy();
+
+    // Brought back in while it is weighed up, they stay.
+    fireEvent.click(screen.getByRole("button", { name: "Show everyone's discards" }));
+    rerender(<PhoneView api={fakeApi(before)} view={{ ...before }} sound={sound} />);
+    expect(ponds()).toBeTruthy();
+  });
+});

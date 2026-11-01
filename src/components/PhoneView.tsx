@@ -46,6 +46,8 @@ import { joinNames, winnersOf, youFirst } from "./TableResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
 import { intoFrame, screenAngle } from "./screenFrame";
+import { MiniPonds } from "./MiniPonds";
+import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 
 /** How far a finger has to travel before a press on a tile becomes a drag. */
 const DRAG_THRESHOLD = 10;
@@ -60,6 +62,22 @@ const FLICK_SPEED = 0.45;
  */
 function handFill(tiles: number, apart: boolean): CSSProperties {
   return { "--hand-count": Math.max(1, tiles), "--hand-apart": apart ? 1 : 0 } as CSSProperties;
+}
+
+/** How far a finger travels sideways across the middle before it counts as a swipe. */
+const SWIPE_REACH = 48;
+
+/** Three small tiles: the discards, on the button that brings them in. */
+function PondsIcon() {
+  return (
+    <svg aria-hidden="true" width="16" height="14" viewBox="0 0 16 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="1" width="4" height="5.5" rx="1" />
+      <rect x="6" y="1" width="4" height="5.5" rx="1" />
+      <rect x="11" y="1" width="4" height="5.5" rx="1" />
+      <rect x="1" y="7.5" width="4" height="5.5" rx="1" />
+      <rect x="6" y="7.5" width="4" height="5.5" rx="1" />
+    </svg>
+  );
 }
 
 /** Open tiles compact fits on its header line beside everything else. */
@@ -199,6 +217,11 @@ export function PhoneView({
   const [preview, setPreview] = useState<ClaimOption | null>(null);
   // Your open sets and flowers drawn large, for reading across a table.
   const [zoomed, setZoomed] = useState(false);
+  // Everyone's discards: kept in the middle right where the screen has room
+  // and the player asked for them, otherwise brought in over the middle.
+  const roomy = useRoomyScreen();
+  const docked = roomy && display.ponds === "on";
+  const [pondsOpen, setPondsOpen] = useState(false);
   // The hand's result, put aside to look at the table, by the hand and phase it was for.
   const [resultAside, setResultAside] = useState<string | null>(null);
   // How many of the computer's turns for you have been acknowledged. The room
@@ -219,6 +242,51 @@ export function PhoneView({
     // A move to make should not open under the enlarged sets.
     setZoomed(false);
   }, [view.turn, view.handNumber, view.phase]);
+
+  // Brought in over the middle, the discards cover the buttons for a call on a
+  // discard, a win or a kong, so a new one of those puts them away — once:
+  // opened again, they stay while it is weighed up.
+  const decision = view.claim
+    ? `claim:${view.lastDiscard?.tile.id}`
+    : view.actions?.canWin || (view.actions?.kongs?.length ?? 0) > 0
+      ? `move:${view.handNumber}:${view.turn}:${view.drawnTileId}`
+      : null;
+  useEffect(() => {
+    if (decision !== null) setPondsOpen(false);
+  }, [decision]);
+  useEffect(() => setPondsOpen(false), [view.handNumber]);
+  useEffect(() => {
+    if (!pondsOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") setPondsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [pondsOpen]);
+
+  // A swipe right across the middle of the controller brings the discards in,
+  // a swipe left puts them away. Read in the controller's own frame: held
+  // upright it is turned on its side, and right is along the glass.
+  const swipe = useRef<{ id: number; x: number; y: number; angle: number } | null>(null);
+  const onSwipeStart = (e: PointerEvent<HTMLDivElement>) => {
+    swipe.current = null;
+    if (docked) return;
+    const target = e.target as Element;
+    if (!target.closest(".phone__controls, .phone__status, .minipond--sheet")) return;
+    if (target.closest("button, a, input, select, textarea")) return;
+    swipe.current = { id: e.pointerId, x: e.clientX, y: e.clientY, angle: screenAngle(rootRef.current) };
+  };
+  const onSwipeMove = (e: PointerEvent<HTMLDivElement>) => {
+    const start = swipe.current;
+    if (!start || start.id !== e.pointerId) return;
+    const moved = intoFrame(e.clientX - start.x, e.clientY - start.y, start.angle);
+    if (Math.abs(moved.x) < SWIPE_REACH || Math.abs(moved.x) < 1.5 * Math.abs(moved.y)) return;
+    swipe.current = null;
+    setPondsOpen(moved.x > 0);
+  };
+  const onSwipeEnd = (e: PointerEvent<HTMLDivElement>) => {
+    if (swipe.current?.id === e.pointerId) swipe.current = null;
+  };
 
   // The first touch asks for full screen. It cannot be asked for without one,
   // and once is enough: someone who backs out of it meant to.
@@ -796,10 +864,15 @@ export function PhoneView({
         hurriedBy !== null ? "phone--hurried" : "",
         showResult ? "phone--result" : "",
         display.stretch === "on" ? "phone--stretch" : "",
+        docked ? "phone--ponds" : "",
       ]
         .filter(Boolean)
         .join(" ")}
       onPointerDownCapture={onFirstTouch}
+      onPointerDown={onSwipeStart}
+      onPointerMove={onSwipeMove}
+      onPointerUp={onSwipeEnd}
+      onPointerCancel={onSwipeEnd}
       ref={rootRef}
     >
       <header className="phone__bar">
@@ -843,6 +916,19 @@ export function PhoneView({
             className="btn btn--sm btn--ghost phone__toggle"
           />
         ) : null}
+        {docked ? null : (
+          <button
+            type="button"
+            className="btn btn--sm btn--ghost phone__toggle phone__ponds-btn"
+            aria-pressed={pondsOpen}
+            aria-label={pondsOpen ? "Put away everyone's discards" : "Show everyone's discards"}
+            title="Everyone's discards — or swipe right across the middle"
+            onClick={() => setPondsOpen((o) => !o)}
+          >
+            <PondsIcon />
+            {compact ? null : <span className="phone__ponds-label"> Discards</span>}
+          </button>
+        )}
         <button
           type="button"
           className="btn btn--sm btn--ghost phone__toggle"
@@ -885,6 +971,18 @@ export function PhoneView({
       )}
 
       {exposedInHeader ? null : exposed}
+
+      {docked || pondsOpen ? (
+        <MiniPonds
+          players={view.players}
+          you={seat}
+          newestId={view.lastPlayed?.tile.id ?? null}
+          order={display.pondOrder}
+          onOrder={display.setPondOrder}
+          nameOf={nameOf}
+          onClose={docked ? undefined : () => setPondsOpen(false)}
+        />
+      ) : null}
 
       {/* The hand is always last, with the choices and the helper above it, so
           nothing that comes and goes can push it off the bottom or cover it. */}

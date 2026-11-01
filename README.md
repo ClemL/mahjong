@@ -462,6 +462,16 @@ real run and every pung is three of a kind, and that the scores stay zero-sum.
 - **Stretch to the edges**, under the phone's settings, runs the hand out to
   the edges of the screen and scales its tiles up to fill it; the fewer tiles
   in hand, the larger they get.
+- **Everyone's discards** come to the phone too. On a phone, swipe right across
+  the middle of the screen (or tap the tiles button in the header) and they
+  slide in over it, one row a person starting with you and going round in the
+  order of play; swipe left, tap ×, or press Escape to put them away. They put
+  themselves away when a discard is offered to you, a win or a kong, since they
+  would cover those buttons. On a foldable opened out or a tablet used as the
+  controller, **Discards beside your hand** in its settings keeps them in the
+  middle right for good. Either way they are shown **as thrown**, with a space
+  marked with the taker's wind where a tile was claimed, or **by suit**, sorted
+  by suit and number to count what has gone; the newest discard is ringed.
 - **Hurry up** flashes the screen of whoever the table is waiting on, whether or
   not they have the setting on themselves: it only decides who has the button.
   Everyone else's *Waiting for …* line then says who hurried them, until they

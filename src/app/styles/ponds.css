@@ -1,0 +1,256 @@
+/* ============================================ phone: everyone's discards == */
+
+/* Kept in the middle right on a screen with room — a foldable opened out, a
+   tablet — beside the buttons for the next move and under the open sets. */
+.phone--landscape.phone--ponds {
+  grid-template-areas:
+    "bar bar"
+    "prompt melds"
+    "controls ponds"
+    "hand hand";
+}
+
+.phone--landscape.phone--ponds:has(> .phone__dock > .helper) {
+  grid-template-areas:
+    "bar bar"
+    "prompt melds"
+    "controls ponds"
+    "helper helper"
+    "hand hand";
+}
+
+.phone--landscape.phone--compact.phone--ponds {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "bar bar"
+    "melds melds"
+    "controls ponds"
+    "hand hand";
+}
+
+.phone--landscape.phone--compact.phone--ponds:has(> .phone__dock > .helper) {
+  grid-template-areas:
+    "bar bar"
+    "melds melds"
+    "controls ponds"
+    "helper helper"
+    "hand hand";
+}
+
+/* The discards take the space the buttons kept free on their right, so the
+   play log has the rest of the width rather than a third of it. */
+.phone--landscape.phone--ponds .phone__controls {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.minipond {
+  grid-area: ponds;
+  align-self: center;
+  box-sizing: border-box;
+  /* A fixed share of the width, so the buttons beside it do not shift as the
+     ponds fill up. */
+  width: min(44cqw, 520px);
+  max-height: 100%;
+  min-height: 0;
+  /* Clear of the gold frame drawn inside the edge on your move. */
+  margin-right: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  /* Small enough for every pond to fit, large enough to read at arm's length. */
+  --tile-sm: clamp(16px, min(2.6cqw, 4.2cqh), 30px);
+}
+
+/* On a phone the discards come in over the middle, between the header and the
+   hand, so the hand stays in reach underneath. */
+.minipond--sheet {
+  grid-area: auto;
+  grid-row: melds-start / controls-end;
+  grid-column: 1 / -1;
+  align-self: stretch;
+  width: auto;
+  margin: 0;
+  z-index: 30;
+  background: var(--modal-bg);
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  --tile-sm: clamp(12px, min(3.2cqw, 6cqh), 30px);
+  animation: minipond-in 180ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes minipond-in {
+  from {
+    transform: translateX(-32px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .minipond--sheet {
+    animation: none;
+  }
+}
+
+.minipond__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.minipond__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.minipond__order {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.minipond__order-btn {
+  margin: 0;
+  padding: 3px 10px;
+  border: none;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* The chosen order is filled, not only coloured. */
+.minipond__order-btn[aria-pressed="true"] {
+  background: var(--gold);
+  color: var(--on-gold);
+  font-weight: 700;
+}
+
+.minipond__close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: -4px -4px -4px 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* One column of names as wide as the longest, so every pond starts in line. */
+.minipond__rows {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 4px 8px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.minipond__row {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  align-items: center;
+}
+
+.minipond__who {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 9em;
+  font-size: 12px;
+}
+
+.minipond__wind {
+  flex: none;
+  color: var(--gold);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.minipond__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Your own row says You in words; the weight only backs that up. */
+.minipond__row--mine .minipond__name {
+  font-weight: 700;
+}
+
+.minipond__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.minipond__none {
+  color: var(--ink-dim);
+}
+
+.minipond__tile {
+  display: inline-flex;
+  border-radius: calc(var(--tile-sm) * 0.16);
+}
+
+/* The newest discard is ringed and stands a little proud, so it does not rest
+   on the ring's colour alone. */
+.minipond__tile--newest {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+  translate: 0 -2px;
+}
+
+.minipond__gap {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--tile-sm);
+  height: calc(var(--tile-sm) * 1.38);
+  border: 1.5px dashed color-mix(in srgb, var(--ink) 32%, transparent);
+  border-radius: calc(var(--tile-sm) * 0.16);
+  color: color-mix(in srgb, var(--ink) 45%, transparent);
+  font-size: calc(var(--tile-sm) * 0.45);
+  line-height: 1;
+}
+
+/* The middle of the controller takes a sideways swipe for the discards, in
+   whichever direction the glass is held: the page does not scroll there. Nor
+   does its text select, or a drag with a mouse would pick the words up and
+   the browser would take the swipe for dragging them away. */
+.phone--landscape .phone__controls,
+.phone--landscape .phone__status,
+.minipond--sheet {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* A narrow phone keeps its header on one line: the button that brings the
+   discards in is its icon alone there, its name still said to screen readers. */
+@container (max-width: 700px) {
+  .phone__ponds-label {
+    display: none;
+  }
+}
