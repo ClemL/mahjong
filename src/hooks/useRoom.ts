@@ -5,7 +5,31 @@ import type { RoomView } from "@/game/room";
 import { SEAT_IDLE_MS } from "@/game/presence";
 import type { PlayerAction, TableCommand } from "@/server/rooms";
 
-const POLL_MS = 1100;
+/** While a hand is being played: every move shows up within about a second. */
+export const POLL_MS = 1100;
+/**
+ * Gathering, paused, over, or only looking on from the seat picker: nothing
+ * moves on its own there, so a slower poll costs nobody anything they notice.
+ */
+export const CALM_POLL_MS = 2500;
+/**
+ * A device left alone while nothing changes — a tablet left on all evening —
+ * slows right down. Hosting is metered per request, and a forgotten screen
+ * polling every second spends a month's allowance in days. Short enough that
+ * the heartbeats it carries keep the table well inside `TABLE_IDLE_MS`, so it
+ * is never shown as gone, and open to a reset, for being left alone.
+ */
+export const IDLE_POLL_MS = 20_000;
+/** How long nothing has to change, with nobody touching this device, before it counts as idle. */
+export const IDLE_AFTER_MS = 10 * 60_000;
+
+/** How long to wait before asking again: by what the table is doing, and how long it has been quiet here. */
+export function pollDelay(view: RoomView | null, quietFor: number): number {
+  if (quietFor >= IDLE_AFTER_MS) return IDLE_POLL_MS;
+  if (!view) return POLL_MS;
+  const live = view.started && !view.paused && view.phase !== "gameOver" && view.you.role !== "spectator";
+  return live ? POLL_MS : CALM_POLL_MS;
+}
 
 export interface RoomApi {
   view: RoomView | null;
@@ -32,7 +56,8 @@ function storageKey(roomId: string): string {
 /**
  * Keeps one room view fresh by polling its version. The server answers with a
  * bare `unchanged` marker when nothing has moved, so the steady state costs a
- * few dozen bytes a second rather than a whole table.
+ * few dozen bytes a poll rather than a whole table — and the poll itself slows
+ * when nothing can move, or nobody is there to see it (`pollDelay`).
  */
 export function useRoom(roomId: string): RoomApi {
   const [view, setView] = useState<RoomView | null>(null);
@@ -47,6 +72,18 @@ export function useRoom(roomId: string): RoomApi {
   // long gap here means the table has been playing this seat without us.
   const seenAtRef = useRef(Date.now());
   const seatedRef = useRef(false);
+  // What the poll's pace is read from: the newest view, when the table last
+  // changed or this device was last touched, and whether it is idling now.
+  const viewRef = useRef<RoomView | null>(null);
+  const quietSinceRef = useRef(Date.now());
+  const idleRef = useRef(false);
+
+  const take = useCallback((next: RoomView) => {
+    versionRef.current = next.version;
+    viewRef.current = next;
+    quietSinceRef.current = Date.now();
+    setView(next);
+  }, []);
 
   useEffect(() => {
     try {
@@ -117,9 +154,8 @@ export function useRoom(roomId: string): RoomApi {
           if (!cancelled) {
             setError(null);
             if (!("unchanged" in body)) {
-              versionRef.current = body.version;
               seatedRef.current = body.you.role === "player";
-              setView(body);
+              take(body);
             }
           }
         }
@@ -130,7 +166,9 @@ export function useRoom(roomId: string): RoomApi {
       // Only a poll that landed counts as being present — a phone that is awake
       // but off the network has had its seat played for it just the same.
       if (reached) seenAtRef.current = Date.now();
-      timer = setTimeout(poll, POLL_MS);
+      const delay = pollDelay(viewRef.current, Date.now() - quietSinceRef.current);
+      idleRef.current = delay === IDLE_POLL_MS;
+      timer = setTimeout(poll, delay);
     };
 
     // A phone coming out of a lock screen may not run its pending timer for a
@@ -146,7 +184,29 @@ export function useRoom(roomId: string): RoomApi {
       clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [roomId, nonce]);
+  }, [roomId, nonce, take]);
+
+  // A touch on an idle device, or its screen coming back, asks straight away
+  // rather than waiting out the slow poll; any touch puts idling off.
+  useEffect(() => {
+    const wake = () => {
+      quietSinceRef.current = Date.now();
+      if (!idleRef.current) return;
+      idleRef.current = false;
+      setNonce((n) => n + 1);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") wake();
+    };
+    window.addEventListener("pointerdown", wake, true);
+    window.addEventListener("keydown", wake, true);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("pointerdown", wake, true);
+      window.removeEventListener("keydown", wake, true);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
 
   const send = useCallback(
     async (path: string, payload: Record<string, unknown>) => {
@@ -163,8 +223,7 @@ export function useRoom(roomId: string): RoomApi {
           setError(body.error ?? "That did not work");
         } else {
           setError(null);
-          versionRef.current = body.version;
-          setView(body);
+          take(body);
         }
       } catch {
         setError("Could not reach the table");
@@ -172,7 +231,7 @@ export function useRoom(roomId: string): RoomApi {
         setBusy(false);
       }
     },
-    [roomId],
+    [roomId, take],
   );
 
   const leave = useCallback(async () => {
@@ -209,14 +268,13 @@ export function useRoom(roomId: string): RoomApi {
         return;
       }
       setError(null);
-      versionRef.current = body.version;
-      setView(body);
+      take(body);
     } catch {
       setError("Could not reach the table");
     } finally {
       setBusy(false);
     }
-  }, [roomId]);
+  }, [roomId, take]);
 
   return {
     view,

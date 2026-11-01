@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_RULES } from "@/game/rules";
-import { DEFAULT_ROOM_SETTINGS, turnMs } from "@/game/room";
+import { DEFAULT_ROOM_SETTINGS, TABLE_IDLE_MS, turnMs } from "@/game/room";
 
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
-const { FIXED_ROOM_ID, RoomError, act, claimSeat, control, listGames, passwordRequired, readRoom, resetTable } =
-  await import("../rooms");
+const {
+  FIXED_ROOM_ID,
+  RoomError,
+  act,
+  claimSeat,
+  control,
+  holdsResetKey,
+  listGames,
+  passwordRequired,
+  readRoom,
+  resetTable,
+} = await import("../rooms");
 const { roomStore } = await import("../store");
 
 const ID = FIXED_ROOM_ID;
@@ -785,9 +795,16 @@ describe("getting up", () => {
 });
 
 describe("resetting from the seat picker", () => {
-  it("empties every chair and frees the table, so a new device can take it", async () => {
+  it("empties every chair and frees a table not seen lately, so a new device can take it", async () => {
     const { id, tokens, table } = await dealtRoom([0, 2]);
-    const reset = await resetTable(id);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    let reset;
+    try {
+      vi.setSystemTime(Date.now() + TABLE_IDLE_MS + 1);
+      reset = await resetTable(id);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(reset.started).toBe(false);
     expect(reset.tablePresent).toBe(false);
     expect(reset.players.every((p) => p.occupant.kind === "open")).toBe(true);
@@ -795,5 +812,30 @@ describe("resetting from the seat picker", () => {
     expect((await readRoom(id, table)).you.role).toBe("spectator");
     expect((await readRoom(id, tokens[0])).you.role).toBe("spectator");
     expect((await claimSeat(id, { seat: "table" })).view.you.role).toBe("table");
+  });
+
+  it("is refused from the seat picker while the table is there, and allowed with the reset key", async () => {
+    const { id } = await dealtRoom([0]);
+    await expect(resetTable(id)).rejects.toMatchObject({ status: 409 });
+    expect((await readRoom(id, null)).started).toBe(true);
+    await resetTable(id, { operator: true });
+    expect((await readRoom(id, null)).started).toBe(false);
+  });
+
+  it("only takes the deployment's own key, and none at all when it has not set one", () => {
+    const before = process.env.MAHJONG_RESET_KEY;
+    try {
+      delete process.env.MAHJONG_RESET_KEY;
+      expect(holdsResetKey("")).toBe(false);
+      expect(holdsResetKey("anything")).toBe(false);
+      process.env.MAHJONG_RESET_KEY = "s3cret";
+      expect(holdsResetKey("s3cret")).toBe(true);
+      expect(holdsResetKey("s3cret ")).toBe(false);
+      expect(holdsResetKey("s3cre")).toBe(false);
+      expect(holdsResetKey(null)).toBe(false);
+    } finally {
+      if (before === undefined) delete process.env.MAHJONG_RESET_KEY;
+      else process.env.MAHJONG_RESET_KEY = before;
+    }
   });
 });

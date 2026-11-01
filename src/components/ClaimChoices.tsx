@@ -19,8 +19,9 @@ export function claimedIndex(option: ClaimOption, discard: TileCode): number {
   return option.type === "chow" ? option.codes.indexOf(discard) : option.codes.length - 1;
 }
 
-function describe(option: ClaimOption, discard: TileCode): string {
+function describe(option: ClaimOption, discard: TileCode, concealed: boolean): string {
   if (option.type === "win") return `Win on ${tileName(discard)}`;
+  if (concealed) return `${option.type[0].toUpperCase()}${option.type.slice(1)} ${tileName(discard)}`;
   const taken = claimedIndex(option, discard);
   const yours = option.codes.filter((_, i) => i !== taken).map(tileName);
   return `${option.type[0].toUpperCase()}${option.type.slice(1)} ${option.codes
@@ -46,6 +47,7 @@ export function ClaimChoices({
   onMoreTime,
   faan,
   running = true,
+  concealed = false,
 }: {
   options: ClaimOption[];
   discard: TileCode;
@@ -61,6 +63,11 @@ export function ClaimChoices({
   faan?: ReactNode;
   /** False while the table is paused: the window holds where it is. */
   running?: boolean;
+  /**
+   * The hand is face down: each claim says what it is and shows the discard
+   * it takes, but not the tiles it would use from the hand.
+   */
+  concealed?: boolean;
 }) {
   const left = useCountdown(deadlineIn, running) ?? 0;
   const timer: CSSProperties & { "--left": number } = {
@@ -77,7 +84,7 @@ export function ClaimChoices({
             type="button"
             className={`claim claim--${option.type}`}
             disabled={busy}
-            aria-label={describe(option, discard)}
+            aria-label={describe(option, discard, concealed)}
             onClick={() => onClaim(option.id)}
             onPointerEnter={() => onPreview?.(option)}
             onPointerLeave={() => onPreview?.(null)}
@@ -86,7 +93,7 @@ export function ClaimChoices({
           >
             <span className="claim__label">{CLAIM_LABEL[option.type]}</span>
             <span className="claim__meld" aria-hidden>
-              {option.type === "win" ? (
+              {option.type === "win" || concealed ? (
                 <span className="claim__taken">
                   <TileFace code={discard} size="sm" />
                 </span>

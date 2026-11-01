@@ -30,6 +30,7 @@ import {
   pauseTable,
   resumeTable,
   resetRoom,
+  resetRefusal,
   returnToLobby,
   beginHand,
   startPlay,
@@ -159,6 +160,18 @@ export async function readRoom(id: string, token: string | null): Promise<RoomVi
     if (await roomStore().compareAndSet(room, expected)) await keepIfFinished(room, wasOver, now);
   }
   return viewFor(room, token, now);
+}
+
+/**
+ * Whether a reset carries the deployment's own key (`MAHJONG_RESET_KEY`). Unset,
+ * nothing matches: a game in progress is then the table's alone to reset.
+ */
+export function holdsResetKey(supplied: string | null): boolean {
+  const expected = process.env.MAHJONG_RESET_KEY ?? "";
+  if (!expected || !supplied) return false;
+  const a = Buffer.from(supplied.padEnd(64).slice(0, 64));
+  const b = Buffer.from(expected.padEnd(64).slice(0, 64));
+  return supplied.length === expected.length && timingSafeEqual(a, b);
 }
 
 /**
@@ -309,8 +322,14 @@ export async function act(id: string, token: string, action: PlayerAction): Prom
  * picker, where nobody holds a token. It is the way back in when the table is
  * marked in use by a device that is no longer there.
  */
-export async function resetTable(id: string): Promise<RoomView> {
+/**
+ * Empty a table from the seat picker. `operator` is whoever runs the
+ * deployment, holding its reset key, who may reset a game in progress too.
+ */
+export async function resetTable(id: string, { operator = false } = {}): Promise<RoomView> {
   const room = await mutate(id, (r, now) => {
+    const refused = operator ? null : resetRefusal(r, now);
+    if (refused) throw new RoomError(refused, 409);
     resetRoom(r, now, { keepTable: false });
   });
   return viewFor(room, null);

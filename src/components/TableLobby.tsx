@@ -101,6 +101,18 @@ export function TableLobby({
 
   const taken = (seat: Seat) => view.players[seat].occupant.kind === "human";
 
+  // A typed name is for whoever scans that chair's code next. Once somebody
+  // sits there it has done its job: kept, it would greet the next person to
+  // scan the chair after they leave, under someone else's name.
+  const seatedKey = SEATS.map((s) => (taken(s) ? "1" : "0")).join("");
+  useEffect(() => {
+    setNames((typed) => {
+      const open = Object.entries(typed).filter(([seat]) => !taken(Number(seat) as Seat));
+      return open.length === Object.keys(typed).length ? typed : Object.fromEntries(open);
+    });
+    // Only when somebody sits down or gets up.
+  }, [seatedKey]);
+
   /**
    * A seat's own link: which chair, and the name the table typed for it. A
    * taken chair's link also says to put out whoever is there, so a dead phone
@@ -337,7 +349,9 @@ export function TableLobby({
           >
             Reset table
           </button>
-          <span className="gather__count">
+          <span className="gather__count" id="deal-note">
+            {/* A greyed-out Deal says nothing on its own about why. */}
+            {seated.length === 0 ? "Deal opens once somebody sits down" : null}
             {seated.length > 0 && open > 0
               ? `${joinNames(computerSeats)} ${open === 1 ? "goes" : "go"} to the computer if still open`
               : null}
@@ -351,6 +365,7 @@ export function TableLobby({
               type="button"
               className="btn btn--primary btn--deal"
               disabled={api.busy || seated.length === 0}
+              aria-describedby={seated.length === 0 ? "deal-note" : undefined}
               // The table's look goes with the deal, for every phone to start the game in.
               onClick={() => void api.control({ type: "deal", look: appearance.appearance })}
             >

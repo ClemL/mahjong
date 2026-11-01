@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { RESET_KEY } from "./e2e/resetKey";
 
 const PORT = 3100;
 
@@ -31,5 +32,8 @@ export default defineConfig({
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
+    // Lets the specs empty a table an earlier one left mid-game, which only
+    // the table itself may otherwise do.
+    env: { MAHJONG_RESET_KEY: RESET_KEY },
   },
 });

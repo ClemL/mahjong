@@ -3,11 +3,12 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import type { Seat } from "@/game/tiles";
 import { SEAT_NAMES, seatWind, tileName } from "@/game/tiles";
-import { hurryUp, noteDiscard } from "@/game/room";
+import { PLAYS_SENT_TO_PHONES, hurryUp, noteDiscard } from "@/game/room";
 import { discard } from "@/game/engine";
 import type { RoomView } from "@/game/room";
 import type { Meld } from "@/game/melds";
 import { PhoneView } from "../PhoneView";
+import { PLAY_LOG_LINES } from "../PlayLog";
 import { NAMES, claimable, dealt, fakeApi, playerView, sound, underway } from "./fixtures";
 
 /** Phones in these tests are touch screens unless they say otherwise. */
@@ -295,6 +296,59 @@ describe("PhoneView", () => {
 
     fireEvent.click(within(group).getAllByRole("button")[0]);
     expect(api.act).toHaveBeenCalledWith({ type: "claim", optionId: option.id });
+  });
+
+  it("keeps the hand's own tiles out of the claims while it is face down", () => {
+    const { room, claimer } = claimable();
+    const view = playerView(room, claimer);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    const discard = view.lastDiscard!.tile.code;
+    const group = () => screen.getByRole("group", { name: `Claim ${tileName(discard)}?` });
+    const sets = view.claim!.options.filter((o) => o.type !== "win");
+    expect(sets.length).toBeGreaterThan(0);
+
+    // Face down, as every hand is dealt: each claim shows only the discard it takes.
+    for (const claim of group().querySelectorAll(".claim:not(.claim--win) .claim__meld")) {
+      expect(claim.querySelectorAll(".tile")).toHaveLength(1);
+    }
+    expect(within(group()).queryByRole("button", { name: /using your/ })).toBeNull();
+
+    // Turned up, the sets it would make are drawn whole.
+    fireEvent.click(container.querySelector(".phone__hand--hidden")!);
+    expect(within(group()).getAllByRole("button", { name: /using your/ })).toHaveLength(sets.length);
+  });
+
+  it("says Discard on a tile only when a press would throw it", () => {
+    const { room, seat } = onTurn();
+    const waiting = playerView(room, ((seat + 1) % 4) as Seat);
+    const { container, unmount } = render(<PhoneView api={fakeApi(waiting)} view={waiting} sound={sound} />);
+    expect(handButtons(container).every((b) => !b.getAttribute("aria-label")!.startsWith("Discard"))).toBe(true);
+    unmount();
+
+    const own = playerView(room, seat);
+    const mine = render(<PhoneView api={fakeApi(own)} view={own} sound={sound} />);
+    expect(handButtons(mine.container).every((b) => b.getAttribute("aria-label")!.startsWith("Discard "))).toBe(true);
+  });
+
+  it("moves the focused tile along the hand with Alt and an arrow, and keeps it focused", () => {
+    window.localStorage.clear();
+    const { seat, room } = onTurn();
+    const view = playerView(room, ((seat + 1) % 4) as Seat);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    const ids = () => handButtons(container).map((b) => b.getAttribute("data-tile-id"));
+    const before = ids();
+    const first = handButtons(container)[0];
+    first.focus();
+
+    fireEvent.keyDown(first, { key: "ArrowRight", altKey: true });
+    expect(ids()).toEqual([before[1], before[0], ...before.slice(2)]);
+    expect(document.activeElement?.getAttribute("data-tile-id")).toBe(before[0]);
+
+    // Without Alt the arrow is left to the browser, and the first tile cannot go further left.
+    fireEvent.keyDown(document.activeElement!, { key: "ArrowRight" });
+    fireEvent.keyDown(handButtons(container)[0], { key: "ArrowLeft", altKey: true });
+    expect(ids()).toEqual([before[1], before[0], ...before.slice(2)]);
+    expect(screen.getByRole("group", { name: "Your hand" }).getAttribute("aria-describedby")).toBeTruthy();
   });
 
   it("opens the patterns a win would score from the faan beside it, off a discard or self-drawn", () => {
@@ -796,5 +850,11 @@ describe("PhoneView — whose move it is", () => {
     const row = container.querySelector(".phone__hand")!;
     expect(row.previousElementSibling).toBe(container.querySelector(".helper"));
     expect(row.parentElement!.lastElementChild).toBe(row);
+  });
+});
+
+describe("PhoneView's play log", () => {
+  it("is sent at least as many plays as it shows", () => {
+    expect(PLAYS_SENT_TO_PHONES).toBeGreaterThanOrEqual(PLAY_LOG_LINES);
   });
 });

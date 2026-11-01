@@ -406,6 +406,8 @@ export interface RoomView {
   look: (TableLook & { id: number }) | null;
   /** Which game this is, for what a phone keeps per hand: hand numbers repeat from game to game. */
   gameId: number;
+  /** Whether the seat picker may empty the table: not while a game is being played round a table that is still there. */
+  canReset: boolean;
 }
 
 const HIDDEN: TileCode = "back";
@@ -757,7 +759,24 @@ export function seatName(room: Room, seat: Seat, name: string | undefined): stri
   const names = seatedNames(room.seats);
   // Whoever is in the chair now is renaming themselves or being put out.
   names[seat] = null;
-  return (name ?? "").trim().slice(0, 16) || openSeatName(names, seat);
+  const typed = (name ?? "").trim().slice(0, 16);
+  return typed ? uniqueName(typed, names) : openSeatName(names, seat);
+}
+
+/**
+ * A typed name nobody else at the table goes by, or it with a number after
+ * it. Two Srinis would make every "Waiting for Srini" a guess, and the
+ * table's history, kept by name, would add their games together.
+ */
+function uniqueName(name: string, names: readonly (string | null)[]): string {
+  const key = (n: string) => n.trim().toLowerCase();
+  const held = new Set(names.flatMap((n) => (n === null ? [] : [key(n)])));
+  if (!held.has(key(name))) return name;
+  for (let n = 2; ; n++) {
+    const suffix = ` ${n}`;
+    const next = `${name.slice(0, 16 - suffix.length).trimEnd()}${suffix}`;
+    if (!held.has(key(next))) return next;
+  }
 }
 
 /** How many taken-over tokens a room remembers; older ones just see the seat picker. */
@@ -784,6 +803,32 @@ export function openTable(room: Room, token: string, { replace = false } = {}, n
   }
   room.table = { token, lastSeen: now };
   return null;
+}
+
+/**
+ * How many of the hand's plays a phone is sent. It shows the last few and
+ * reads the winning tile off the newest; the whole log, the table's for its
+ * replay, was three quarters of every update a phone downloaded.
+ */
+export const PLAYS_SENT_TO_PHONES = 8;
+
+function recentPlays(state: GameState): LogEntry[] {
+  return state.log
+    .filter((e) => e.play?.hand === state.handNumber && e.seat !== null)
+    .slice(-PLAYS_SENT_TO_PHONES);
+}
+
+/**
+ * Why emptying the table from the seat picker would be refused, or null. The
+ * link is all anyone needs to reach the seat picker, so one tap there must not
+ * wipe a game being played round a table that is still there: that game is the
+ * table's to end. A table not seen lately can still be reset — or taken over,
+ * which keeps the game — and so can a finished game, already kept in history.
+ */
+export function resetRefusal(room: Room, now = Date.now()): string | null {
+  if (!room.started || room.state.phase === "gameOver") return null;
+  if (!room.table || now - room.table.lastSeen > TABLE_IDLE_MS) return null;
+  return "A game is being played here, and only the table can reset it. Take the table over first to reset it from this device.";
 }
 
 /**
@@ -1217,7 +1262,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     scores: state.scores,
     result: state.result,
     history: state.history,
-    log: state.log,
+    log: you.role === "table" ? state.log : recentPlays(state),
     config: state.config,
     you,
     displacedFrom: displaced && displaced.seat !== "table" ? displaced.seat : null,
@@ -1274,6 +1319,7 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     readyWaiting: readyWaiting(room, now),
     look: room.look,
     gameId: room.gameId,
+    canReset: resetRefusal(room, now) === null,
   };
 }
 

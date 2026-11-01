@@ -87,6 +87,12 @@ describe("SeatPicker", () => {
     expect(screen.getByText("That seat is taken")).toBeTruthy();
   });
 
+  it("leaves a game in progress to the table rather than offering to reset it", () => {
+    render(<SeatPicker view={spectating()} onClaim={vi.fn()} onReset={() => {}} busy={false} error={null} />);
+    expect(screen.queryByRole("button", { name: "Reset table" })).toBeNull();
+    expect(screen.getByText(/Only the table can reset it/)).toBeTruthy();
+  });
+
   it("offers to take over a table open on another device, game and all", () => {
     const room = dealt([0, 2]);
     const onClaim = vi.fn(async () => true);

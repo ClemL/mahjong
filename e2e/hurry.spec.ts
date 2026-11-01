@@ -1,11 +1,24 @@
 import { type Browser, type Page, expect, test } from "@playwright/test";
-import { PHONE_LANDSCAPE, TABLET, expectNoSidewaysScroll, presetPreferences, watchErrors } from "./helpers";
+import {
+  PHONE_LANDSCAPE,
+  TABLET,
+  deviceAddress,
+  expectNoSidewaysScroll,
+  presetPreferences,
+  resetTable,
+  watchErrors,
+} from "./helpers";
 
 const ROOM = "TABLE3";
 const HURRY_BUZZ = [120, 80, 120, 80, 120];
 
 async function open(browser: Browser, assists = false) {
-  const context = await browser.newContext({ viewport: PHONE_LANDSCAPE, hasTouch: true, isMobile: true });
+  const context = await browser.newContext({
+    viewport: PHONE_LANDSCAPE,
+    hasTouch: true,
+    isMobile: true,
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
+  });
   const page = await context.newPage();
   await presetPreferences(page, {});
   if (assists) {
@@ -51,7 +64,7 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   browser,
   request,
 }) => {
-  expect((await request.post(`/api/rooms/${ROOM}/reset`)).ok()).toBe(true);
+  await resetTable(request, ROOM);
 
   // Kris has switched the assists on; Zaid and Lucy have them on without
   // touching a setting.
@@ -65,7 +78,10 @@ test("a hurry-up flashes everything but the hand of the player on turn, one at a
   await zaid.page.goto(`/room/${ROOM}?seat=1&name=Zaid`);
   const lucy = await open(browser);
   await lucy.page.goto(`/room/${ROOM}?seat=2&name=Lucy`);
-  const tableContext = await browser.newContext({ viewport: TABLET });
+  const tableContext = await browser.newContext({
+    viewport: TABLET,
+    extraHTTPHeaders: { "x-forwarded-for": deviceAddress() },
+  });
   const table = await tableContext.newPage();
   const tableErrors = watchErrors(table);
   await presetPreferences(table, {});

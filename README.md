@@ -249,10 +249,16 @@ view so the pond is visible somewhere.
   every poll in an `Authorization` header — never the URL, which ends up in
   logs — and the server maps token → seat. Nobody can play a seat that is not
   theirs.
-- **Version polling.** Clients poll the room version about once a second; when
-  nothing has changed the server replies with a bare marker instead of the
-  table, so the idle cost to the client is a few dozen bytes a second. No
-  sockets, which keeps the whole thing on Vercel's serverless runtime.
+- **Version polling.** Clients poll the room version about once a second while
+  a hand is being played; when nothing has changed the server replies with a
+  bare marker instead of the table, so the idle cost to the client is a few
+  dozen bytes a poll. No sockets, which keeps the whole thing on Vercel's
+  serverless runtime. Where nothing moves on its own — the lobby, a paused or
+  finished game, a phone still at the seat picker — the poll slows to every
+  2.5 seconds, and a device left untouched for ten minutes while nothing
+  changes slows to every 20 seconds until it is touched again. A tablet left on
+  overnight used to make about 78,000 requests a day, each a function call and
+  a Redis read; it now makes about 4,500.
 - **Rooms are stored deflated.** Each poll still reads the room from Redis, and
   a room reaches 28 KB of JSON late in a game. Stored deflated (with the version
   kept readable in front for the compare-and-set script) it is about 5 KB: over
@@ -262,7 +268,10 @@ view so the pond is visible somewhere.
 - **Redaction happens on the server.** A player's view carries their own tiles
   and opaque stand-ins for everyone else's; the table's view carries no
   concealed tiles at all; the wall is never serialized to anyone. This is
-  covered by tests that assert on the wire format rather than the UI.
+  covered by tests that assert on the wire format rather than the UI. A phone
+  is also sent only the newest eight plays of the hand rather than the table's
+  whole log, which was three quarters of every update it downloaded: late in a
+  game a phone's view is now about 9 KB instead of 29 KB.
 - **Claims are windowed.** A discard opens a 20-second window. Computer seats
   answer at once, people get the window, and an unanswered seat is treated as a
   pass — so one person putting their phone down does not stall the table. The
@@ -291,6 +300,12 @@ view so the pond is visible somewhere.
   across serverless instances: 20 claim attempts per 10 minutes, and 120 actions
   a minute. The table is open to anyone holding the link, so that limit is what
   stands between a passer-by and all four chairs.
+- **Resetting.** The seat picker can empty a table, for a new group sitting down
+  to what is left of the last one's game. It cannot while a game is being
+  played round a table seen in the last minute: that game is the table's to
+  end, from its own settings, and anyone else is pointed at taking the table
+  over first. Whoever runs the deployment can still reset any table by sending
+  `MAHJONG_RESET_KEY` in an `x-reset-key` header; the browser tests do.
 - **Pacing.** Around a shared table nobody is watching the exact instant a tile
   is thrown, and a poll can deliver the move up to a second after it happened,
   so the table runs its animations about 2.5× slower than a screen you watch up
@@ -306,6 +321,7 @@ view so the pond is visible somewhere.
 ```bash
 UPSTASH_REDIS_REST_URL=...    # required in production
 UPSTASH_REDIS_REST_TOKEN=...
+MAHJONG_RESET_KEY=...         # optional: lets the operator reset a game in progress
 ```
 
 Multiplayer needs no password variable while `REQUIRE_PASSWORD` is false.
