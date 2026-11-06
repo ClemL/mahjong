@@ -6,6 +6,7 @@
  * different buttons.
  */
 
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { PublicPlayer, RoomView } from "@/game/room";
 import { SEAT_NAMES, roundName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
@@ -147,5 +148,75 @@ export function TableMenu({
         <TableSettings api={api} view={view} sound={sound} appearance={appearance} display={display} />
       </SettingsMenu>
     </>
+  );
+}
+
+/** Three dots, for the menu that holds the table's own controls. */
+function MoreIcon() {
+  return (
+    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <circle cx="19" cy="12" r="2" />
+    </svg>
+  );
+}
+
+/**
+ * The table's controls folded into a corner of the felt: a button that opens
+ * them over the cloth, and closes on Escape or a touch anywhere else. A corner
+ * sits between two chairs and belongs to neither, and the controls are used a
+ * few times a game, so they need not hold a bar across every hand.
+ */
+export function CornerMenu({
+  label,
+  alert,
+  children,
+}: {
+  label: string;
+  /** Something in the menu wants attention: marked on the button, and said in its name. */
+  alert?: string | null;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (!target || box.current?.contains(target)) return;
+      // A sheet or dialog opened from the menu covers the screen; touching it
+      // is not touching the felt.
+      if (target.closest?.(".sheet__backdrop, .modal__backdrop, .drawer__backdrop, .film__backdrop")) return;
+      setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+    };
+  }, [open]);
+  return (
+    <div className="corner-menu" ref={box}>
+      <button
+        type="button"
+        className="felt__corner-btn"
+        aria-label={alert ? `${label}: ${alert}` : label}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <MoreIcon />
+        {alert ? <span className="felt__corner-alert" aria-hidden /> : null}
+      </button>
+      {open ? (
+        <div className="corner-menu__panel" role="group" aria-label={label}>
+          {children}
+        </div>
+      ) : null}
+    </div>
   );
 }

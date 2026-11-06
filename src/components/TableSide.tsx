@@ -8,7 +8,7 @@ import { tableName } from "@/game/tables";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { FullscreenApi } from "@/hooks/useFullscreen";
-import { SIDE_PANES, type SidePane, type TabletDisplay, useHiddenPanes } from "@/hooks/useLocalSetting";
+import { SIDE_PANES, type SidePane, type TabletDisplay, useFoldedPanes, useHiddenPanes } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import type { WakeLockState } from "@/hooks/useWakeLock";
 import { QrCode } from "./QrCode";
@@ -60,35 +60,73 @@ const PANE_TITLES: Record<SidePane, string> = {
   settings: "Settings",
 };
 
-/** A pane, with a way to close it for anyone who would rather see less. */
+/** How each pane is folded and closed: shared by every card, so each says only what it holds. */
+type PaneControls = {
+  onHide: (pane: SidePane) => void;
+  folded: SidePane[];
+  onFold: (pane: SidePane) => void;
+};
+
+/**
+ * A pane, with a chevron before its title that folds it down to that one line
+ * and back, and a way to close it for anyone who would rather not see it at all.
+ */
 function Card({
   pane,
-  onHide,
+  controls,
   children,
 }: {
   pane: SidePane;
-  onHide: (pane: SidePane) => void;
+  controls: PaneControls;
   children: ReactNode;
 }) {
   const id = useId();
   const title = PANE_TITLES[pane];
+  const folded = controls.folded.includes(pane);
   return (
-    <section className={`side__card side__${pane}`} aria-labelledby={id}>
+    <section className={`side__card side__${pane}${folded ? " side__card--folded" : ""}`} aria-labelledby={id}>
       <div className="side__cardhead">
+        <button
+          type="button"
+          className="side__fold"
+          aria-label={`${folded ? "Unfold" : "Fold"} ${title}`}
+          aria-expanded={!folded}
+          onClick={() => controls.onFold(pane)}
+        >
+          <svg
+            className="side__fold-icon"
+            aria-hidden="true"
+            width="12"
+            height="12"
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2.5 4.5 6 8l3.5-3.5" />
+          </svg>
+        </button>
         <h3 className="side__title" id={id}>
           {title}
         </h3>
-        <button type="button" className="side__hide" aria-label={`Hide ${title}`} onClick={() => onHide(pane)}>
+        <button
+          type="button"
+          className="side__hide"
+          aria-label={`Hide ${title}`}
+          onClick={() => controls.onHide(pane)}
+        >
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      {children}
+      {folded ? null : children}
     </section>
   );
 }
 
 /** The round, the dealership, the wall, and who the table is waiting on. */
-function RoundCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) => void }) {
+function RoundCard({ view, controls }: { view: RoomView; controls: PaneControls }) {
   const name = (seat: Seat) => occupantName(view.players[seat]);
   const { deal, total } = gameProgress(view);
   const doing =
@@ -103,7 +141,7 @@ function RoundCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) 
           : `${name(view.turn)} to play`;
 
   return (
-    <Card pane="round" onHide={onHide}>
+    <Card pane="round" controls={controls}>
       <div className="side__roundline">
         <span className="side__roundwind" aria-hidden>
           {tileGlyph(view.roundWind)}
@@ -136,7 +174,7 @@ function RoundCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) 
 }
 
 /** Everyone's chips, their place, and what the last hand did to them. */
-function ScoreCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) => void }) {
+function ScoreCard({ view, controls }: { view: RoomView; controls: PaneControls }) {
   const name = (seat: Seat) => occupantName(view.players[seat]);
   const place = standings(view.scores);
   const last = view.history.at(-1) ?? null;
@@ -149,7 +187,7 @@ function ScoreCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) 
     : null;
 
   return (
-    <Card pane="scores" onHide={onHide}>
+    <Card pane="scores" controls={controls}>
       <table className="side__board">
         <thead>
           <tr>
@@ -206,11 +244,11 @@ function ScoreCard({ view, onHide }: { view: RoomView; onHide: (pane: SidePane) 
 }
 
 /** The rules a win is paid under: what is in force, and points for each faan. */
-function RulesCard({ config, onHide }: { config: RuleConfig; onHide: (pane: SidePane) => void }) {
+function RulesCard({ config, controls }: { config: RuleConfig; controls: PaneControls }) {
   const from = Math.max(0, config.minFaan);
   const faans = Array.from({ length: Math.max(0, config.limitFaan - from + 1) }, (_, i) => from + i);
   return (
-    <Card pane="scoring" onHide={onHide}>
+    <Card pane="scoring" controls={controls}>
       <div className="side__chips-row">
         {rulesInForce(config).map((rule) => (
           <span key={rule} className="tset__chip">
@@ -253,11 +291,11 @@ function RulesCard({ config, onHide }: { config: RuleConfig; onHide: (pane: Side
 function JoinCard({
   view,
   seats,
-  onHide,
+  controls,
 }: {
   view: RoomView;
   seats: Seat[];
-  onHide: (pane: SidePane) => void;
+  controls: PaneControls;
 }) {
   // Built in the browser: the page has no idea what host it is served from.
   const [origin, setOrigin] = useState<string | null>(null);
@@ -272,7 +310,7 @@ function JoinCard({
   const more = seats.length - 1;
 
   return (
-    <Card pane="join" onHide={onHide}>
+    <Card pane="join" controls={controls}>
       <div className="side__code">
         {origin ? (
           <QrCode
@@ -320,16 +358,16 @@ function SettingsCard({
   view,
   sound,
   display,
-  onHide,
+  controls,
 }: {
   api: RoomApi;
   view: RoomView;
   sound?: SoundToggle;
   display: TabletDisplay;
-  onHide: (pane: SidePane) => void;
+  controls: PaneControls;
 }) {
   return (
-    <Card pane="settings" onHide={onHide}>
+    <Card pane="settings" controls={controls}>
       {sound ? (
         <SwitchRow
           label="Sound"
@@ -393,7 +431,9 @@ export function TableSide({
 }) {
   const computer = SEATS.filter((seat) => view.players[seat].occupant.kind === "ai");
   const panes = useHiddenPanes();
+  const folds = useFoldedPanes();
   const shown = (pane: SidePane) => !panes.hidden.includes(pane);
+  const controls: PaneControls = { onHide: panes.hide, folded: folds.folded, onFold: folds.toggle };
 
   return (
     <aside className="side" aria-label={`${tableName(view.roomId)}: the game`}>
@@ -416,16 +456,16 @@ export function TableSide({
       <div className="side__body">
         <div className="side__cols">
           <div className="side__col">
-            {shown("round") ? <RoundCard view={view} onHide={panes.hide} /> : null}
-            {shown("scores") ? <ScoreCard view={view} onHide={panes.hide} /> : null}
-            {shown("scoring") ? <RulesCard config={view.config} onHide={panes.hide} /> : null}
+            {shown("round") ? <RoundCard view={view} controls={controls} /> : null}
+            {shown("scores") ? <ScoreCard view={view} controls={controls} /> : null}
+            {shown("scoring") ? <RulesCard config={view.config} controls={controls} /> : null}
           </div>
           <div className="side__col">
             {shown("join") && computer.length > 0 ? (
-              <JoinCard view={view} seats={computer} onHide={panes.hide} />
+              <JoinCard view={view} seats={computer} controls={controls} />
             ) : null}
             {shown("settings") ? (
-              <SettingsCard api={api} view={view} sound={sound} display={display} onHide={panes.hide} />
+              <SettingsCard api={api} view={view} sound={sound} display={display} controls={controls} />
             ) : null}
           </div>
         </div>

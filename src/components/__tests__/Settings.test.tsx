@@ -194,13 +194,14 @@ describe("a phone's settings", () => {
 
   it("groups the phone's own settings, each a switch or a choice", () => {
     const display = phoneDisplay();
+    const layout = { layout: "rail" as const, setLayout: vi.fn() };
     render(
       <PhoneSettings
         sound={sound}
         config={tableView(lobby([0])).config}
         appearance={appearance}
         display={display}
-        layout={{ compact: false, setCompact: vi.fn() }}
+        layout={layout}
       />,
     );
     for (const group of ["On this phone", "Your hand", "Assists"]) {
@@ -212,6 +213,8 @@ describe("a phone's settings", () => {
     expect(display.setHurry).toHaveBeenCalledWith("on");
     fireEvent.click(within(screen.getByRole("group", { name: "Button size" })).getByRole("button", { name: "Comfy" }));
     expect(display.setSize).toHaveBeenCalledWith("comfy");
+    fireEvent.click(within(screen.getByRole("group", { name: "Layout" })).getByRole("button", { name: "Shelves" }));
+    expect(layout.setLayout).toHaveBeenCalledWith("shelves");
     fireEvent.click(screen.getByRole("switch", { name: "Stretch to the edges" }));
     expect(display.setStretch).toHaveBeenCalledWith("on");
     // Set hints are one of the assists now.

@@ -54,8 +54,8 @@ describe("TableTop", () => {
     const view = { ...tableView(dealt()), roomId: "TABLE2" };
     const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
 
+    // The corners are placed against the racks, so they wait for the measure too.
     expect(container.querySelector(".felt")!.childElementCount).toBe(0);
-    expect(screen.getByText("Table 2")).toBeTruthy();
   });
 
   it("draws a rack for every seat with who sits there and how many tiles they hold", () => {
@@ -455,16 +455,29 @@ describe("TableTop", () => {
     expect(side.getByRole("button", { name: "Settings" })).toBeTruthy();
   });
 
-  it("keeps the bar and a full-width felt on a screen close to square", () => {
+  it("keeps a full-width felt on a screen close to square, its controls in the corners", () => {
     // A OnePlus Open opened out, in Chrome.
     feltSize(898, 764);
     const view = tableView(dealt([0, 2]));
-    const { container } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const api = fakeApi(view);
+    const { container } = render(<TableTop api={api} view={view} sound={sound} />);
 
     expect(container.querySelector(".tabletop")!.className).not.toContain("tabletop--wide");
-    expect(container.querySelector(".tabletop__bar")).not.toBeNull();
+    expect(container.querySelector(".tabletop__bar")).toBeNull();
     expect(screen.queryByRole("complementary")).toBeNull();
     expect(screen.queryByRole("img", { name: /Scan to take over/ })).toBeNull();
+    // The wall and the round sit in corners, and pause has one to itself.
+    expect(container.querySelector(".felt__corner--tr")!.textContent).toContain(`${view.wallCount}left`);
+    expect(container.querySelector(".felt__corner--bl")!.textContent).toContain(`hand ${view.handNumber}`);
+    fireEvent.click(screen.getByRole("button", { name: "Pause" }));
+    expect(api.control).toHaveBeenLastCalledWith({ type: "pause", value: true });
+    // The rest wait behind the menu in the top-left corner, until a touch anywhere else.
+    expect(screen.queryByRole("button", { name: "Redeal" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Table menu/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Redeal" }));
+    expect(api.control).toHaveBeenLastCalledWith({ type: "redeal" });
+    fireEvent.pointerDown(container.querySelector(".console")!);
+    expect(screen.queryByRole("button", { name: "Redeal" })).toBeNull();
   });
 
   it("offers one computer chair's code at a time, and the next once somebody sits down", () => {
@@ -518,6 +531,31 @@ describe("TableTop", () => {
     expect(screen.getByRole("region", { name: "Scoring" })).toBeTruthy();
     expect(screen.getByRole("region", { name: "Join in" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Show hidden panes/ })).toBeNull();
+    window.localStorage.clear();
+  });
+
+  it("folds a pane down to its title on a tap of it, remembers that on this tablet, and opens it again", () => {
+    feltSize(1264, 700);
+    window.localStorage.clear();
+    const view = tableView(dealt([0]));
+    const { unmount } = render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+
+    const scores = screen.getByRole("region", { name: "Scores" });
+    const fold = within(scores).getByRole("button", { name: "Fold Scores" });
+    expect(fold.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(fold);
+    // Folded, the pane is its title alone: still there to open, its table gone.
+    expect(fold.getAttribute("aria-expanded")).toBe("false");
+    expect(fold.getAttribute("aria-label")).toBe("Unfold Scores");
+    expect(within(scores).queryByRole("table")).toBeNull();
+    expect(screen.getByRole("region", { name: "Round" }).textContent).toMatch(/tiles left/);
+    unmount();
+
+    render(<TableTop api={fakeApi(view)} view={view} sound={sound} />);
+    const again = within(screen.getByRole("region", { name: "Scores" }));
+    expect(again.queryByRole("table")).toBeNull();
+    fireEvent.click(again.getByRole("button", { name: "Unfold Scores" }));
+    expect(again.getByRole("table")).toBeTruthy();
     window.localStorage.clear();
   });
 

@@ -3,7 +3,7 @@
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from "react";
 import { type GameSettings, usePreferences } from "@/hooks/usePreferences";
 import { type AppearanceApi, useAppearance } from "@/hooks/useAppearance";
-import { useCompactLayout } from "@/hooks/useCompactLayout";
+import { type PhoneLayout, usePhoneLayout } from "@/hooks/usePhoneLayout";
 import { SUIT_PALETTES, THEMES, TILE_BACKS, TILE_BODIES, TILE_STYLES } from "@/game/appearance";
 import type { TileCode } from "@/game/tiles";
 import { TABLES, type TableInfo, findTable } from "@/game/tables";
@@ -500,13 +500,13 @@ function LookTab({ api }: { api: AppearanceApi }) {
   );
 }
 
-const LAYOUTS = [
-  { compact: false, label: "Standard", hint: "A line for the prompt, roomy buttons" },
-  { compact: true, label: "Compact", hint: "Slimmer bars, so the hand tiles get larger" },
+const LAYOUTS: { value: PhoneLayout; label: string; hint: string }[] = [
+  { value: "rail", label: "Rail", hint: "The tile in play on the left, buttons on the right, the hand in one row" },
+  { value: "shelves", label: "Shelves", hint: "The hand in two rows split by suit, for the largest tiles" },
 ];
 
 function PhoneTab() {
-  const layout = useCompactLayout();
+  const layout = usePhoneLayout();
   return (
     <div className="bench__phone">
       <span className="bench__label" id="bench-layout-label">
@@ -514,28 +514,47 @@ function PhoneTab() {
       </span>
       <div className="bench__layouts" role="group" aria-labelledby="bench-layout-label">
         {LAYOUTS.map((option) => {
-          const on = option.compact === layout.compact;
+          const on = option.value === layout.layout;
           return (
             <button
-              key={option.label}
+              key={option.value}
               type="button"
-              className={`bench__layout${option.compact ? " bench__layout--compact" : ""}`}
+              className={`bench__layout bench__layout--${option.value}`}
               aria-pressed={on}
-              onClick={() => layout.setCompact(option.compact)}
+              onClick={() => layout.setLayout(option.value)}
             >
-              {/* A sketch of the controller: the bars, the hand, the buttons. */}
+              {/* A sketch of the controller: the bar, the middle, the hand. */}
               <span className="bench__sketch" aria-hidden="true">
                 <span className="bench__sketch-bar" />
-                {option.compact ? null : <span className="bench__sketch-bar bench__sketch-bar--short" />}
-                <span className="bench__sketch-hand">
-                  {Array.from({ length: 8 }, (_, i) => (
-                    <span key={i} />
-                  ))}
-                </span>
-                <span className="bench__sketch-btns">
-                  <span />
-                  <span />
-                </span>
+                {option.value === "rail" ? (
+                  <>
+                    <span className="bench__sketch-btns">
+                      <span />
+                      <span />
+                    </span>
+                    <span className="bench__sketch-hand">
+                      {Array.from({ length: 10 }, (_, i) => (
+                        <span key={i} />
+                      ))}
+                    </span>
+                  </>
+                ) : (
+                  <span className="bench__sketch-shelves">
+                    <span className="bench__sketch-rows">
+                      {[0, 1].map((row) => (
+                        <span key={row} className="bench__sketch-hand">
+                          {Array.from({ length: 6 }, (_, i) => (
+                            <span key={i} />
+                          ))}
+                        </span>
+                      ))}
+                    </span>
+                    <span className="bench__sketch-col">
+                      <span />
+                      <span />
+                    </span>
+                  </span>
+                )}
               </span>
               <span className="bench__layout-name">
                 {on ? <Check /> : null}

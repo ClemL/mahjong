@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import type { CompactLayout } from "@/hooks/useCompactLayout";
+import type { PhoneLayout, PhoneLayoutApi } from "@/hooks/usePhoneLayout";
 import type { PhoneDisplay, PhoneSize, PondOrder } from "@/hooks/useLocalSetting";
 import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
@@ -15,12 +15,16 @@ import { AppearancePanel } from "./AppearancePanel";
 import { FaanPanel, RulesPanel } from "./SidePanels";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 
-const LAYOUT: SegmentOption<"standard" | "compact">[] = [
-  { value: "standard", label: "Standard", hint: "A line for the prompt, roomy buttons" },
+const LAYOUT: SegmentOption<PhoneLayout>[] = [
   {
-    value: "compact",
-    label: "Compact",
-    hint: "One header line and slimmer buttons, so the hand tiles get larger",
+    value: "rail",
+    label: "Rail",
+    hint: "The tile in play on the left, your buttons on the right, the hand in one row along the bottom",
+  },
+  {
+    value: "shelves",
+    label: "Shelves",
+    hint: "The hand in two rows split by suit, for the largest tiles; everything else in a column on the right",
   },
 ];
 
@@ -81,7 +85,7 @@ export function PhoneSettings({
   wakeLock?: WakeLockState;
   /** Whether the table allows take back at all. */
   tableTakeBack?: boolean;
-  layout?: CompactLayout;
+  layout?: PhoneLayoutApi;
   /** This phone's display choices. */
   display?: PhoneDisplay;
   /** How the hand is laid out; absent where there is no hand yet. */
@@ -149,25 +153,25 @@ export function PhoneSettings({
         <Group title="Your hand">
           {sort ? <Segmented label="Sort tiles" options={SORT} value={sort.mode} onChange={sort.setMode} /> : null}
           {layout ? (
-            <Segmented
-              label="Layout"
-              options={LAYOUT}
-              value={layout.compact ? "compact" : "standard"}
-              onChange={(value) => layout.setCompact(value === "compact")}
-            />
+            <Segmented label="Layout" options={LAYOUT} value={layout.layout} onChange={layout.setLayout} />
           ) : null}
           {display ? (
             <>
               <Segmented label="Button size" options={SIZE} value={display.size} onChange={display.setSize} />
               <SwitchRow
                 label="Stretch to the edges"
-                hint="The hand runs to the edges of the screen and its tiles grow to fill it — the fewer in hand, the larger"
-                checked={display.stretch === "on"}
+                hint={
+                  layout?.layout === "shelves"
+                    ? "Rail only: shelves already size their tiles to fill the space"
+                    : "The hand runs to the edges of the screen and its tiles grow to fill it — the fewer in hand, the larger"
+                }
+                checked={layout?.layout !== "shelves" && display.stretch === "on"}
+                disabled={layout?.layout === "shelves"}
                 onChange={(on) => display.setStretch(on ? "on" : "off")}
               />
               <SwitchRow
                 label="Play log"
-                hint="The last four plays beside your buttons: discards, chows, pungs and kongs"
+                hint="The last four plays where your buttons go, while there is nothing to decide: discards, chows, pungs and kongs"
                 checked={display.playLog === "on"}
                 onChange={(on) => display.setPlayLog(on ? "on" : "off")}
               />

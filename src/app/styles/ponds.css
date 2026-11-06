@@ -19,24 +19,6 @@
     "hand hand";
 }
 
-.phone--landscape.phone--compact.phone--ponds {
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas:
-    "bar bar"
-    "melds melds"
-    "controls ponds"
-    "hand hand";
-}
-
-.phone--landscape.phone--compact.phone--ponds:has(> .phone__dock > .helper) {
-  grid-template-areas:
-    "bar bar"
-    "melds melds"
-    "controls ponds"
-    "helper helper"
-    "hand hand";
-}
-
 /* The discards take the space the buttons kept free on their right, so the
    play log has the rest of the width rather than a third of it. */
 .phone--landscape.phone--ponds .phone__controls {
@@ -245,12 +227,4 @@
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
-}
-
-/* A narrow phone keeps its header on one line: the button that brings the
-   discards in is its icon alone there, its name still said to screen readers. */
-@container (max-width: 700px) {
-  .phone__ponds-label {
-    display: none;
-  }
 }

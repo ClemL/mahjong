@@ -3,7 +3,9 @@
  *
  * The felt is a rectangle of whatever shape the tablet happens to be. Along
  * each edge runs a rack for that seat; inside them, each seat's discards sit in
- * a block in front of its owner, and a console fills the middle. The discards
+ * a block in front of its owner, and a console fills the middle. Where they
+ * fit, the four blocks are slid round into a pinwheel, each towards its
+ * owner's left, so a pond can run longer than the gap between its neighbours. The discards
  * are what everyone is watching, so the tile size is solved for: the largest
  * tile at which all four ponds hold `capacity` discards without crowding the
  * console out.
@@ -72,6 +74,8 @@ const CAPTION = 24;
 const MIN_TILE = 20;
 const MAX_TILE = 96;
 const MAX_ROWS = 6;
+/** The share of the largest tile a pinwheel may give up and still be preferred. */
+const PINWHEEL_GIVE = 0.95;
 /** A pond any wider stops reading as one player's pile and starts at their elbow. */
 const MAX_COLS = 12;
 const MAX_RACK_TILE = 34;
@@ -110,13 +114,17 @@ interface Candidate {
   side: PondShape;
   centerW: number;
   centerH: number;
+  /** Each pond slid towards its owner's left, the four turning about the middle. */
+  pinwheel: boolean;
 }
 
 /**
- * The best pond shapes for one tile size, or null if none fits. Two shapes
- * are tried: the across ponds fitting between the side ponds (which may then
- * run the full height), or the side ponds fitting between the across ponds.
- * A landscape tablet almost always wants the first.
+ * The best pond shapes for one tile size, or null if none fits. Three ways of
+ * laying them are tried: a pinwheel, each pond running along its edge from one
+ * corner until it meets the next pond; the across ponds fitting between the
+ * side ponds (which may then run the full height); or the side ponds fitting
+ * between the across ponds. A pinwheel is taken whenever one fits: it leaves
+ * the middle square and every pond the same distance from it.
  */
 function fitPonds(tile: number, width: number, height: number, capacity: number): Candidate | null {
   const pitch = rowPitch(tile);
@@ -136,19 +144,23 @@ function fitPonds(tile: number, width: number, height: number, capacity: number)
       const acrossLength = rowLength(tile, across.cols);
       const sideLength = rowLength(tile, side.cols);
 
+      const pinwheel =
+        acrossLength + MARGIN + sideDepth <= width && sideLength + MARGIN + acrossDepth <= height;
       const acrossBetweenSides =
         acrossLength <= width - 2 * (sideDepth + MARGIN) && sideLength <= height;
       const sidesBetweenAcross =
         sideLength <= height - 2 * (acrossDepth + MARGIN) && acrossLength <= width;
-      if (!acrossBetweenSides && !sidesBetweenAcross) continue;
+      if (!pinwheel && !acrossBetweenSides && !sidesBetweenAcross) continue;
 
       const centerW = width - 2 * (sideDepth + MARGIN);
       const centerH = height - 2 * (acrossDepth + MARGIN);
       if (centerW < minW || centerH < minH) continue;
 
-      if (!best || centerW * centerH > best.centerW * best.centerH) {
-        best = { across, side, centerW, centerH };
-      }
+      const better =
+        !best ||
+        (pinwheel && !best.pinwheel) ||
+        (pinwheel === best.pinwheel && centerW * centerH > best.centerW * best.centerH);
+      if (better) best = { across, side, centerW, centerH, pinwheel };
     }
   }
   return best;
@@ -167,13 +179,17 @@ export function layoutTable({
   const midW = Math.max(0, width - 2 * rack - 2 * MARGIN);
   const midH = Math.max(0, height - 2 * rack - 2 * MARGIN);
 
+  // The largest tile that fits, unless a pinwheel fits at nearly that size:
+  // on a near-square felt it is worth a pixel or two of tile.
   let tile = MIN_TILE;
   let fit: Candidate | null = null;
   for (let t = MAX_TILE; t >= MIN_TILE; t -= 1) {
-    fit = fitPonds(t, midW, midH, capacity);
-    if (fit) {
+    if (fit && (fit.pinwheel || t < tile * PINWHEEL_GIVE)) break;
+    const found = fitPonds(t, midW, midH, capacity);
+    if (!found) continue;
+    if (!fit || found.pinwheel) {
+      fit = found;
       tile = t;
-      break;
     }
   }
   // A screen too small for any of it still gets a table, just a cramped one.
@@ -186,6 +202,7 @@ export function layoutTable({
       side: shape,
       centerW: Math.max(0, midW - 2 * (depth + MARGIN)),
       centerH: Math.max(0, midH - 2 * (depth + MARGIN)),
+      pinwheel: false,
     };
   }
 
@@ -218,9 +235,15 @@ export function layoutTable({
     { cx: rack / 2, cy, w: along, h: depth, rotate: POSITION_ROTATION[3] },
   ];
 
+  // In a pinwheel each pond starts in the corner on its owner's left: the
+  // bottom one from the bottom left, the right one from the bottom right, and
+  // so round. Otherwise each is centred on its edge.
+  const inner = rack + MARGIN;
+  const slide = (start: number, end: number, length: number, fromStart: boolean) =>
+    fit!.pinwheel ? (fromStart ? start + length / 2 : end - length / 2) : (start + end) / 2;
   const ponds: TableLayout["ponds"] = [
     {
-      cx,
+      cx: slide(inner, width - inner, acrossLength, true),
       cy: height - rack - MARGIN - acrossDepth / 2,
       w: acrossLength,
       h: acrossDepth,
@@ -228,13 +251,25 @@ export function layoutTable({
     },
     {
       cx: width - rack - MARGIN - sideDepth / 2,
-      cy,
+      cy: slide(inner, height - inner, sideLength, false),
       w: sideLength,
       h: sideDepth,
       rotate: POSITION_ROTATION[1],
     },
-    { cx, cy: rack + MARGIN + acrossDepth / 2, w: acrossLength, h: acrossDepth, rotate: POSITION_ROTATION[2] },
-    { cx: rack + MARGIN + sideDepth / 2, cy, w: sideLength, h: sideDepth, rotate: POSITION_ROTATION[3] },
+    {
+      cx: slide(inner, width - inner, acrossLength, false),
+      cy: rack + MARGIN + acrossDepth / 2,
+      w: acrossLength,
+      h: acrossDepth,
+      rotate: POSITION_ROTATION[2],
+    },
+    {
+      cx: rack + MARGIN + sideDepth / 2,
+      cy: slide(inner, height - inner, sideLength, true),
+      w: sideLength,
+      h: sideDepth,
+      rotate: POSITION_ROTATION[3],
+    },
   ];
 
   return {
