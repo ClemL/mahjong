@@ -7,9 +7,9 @@ import { alwaysTakesBack } from "@/game/room";
  * A per-device display choice kept in localStorage, like sound or the
  * controller's density: what one screen shows is that screen's business.
  *
- * Read during the first render, as `useCompactLayout` does, so the screen does
- * not paint once with the default and then jump. Both screens that use it only
- * render after the room view has arrived in the browser, never on the server.
+ * Read during the first render, so the screen does not paint once with the
+ * default and then jump. Both screens that use it only render after the room
+ * view has arrived in the browser, never on the server.
  */
 export function useLocalSetting<T extends string>(
   key: string,
@@ -94,7 +94,8 @@ export interface TabletDisplay {
 
 export function useTabletDisplay(): TabletDisplay {
   const [turnGlow, setTurnGlow] = useLocalSetting<OnOff>("hk-mahjong.turn-glow", "on", ON_OFF);
-  const [wall, setWall] = useLocalSetting<OnOff>("hk-mahjong.wall", "on", ON_OFF);
+  // Off unless asked for: drawn faintly under the discards, it is texture more than information.
+  const [wall, setWall] = useLocalSetting<OnOff>("hk-mahjong.wall", "off", ON_OFF);
   const [density, setDensity] = useLocalSetting<TabletDensity>(
     "hk-mahjong.tablet-density",
     "normal",
@@ -143,6 +144,42 @@ export function useHiddenPanes(): {
     hide: useCallback((pane: SidePane) => save([...hidden.filter((p) => p !== pane), pane]), [hidden, save]),
     showAll: useCallback(() => save([]), [save]),
   };
+}
+
+const FOLDED_PANES_KEY = "hk-mahjong.side-folded";
+
+/**
+ * Which side-panel panes this tablet has folded down to their titles: still
+ * there, one tap from open, but taking a line rather than half the panel.
+ * Remembered per screen, like the panes it has closed.
+ */
+export function useFoldedPanes(): {
+  folded: SidePane[];
+  toggle: (pane: SidePane) => void;
+} {
+  const [folded, setFolded] = useState<SidePane[]>(() => {
+    try {
+      const stored = typeof window !== "undefined" ? window.localStorage.getItem(FOLDED_PANES_KEY) : null;
+      return SIDE_PANES.filter((pane) => (stored ?? "").split(",").includes(pane));
+    } catch {
+      return [];
+    }
+  });
+
+  const toggle = useCallback(
+    (pane: SidePane) => {
+      const next = folded.includes(pane) ? folded.filter((p) => p !== pane) : [...folded, pane];
+      setFolded(next);
+      try {
+        window.localStorage.setItem(FOLDED_PANES_KEY, next.join(","));
+      } catch {
+        // A choice that cannot be saved still applies for this session.
+      }
+    },
+    [folded],
+  );
+
+  return { folded, toggle };
 }
 
 export type PhoneSize = "compact" | "standard" | "comfy";

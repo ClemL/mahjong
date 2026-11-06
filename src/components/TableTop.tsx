@@ -42,7 +42,7 @@ import { TableWall, WallDraws, headPoint, wallBreak, wallGeometry } from "./Tabl
 import { DEAL_MS, FLOWER_STEP_MS } from "@/game/room";
 import { flowersInPlay } from "@/game/rules";
 import { MeldRow, bonusClass, isFreshClaim } from "./MeldRow";
-import { TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
+import { CornerMenu, TableActions, TableMenu, WakeNote, occupantName } from "./TableControls";
 import { TableSide } from "./TableSide";
 import { AchievementToasts } from "./AchievementToasts";
 import type { SoundToggle } from "@/hooks/useRoomSound";
@@ -83,6 +83,9 @@ const DENSITY: Record<TabletDensity, { capacity: number; rack: number }> = {
   compact: { capacity: 1.25, rack: 0.9 },
   extra: { capacity: 1.75, rack: 0.8 },
 };
+
+/** What the console spends around the tile in play: the wind bands each side and the caption. */
+const CONSOLE_CHROME = 72;
 
 /** Custom properties are not in React's style typing. */
 type Vars = CSSProperties & Record<`--${string}`, string | number>;
@@ -568,8 +571,9 @@ function useClaimFlight(
 /**
  * The middle of the table, like the console of an automatic table: each
  * seat's wind on its own side, lit for whoever is to play, and the tile just
- * thrown, turned to face the player who threw it. It is drawn the same size
- * as the ponds — the middle says which tile, not that it matters more.
+ * thrown, turned to face the player who threw it. That tile is the one every
+ * chair is deciding on, so it is drawn half as large again as the ponds, as
+ * far as the middle has room for it and its caption.
  */
 function Console({
   view,
@@ -583,9 +587,10 @@ function Console({
   /** The full result is laid over the felt, so the middle need not repeat it through it. */
   sheetOpen: boolean;
 }) {
+  const room = Math.min((layout.console.h - CONSOLE_CHROME) / 1.38, layout.console.w - CONSOLE_CHROME);
   const style: Vars = {
     ...placementStyle(layout.console),
-    "--tile-lg": `${layout.tile}px`,
+    "--tile-lg": `${Math.round(Math.max(layout.tile, Math.min(layout.tile * 1.5, room)))}px`,
   };
   const played = view.lastPlayed;
   // A claimed discard has left its pond for somebody's meld.
@@ -680,6 +685,10 @@ function Console({
   );
 }
 
+/** The felt's corners, where two racks meet and neither chair owns the space. */
+type Corner = "tl" | "tr" | "bl" | "br";
+const CORNERS: Corner[] = ["tl", "tr", "bl", "br"];
+
 /**
  * Whether the hand's result is laid over the felt. It can be put aside to look
  * at the table, and the next hand brings it back.
@@ -722,6 +731,7 @@ export function Felt({
   onResume,
   busy = false,
   sheetHost = null,
+  corners = {},
 }: {
   view: RoomView;
   display: TabletDisplay;
@@ -739,6 +749,8 @@ export function Felt({
   /** Pick a paused hand back up. */
   onResume?: () => void;
   busy?: boolean;
+  /** What sits in each corner of the felt, between the racks: the table's own controls and counts. */
+  corners?: Partial<Record<Corner, ReactNode>>;
 }) {
   const felt = useRef<HTMLDivElement>(null);
   // The hand being replayed over the result, named by its number so a new
@@ -868,6 +880,17 @@ export function Felt({
             />
           ))}
           <Console view={view} layout={layout} position={position} sheetOpen={sheet.open} />
+          {CORNERS.map((corner) =>
+            corners[corner] ? (
+              <div
+                key={corner}
+                className={`felt__corner felt__corner--${corner}`}
+                style={{ width: layout.rack, height: layout.rack }}
+              >
+                {corners[corner]}
+              </div>
+            ) : null,
+          )}
           <DealOverlay
             live={dealing}
             layout={layout}
@@ -961,11 +984,48 @@ export function Felt({
 }
 
 /**
- * The shared tablet, drawn as the table itself: the felt under a bar of the
- * table's own controls. On a widescreen tablet the felt is square, as a table
- * is, and the bar becomes a side panel in the width left over. Concealed tiles
- * are never on it — the server does not send them to this device at all.
+ * The shared tablet, drawn as the table itself: the felt edge to edge, with the
+ * table's own controls and counts in its corners, where no chair is. On a
+ * widescreen tablet the felt is square, as a table is, and the controls move
+ * to a side panel in the width left over. Concealed tiles are never on it —
+ * the server does not send them to this device at all.
  */
+/**
+ * The one control a corner keeps out: Pause or Resume while a hand is in play,
+ * or the way back to a result that was put aside to look at the table.
+ */
+function CornerAction({ api, view, sheet }: { api: RoomApi; view: RoomView; sheet: ResultSheet }) {
+  const live = view.started && (view.phase === "action" || view.phase === "claiming");
+  if (sheet.aside) {
+    return (
+      <button type="button" className="felt__corner-btn felt__corner-btn--text" onClick={sheet.show}>
+        {view.phase === "gameOver" ? "Scores" : "Result"}
+      </button>
+    );
+  }
+  if (!live) return null;
+  return (
+    <button
+      type="button"
+      className={`felt__corner-btn${view.paused ? " felt__corner-btn--on" : ""}`}
+      aria-label={view.paused ? "Resume" : "Pause"}
+      disabled={api.busy}
+      onClick={() => void api.control({ type: "pause", value: !view.paused })}
+    >
+      {view.paused ? (
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7 4.5v15l12-7.5z" />
+        </svg>
+      ) : (
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <rect x="5" y="4" width="5" height="16" rx="1.5" />
+          <rect x="14" y="4" width="5" height="16" rx="1.5" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; sound?: SoundToggle }) {
   const wakeLock = useWakeLock(true);
   const appearance = useAppearance();
@@ -989,29 +1049,6 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
       className={`tabletop tabletop--${display.density}${split ? " tabletop--wide" : ""}`}
       style={split ? ({ "--felt-side": `${split.felt}px` } as Vars) : undefined}
     >
-      {split ? null : (
-        <header className="tabletop__bar">
-          <span className="tableview__code">{tableName(view.roomId)}</span>
-          <span className="stat__value">
-            {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
-          </span>
-          <span className="seat__meta">{view.wallCount} tiles left</span>
-          <WakeNote state={wakeLock} />
-          <span className="topbar__spacer" />
-          <div className="actions">
-            <TableActions api={api} view={view} sheet={sheet} />
-            <TableMenu
-              api={api}
-              view={view}
-              sound={sound}
-              appearance={appearance}
-              display={display}
-              fullscreen={fullscreen}
-            />
-          </div>
-        </header>
-      )}
-
       <Felt
         view={view}
         display={display}
@@ -1022,6 +1059,55 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
         onResume={() => void api.control({ type: "pause", value: false })}
         busy={api.busy}
         sheetHost={split ? host : null}
+        corners={{
+          ...(split
+            ? {}
+            : {
+                tl: (
+                  <CornerMenu
+                    label="Table menu"
+                    alert={wakeLock === "held" ? null : "the screen may sleep"}
+                  >
+                    <div className="corner-menu__head">
+                      <span className="tableview__code">{tableName(view.roomId)}</span>
+                      <span className="stat__value">
+                        {tileGlyph(view.roundWind)} {roundName(view.roundWind)} · hand {view.handNumber}
+                      </span>
+                      <span className="seat__meta">{view.wallCount} tiles left</span>
+                    </div>
+                    <div className="actions">
+                      <TableActions api={api} view={view} sheet={sheet} />
+                      <TableMenu
+                        api={api}
+                        view={view}
+                        sound={sound}
+                        appearance={appearance}
+                        display={display}
+                        fullscreen={fullscreen}
+                      />
+                    </div>
+                    <WakeNote state={wakeLock} />
+                  </CornerMenu>
+                ),
+                br: <CornerAction api={api} view={view} sheet={sheet} />,
+              }),
+          tr: (
+            <span className="felt__chip" title="Tiles left in the wall">
+              <strong className="felt__chip-big">{view.wallCount}</strong>
+              <span className="felt__chip-small">left</span>
+              <span className="sr-only"> in the wall</span>
+            </span>
+          ),
+          bl: (
+            <span className="felt__chip" title={`${roundName(view.roundWind)} round, hand ${view.handNumber}`}>
+              <span className="felt__chip-big felt__chip-glyph" aria-hidden>
+                {tileGlyph(view.roundWind)}
+              </span>
+              <span className="felt__chip-small">hand {view.handNumber}</span>
+              <span className="sr-only">{roundName(view.roundWind)} round</span>
+            </span>
+          ),
+        }}
       />
 
       {split ? (

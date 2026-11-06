@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { type RoomView, neighbourSeat, openSeatName, seatedNames } from "@/game/room";
 import type { RoomApi } from "@/hooks/useRoom";
 import { useAppearance } from "@/hooks/useAppearance";
-import { useCompactLayout } from "@/hooks/useCompactLayout";
+import { usePhoneLayout } from "@/hooks/usePhoneLayout";
 import { usePhoneDisplay, useTabletDisplay } from "@/hooks/useLocalSetting";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useWakeLock } from "@/hooks/useWakeLock";
@@ -76,7 +76,7 @@ export function TableLobby({
   sound: SoundToggle;
 }) {
   const appearance = useAppearance();
-  const layout = useCompactLayout();
+  const layout = usePhoneLayout();
   const tabletDisplay = useTabletDisplay();
   const phoneDisplay = usePhoneDisplay(
     view.you.seat !== null ? view.players[view.you.seat].occupant.name : null,

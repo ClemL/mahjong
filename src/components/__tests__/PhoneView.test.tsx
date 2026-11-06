@@ -7,7 +7,7 @@ import { PLAYS_SENT_TO_PHONES, hurryUp, noteDiscard } from "@/game/room";
 import { discard } from "@/game/engine";
 import type { RoomView } from "@/game/room";
 import type { Meld } from "@/game/melds";
-import { PhoneView } from "../PhoneView";
+import { PhoneView, shelfBreak } from "../PhoneView";
 import { PLAY_LOG_LINES } from "../PlayLog";
 import { NAMES, claimable, dealt, fakeApi, playerView, sound, underway } from "./fixtures";
 
@@ -415,14 +415,31 @@ describe("PhoneView", () => {
     expect(hand.style.getPropertyValue("--hand-count")).toBe(String(view.players[seat].hand.length));
   });
 
-  it("shows the newest discard and a play log on the controller", () => {
+  it("says who threw the tile in play, where they sit from here, and how many of it are seen", () => {
     const { room, claimer } = claimable();
     const view = playerView(room, claimer);
     const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
     const discard = view.lastDiscard!;
-    expect(container.querySelector(".phone__last")).not.toBeNull();
-    const rows = Array.from(container.querySelectorAll(".playlog__row"));
+    const last = container.querySelector(".phone__now .phone__last")!;
+    expect(last.querySelector(".phone__last-who")!.textContent).toContain(view.players[discard.from].occupant.name);
+    const where = ["you", "your right", "across", "your left"][(discard.from - claimer + 4) % 4];
+    expect(last.querySelector(".phone__last-where")!.textContent).toBe(where);
+    expect(last.querySelector(".phone__last-seen")!.textContent).toMatch(/^[1-4] of 4 seen$/);
+    // The claim has the buttons' space to itself.
+    expect(container.querySelector(".playlog")).toBeNull();
+  });
+
+  it("shows the play log where the buttons go while there is nothing to decide", () => {
+    const { room } = claimable();
+    const thrower = room.state.dealer as Seat;
+    const view = playerView(room, thrower);
+    expect(view.claim).toBeNull();
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+
+    const discard = view.lastDiscard!;
+    expect(container.querySelector(".phone__last-who")!.textContent).toContain("You");
+    const rows = Array.from(container.querySelectorAll(".phone__controls .playlog__row"));
     expect(rows.at(-1)!.getAttribute("title")).toBe(
       `${view.players[discard.from].occupant.name} discarded ${tileName(discard.tile.code)}`,
     );
@@ -614,34 +631,60 @@ describe("PhoneView", () => {
   });
 });
 
-describe("PhoneView compact mode", () => {
-  const compactStored = () => window.localStorage.setItem("hk-mahjong.compact", "1");
-
-  it("folds the prompt into the bar on a landscape controller", () => {
-    compactStored();
+describe("PhoneView layouts", () => {
+  it("lays the controller out as a rail unless the phone chose shelves", () => {
     const { view } = onTurn();
     const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
     const root = container.firstElementChild!;
     expect(root.className).toContain("phone--landscape");
-    expect(root.className).toContain("phone--compact");
-    const bar = container.querySelector(".phone__bar")!;
-    expect(bar.querySelector(".phone__prompt")).not.toBeNull();
+    expect(root.className).toContain("phone--rail");
+    expect(container.querySelector(".phone__now .phone__prompt")).not.toBeNull();
     expect(container.querySelectorAll(".phone__prompt")).toHaveLength(1);
-    // The wind glyph carries the seat; the name stays for screen readers.
-    expect(seatName(container).className).toBe("sr-only");
+    handButtons(container);
+    expect(container.querySelector(".hand__shelf")).toBeNull();
+    // The header's buttons are icons, still named for screen readers.
+    expect(screen.getByRole("button", { name: "Hide hand" }).textContent).toBe("");
   });
 
-  it("leaves the roomy layout in place when compact is off", () => {
-    const { view } = onTurn();
+  it("splits the hand into two shelves by suit, and never stretches it, when the phone asks for shelves", () => {
+    window.localStorage.setItem("hk-mahjong.phone-layout", "shelves");
+    window.localStorage.setItem("hk-mahjong.hand-stretch", "on");
+    onTestFinished(() => {
+      window.localStorage.removeItem("hk-mahjong.phone-layout");
+      window.localStorage.removeItem("hk-mahjong.hand-stretch");
+    });
+    const { seat, view } = onTurn();
     const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
 
-    expect(container.firstElementChild!.className).not.toContain("phone--compact");
-    expect(container.querySelector(".phone__bar .phone__prompt")).toBeNull();
-    expect(container.querySelectorAll(".phone__prompt")).toHaveLength(1);
-    expect(seatName(container).className).toBe("");
+    const root = container.firstElementChild!;
+    expect(root.className).toContain("phone--shelves");
+    expect(root.className).not.toContain("phone--stretch");
+    // Face down, the hand is halved: where it breaks says nothing about its suits.
+    const facedown = container.querySelector<HTMLElement>(".phone__hand--hidden")!;
+    const backs = Array.from(facedown.children).filter((el) => !el.classList.contains("phone__hidden-label"));
+    expect(backs.findIndex((el) => el.classList.contains("hand__shelf"))).toBe(Math.ceil(view.players[seat].hand.length / 2));
+
+    expect(handButtons(container)).toHaveLength(view.players[seat].hand.length);
+    const hand = container.querySelector<HTMLElement>(".phone__hand")!;
+    expect(hand.querySelectorAll(".hand__shelf")).toHaveLength(1);
+    expect(Number(hand.style.getPropertyValue("--shelf-count"))).toBeGreaterThanOrEqual(7);
+  });
+});
+
+describe("shelfBreak", () => {
+  it("breaks at the change of suit that leaves the rows closest in length", () => {
+    const hand = ["m1", "m2", "m3", "m4", "m5", "m6", "p1", "p2", "s1", "s2", "s3", "we", "we"];
+    expect(shelfBreak(hand)).toBe(6);
+    // The drawn tile at the end of the second row counts towards it.
+    expect(shelfBreak(hand, 1)).toBe(6);
+    expect(shelfBreak(["m1", "m2", "p1", "p2", "p3", "s1", "s2", "s3", "s4", "dr", "dr", "dg", "dg"])).toBe(5);
   });
 
+  it("halves a hand that is one suit, or that splitting by suit would leave lopsided", () => {
+    expect(shelfBreak(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m9", "m9", "m1", "m1"])).toBe(7);
+    expect(shelfBreak(["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m9", "m9", "s1", "s1"])).toBe(7);
+  });
 });
 
 describe("PhoneView — whose move it is", () => {

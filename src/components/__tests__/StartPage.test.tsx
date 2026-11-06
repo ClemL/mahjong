@@ -59,8 +59,8 @@ describe("StartPage", () => {
     vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-height: 560px") }));
     const phone = render(<StartPage />);
     expect(screen.getByRole("tab", { name: "This phone" }).getAttribute("aria-selected")).toBe("true");
-    fireEvent.click(within(screen.getByRole("group", { name: "Phone layout" })).getByRole("button", { name: /Compact/ }));
-    expect(window.localStorage.getItem("hk-mahjong.compact")).toBe("1");
+    fireEvent.click(within(screen.getByRole("group", { name: "Phone layout" })).getByRole("button", { name: /Shelves/ }));
+    expect(window.localStorage.getItem("hk-mahjong.phone-layout")).toBe("shelves");
 
     // The arrow keys walk the tabs, and the one left open is the one that opens next time.
     fireEvent.keyDown(screen.getByRole("tab", { name: "This phone" }), { key: "ArrowLeft" });

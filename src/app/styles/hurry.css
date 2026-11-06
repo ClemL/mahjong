@@ -12,10 +12,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.phone--compact .phone__hurry-btn {
-  width: 7.2em;
-}
-
 /* Resting after anyone's hurry-up: the seconds until the table takes another,
    and a bar draining under them as the turn clock does. Brighter than other
    disabled buttons, so the count can be read. */

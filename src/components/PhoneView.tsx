@@ -2,6 +2,7 @@
 
 import {
   type CSSProperties,
+  Fragment,
   type KeyboardEvent,
   type PointerEvent,
   useEffect,
@@ -15,11 +16,11 @@ import type { ClaimOption } from "@/game/engine";
 import { HURRY_COOLDOWN_MS, HURRY_GRACE_MS, MORE_TIME_MS, TAKE_BACK_MS, type RoomView } from "@/game/room";
 import { findSets } from "@/game/sets";
 import type { RoomApi } from "@/hooks/useRoom";
-import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, tileGlyph, tileName } from "@/game/tiles";
+import { SEAT_NAMES, type Seat, type Tile, type TileCode, seatWind, suitOf, tileGlyph, tileName } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { useAppearance } from "@/hooks/useAppearance";
 import { useCoarsePointer } from "@/hooks/useCoarsePointer";
-import { useCompactLayout } from "@/hooks/useCompactLayout";
+import { usePhoneLayout } from "@/hooks/usePhoneLayout";
 import { useCountdown } from "@/hooks/useCountdown";
 import { useFullscreen } from "@/hooks/useFullscreen";
 import { useHandOrder } from "@/hooks/useHandOrder";
@@ -44,7 +45,7 @@ import { useTakeBackAssist } from "@/hooks/useTakeBackAssist";
 import { FaanPreview, FaanToggle } from "./FaanPreview";
 import { joinNames, winnersOf, youFirst } from "./TableResult";
 import { usePhoneDisplay } from "@/hooks/useLocalSetting";
-import { CLAIM_LABEL, ClaimChoices, claimedIndex } from "./ClaimChoices";
+import { ClaimChoices } from "./ClaimChoices";
 import { intoFrame, screenAngle } from "./screenFrame";
 import { MiniPonds } from "./MiniPonds";
 import { AchievementToasts } from "./AchievementToasts";
@@ -59,14 +60,58 @@ const FLICK_SPEED = 0.45;
 
 /**
  * How many tiles the hand row holds, and whether the drawn one stands apart,
- * so a stretched hand can size its tiles to fill the width exactly.
+ * so a stretched hand can size its tiles to fill the width exactly. Shelves
+ * size theirs by the longer of their two rows.
  */
-function handFill(tiles: number, apart: boolean): CSSProperties {
-  return { "--hand-count": Math.max(1, tiles), "--hand-apart": apart ? 1 : 0 } as CSSProperties;
+function handFill(tiles: number, apart: boolean, shelf = 0): CSSProperties {
+  return {
+    "--hand-count": Math.max(1, tiles),
+    "--hand-apart": apart ? 1 : 0,
+    "--shelf-count": Math.max(1, shelf),
+  } as CSSProperties;
+}
+
+/** Where whoever threw a tile sits, said from your chair: play passes to your right. */
+const RELATIVE = ["you", "your right", "across", "your left"] as const;
+
+const shelfKind = (code: TileCode) => suitOf(code) ?? "honor";
+
+/**
+ * Where the shelves layout starts the hand's second row: at the change of suit
+ * that leaves the two rows closest in length, so a suit stays on one shelf.
+ * Halved instead when the hand is one suit, or splitting by suit would leave
+ * one row much the longer. `after` is the room the drawn tile takes at the end
+ * of the second row.
+ */
+export function shelfBreak(codes: readonly TileCode[], after = 0): number {
+  const n = codes.length;
+  const even = Math.min(n, Math.ceil((n + after) / 2));
+  let best = -1;
+  let longest = Infinity;
+  for (let i = 1; i < n; i++) {
+    if (shelfKind(codes[i]) === shelfKind(codes[i - 1])) continue;
+    const rows = Math.max(i, n - i + after);
+    if (rows < longest) {
+      longest = rows;
+      best = i;
+    }
+  }
+  return best < 0 || longest > even + 2 ? even : best;
 }
 
 /** How far a finger travels sideways across the middle before it counts as a swipe. */
 const SWIPE_REACH = 48;
+
+/** An eye, open to turn the hand up, struck through to turn it down. */
+function EyeIcon({ open }: { open: boolean }) {
+  return (
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+      <circle cx="12" cy="12" r="2.8" />
+      {open ? null : <path d="M4 20 20 4" />}
+    </svg>
+  );
+}
 
 /** Three small tiles: the discards, on the button that brings them in. */
 function PondsIcon() {
@@ -81,13 +126,6 @@ function PondsIcon() {
   );
 }
 
-/** Open tiles compact fits on its header line beside everything else. */
-const COMPACT_HEADER_TILES = 5;
-
-/**
- * A claim drawn where its meld would land — among your own open sets — but
- * faint, so what is on offer reads at a glance before anything is chosen.
- */
 /**
  * Where an element sits inside a box, in the box's own frame. The controller
  * can be turned on its side with a transform, so screen rectangles would point
@@ -124,33 +162,6 @@ const SET_SPOKEN: Record<SetMark["kind"], string> = {
 /** A discard on its way from this phone up to the table. */
 type Sent = { id: string; code: TileCode; x: number; y: number; w: number; h: number };
 
-function GhostMeld({
-  option,
-  discard,
-  lit,
-}: {
-  option: ClaimOption;
-  discard: TileCode;
-  lit: boolean;
-}) {
-  const codes = option.type === "win" ? [discard] : option.codes;
-  const taken = option.type === "win" ? 0 : claimedIndex(option, discard);
-  return (
-    <span className={`meld meld--ghost${lit ? " meld--ghost-lit" : ""}`} aria-hidden>
-      <span className="meld__ghost-label">{CLAIM_LABEL[option.type]}</span>
-      {codes.map((code, i) =>
-        i === taken ? (
-          <span key={i} className="claim__taken">
-            <TileFace code={code} size="sm" />
-          </span>
-        ) : (
-          <TileFace key={i} code={code} size="sm" />
-        ),
-      )}
-    </span>
-  );
-}
-
 /**
  * The player's own view: their hand and the decisions that are theirs, on a
  * phone held sideways. The pond, the scores and everyone's melds are on the
@@ -171,7 +182,7 @@ export function PhoneView({
   const coarse = useCoarsePointer();
   const appearance = useAppearance();
   const fullscreen = useFullscreen("landscape");
-  const layout = useCompactLayout();
+  const layout = usePhoneLayout();
   const display = usePhoneDisplay(me.occupant.name);
   useHaptics(view, display.vibrate === "on");
   const wakeLock = useWakeLock(display.keepAwake === "on");
@@ -188,7 +199,7 @@ export function PhoneView({
   const graceLeft = useCountdown(view.hurryGraceLeft > 0 ? view.hurryGraceLeft : null, !view.paused, view.version);
   const takeBackLeft = useCountdown(view.takeBackIn > 0 ? view.takeBackIn : null, true, view.version);
   const order = useHandOrder(me.hand, view.drawnTileId, `${view.roomId}:${view.gameId}:${view.handNumber}`);
-  const compact = layout.compact;
+  const shelves = layout.layout === "shelves";
   // A tile is armed by the first tap or click and thrown by the second, so a
   // double-click or double-tap discards and a single stray touch never does.
   const [armed, setArmed] = useState<string | null>(null);
@@ -635,19 +646,42 @@ export function PhoneView({
       ? `Hurried by ${view.hurried.by === seat ? "you" : nameOf(view.hurried.by)}`
       : null;
 
-  // The newest discard at the table, with the wind of whoever threw it — just
-  // enough to know what went out without looking up at the shared screen.
+  // The newest discard at the table, who threw it and where they sit from
+  // here, and how many of it this seat can already see — enough to decide on
+  // it without looking up at the shared screen.
   const played = view.lastPlayed;
+  const seenOf = (code: TileCode, id: string) => {
+    const ids = new Set([id]);
+    for (const t of me.hand) if (t.code === code) ids.add(t.id);
+    for (const p of view.players) {
+      for (const t of p.discards) if (t.code === code) ids.add(t.id);
+      for (const m of p.melds) {
+        // Another seat's concealed kong shows its ends face down, as the table draws it.
+        const faceUp = m.type === "kong" && m.concealed && p.seat !== seat ? m.tiles.slice(1, 3) : m.tiles;
+        for (const t of faceUp) if (t.code === code) ids.add(t.id);
+      }
+    }
+    return ids.size;
+  };
   const lastPlayed = played ? (
     <span
       className="phone__last"
       title={`Last played: ${tileName(played.tile.code)} from ${nameOf(played.from)}`}
     >
-      <span className="phone__last-from" aria-hidden>
-        {tileGlyph(seatWind(played.from))}
-      </span>
       <TileFace key={played.tile.id} code={played.tile.code} size="sm" entry="toss" tossFrom="top" />
-      <span className="sr-only">from {nameOf(played.from)}</span>
+      <span className="phone__last-text">
+        <span className="phone__last-who">
+          <span className="phone__last-from" aria-hidden>
+            {tileGlyph(seatWind(played.from))}
+          </span>
+          <span className="sr-only">from </span>
+          {played.from === seat ? "You" : nameOf(played.from)}
+        </span>
+        {played.from === seat ? null : (
+          <span className="phone__last-where">{RELATIVE[(played.from - seat + 4) % 4]}</span>
+        )}
+        <span className="phone__last-seen">{seenOf(played.tile.code, played.tile.id)} of 4 seen</span>
+      </span>
     </span>
   ) : null;
 
@@ -688,7 +722,7 @@ export function PhoneView({
       >
         {/* "Hurried" while it is this wait that was nudged; once the turn has
             moved on, the button is only resting. */}
-        {cooldown?.seat === waitingOn ? "Hurried" : compact ? "Hurry" : "Hurry up"}
+        {cooldown?.seat === waitingOn ? "Hurried" : "Hurry up"}
         {cooldown ? ` ${cooldownSeconds}s` : settling ? ` ${graceSeconds}s` : null}
       </button>
     ) : null;
@@ -759,20 +793,6 @@ export function PhoneView({
     </p>
   );
 
-  // Ghosts of every set the discard on offer would complete, laid out where
-  // claimed sets go.
-  // Hidden too when the hand is: a ghost is drawn from the tiles in it.
-  const ghosts =
-    view.claim && view.lastDiscard && !hidden
-      ? view.claim.options.map((option) => (
-          <GhostMeld
-            key={option.id}
-            option={option}
-            discard={view.lastDiscard!.tile.code}
-            lit={previewed?.id === option.id}
-          />
-        ))
-      : null;
   const sets = (
     <>
       {me.melds.map((m, i) => (
@@ -794,7 +814,7 @@ export function PhoneView({
   );
   const hasSets = me.melds.length > 0 || me.flowers.length > 0;
   const exposed =
-    hasSets || ghosts || takeBackButton ? (
+    hasSets || takeBackButton ? (
       <div className="seat__row phone__melds">
         {hasSets ? (
           <button
@@ -809,14 +829,24 @@ export function PhoneView({
         {/* To the right of the flowers: up out of the way of the hand and the
             buttons for the next move, where a hurried tap cannot find it. */}
         {takeBackButton}
-        {ghosts}
       </div>
     ) : null;
-  // Compact keeps open melds on its one header line while they are few; past
-  // that, or when ghosts need the room, they get a row of their own so they
-  // can be drawn large enough to read.
-  const exposedTiles = me.melds.reduce((n, m) => n + m.tiles.length, 0) + me.flowers.length;
-  const exposedInHeader = compact && !ghosts && exposedTiles <= COMPACT_HEADER_TILES;
+  // Recent plays fill the space the buttons use, only while nothing there is
+  // waiting on a decision.
+  const idle =
+    !view.claim &&
+    !view.actions?.canWin &&
+    (view.actions?.kongs?.length ?? 0) === 0 &&
+    view.phase !== "handOver" &&
+    view.phase !== "gameOver";
+
+  // Shelves split the hand in two rows by suit; the face-down hand is halved,
+  // so its split says nothing about the suits in it.
+  const shelfAt = shelves ? shelfBreak(order.tiles.map((t) => t.code), order.drawn ? 1 : 0) : 0;
+  const shelfLong = Math.max(shelfAt, order.tiles.length - shelfAt + (order.drawn ? 1.3 : 0));
+  const hiddenAt = Math.ceil(me.hand.length / 2);
+  const shelfGap = (i: number, at: number, of: number) =>
+    shelves && i === at && i > 0 && i < of ? <span className="hand__shelf" aria-hidden /> : null;
 
   const handTile = (t: Tile, drawn: boolean) => {
     const mark = marks.get(t.id);
@@ -857,14 +887,14 @@ export function PhoneView({
       className={[
         "phone",
         "phone--landscape",
-        compact ? "phone--compact" : "",
+        shelves ? "phone--shelves" : "phone--rail",
         `phone--size-${display.size}`,
         // Your move — your turn or your call on a discard — lit in the same
         // colour the table lights your rack with.
         yourTurn || view.claim ? "phone--acting" : "",
         hurriedBy !== null ? "phone--hurried" : "",
         showResult ? "phone--result" : "",
-        display.stretch === "on" ? "phone--stretch" : "",
+        display.stretch === "on" && !shelves ? "phone--stretch" : "",
         docked ? "phone--ponds" : "",
       ]
         .filter(Boolean)
@@ -882,8 +912,7 @@ export function PhoneView({
             {tileGlyph(seatWind(seat))}
           </span>
           <span className="phone__name">{nameOf(seat)}</span>
-          {/* The wind glyph says it already; compact keeps the wind's name for screen readers only. */}
-          <span className={compact ? "sr-only" : undefined}> · {SEAT_NAMES[seat]}</span>
+          <span> · {SEAT_NAMES[seat]}</span>
           {view.dealer === seat ? " · dealer" : ""}
         </span>
         {view.tablePresent ? (
@@ -904,12 +933,7 @@ export function PhoneView({
           </span>
         )}
         <span className="phone__wall">{view.wallCount} left</span>
-        {/* Compact folds the last tile, the prompt and the open melds into this one line. */}
-        {compact ? lastPlayed : null}
-        {compact ? promptLine : null}
-        {compact ? turnTimer : null}
-        {compact ? hurryButton : null}
-        {exposedInHeader ? exposed : null}
+        <span className="phone__bar-gap" />
         {helperAvailable ? (
           <HelperButton
             open={helperOpen}
@@ -927,7 +951,6 @@ export function PhoneView({
             onClick={() => setPondsOpen((o) => !o)}
           >
             <PondsIcon />
-            {compact ? null : <span className="phone__ponds-label"> Discards</span>}
           </button>
         )}
         <button
@@ -940,8 +963,7 @@ export function PhoneView({
             setHidden((h) => !h);
           }}
         >
-          {hidden ? "Show" : "Hide"}
-          {compact ? null : " hand"}
+          <EyeIcon open={hidden} />
         </button>
         {sound ? (
           <SettingsMenu>
@@ -962,16 +984,19 @@ export function PhoneView({
         ) : null}
       </header>
 
-      {compact ? null : (
-        <div className="phone__status">
-          {lastPlayed}
-          {promptLine}
-          {turnTimer}
-          {hurryButton}
-        </div>
-      )}
+      {/* The play: the tile in question, what to do, and the clock. */}
+      <div className="phone__status phone__now">
+        {lastPlayed}
+        {promptLine}
+        {turnTimer || hurryButton ? (
+          <span className="phone__now-row">
+            {turnTimer}
+            {hurryButton}
+          </span>
+        ) : null}
+      </div>
 
-      {exposedInHeader ? null : exposed}
+      {exposed}
 
       {docked || pondsOpen ? (
         <MiniPonds
@@ -989,7 +1014,7 @@ export function PhoneView({
           nothing that comes and goes can push it off the bottom or cover it. */}
       <div className="phone__dock">
         <div className="phone__controls">
-          {display.playLog === "on" ? (
+          {display.playLog === "on" && idle ? (
             <PlayLog log={view.log} hand={view.handNumber} players={view.players} />
           ) : null}
           {faanOpen && winOnOffer ? <FaanPreview score={winOnOffer} /> : null}
@@ -1100,12 +1125,15 @@ export function PhoneView({
           <button
             type="button"
             className="phone__hand phone__hand--hidden"
-            style={handFill(me.hand.length, false)}
+            style={handFill(me.hand.length, false, hiddenAt)}
             aria-label={`Hand hidden, ${me.hand.length} tiles. Show hand`}
             onClick={() => setHidden(false)}
           >
-            {me.hand.map((t) => (
-              <TileBack key={t.id} size="lg" />
+            {me.hand.map((t, i) => (
+              <Fragment key={t.id}>
+                {shelfGap(i, hiddenAt, me.hand.length)}
+                <TileBack size="lg" />
+              </Fragment>
             ))}
             <span className="phone__hidden-label" aria-hidden>
               Tap to show
@@ -1121,7 +1149,7 @@ export function PhoneView({
             ]
               .filter(Boolean)
               .join(" ")}
-            style={handFill(order.tiles.length + (order.drawn ? 1 : 0), order.drawn !== undefined)}
+            style={handFill(order.tiles.length + (order.drawn ? 1 : 0), order.drawn !== undefined, shelfLong)}
             role="group"
             aria-label="Your hand"
             aria-describedby={keysHint}
@@ -1131,7 +1159,12 @@ export function PhoneView({
             onPointerCancel={endDrag}
             onKeyDown={onHandKeyDown}
           >
-            {order.tiles.map((t) => handTile(t, t.id === view.drawnTileId))}
+            {order.tiles.map((t, i) => (
+              <Fragment key={t.id}>
+                {shelfGap(i, shelfAt, order.tiles.length)}
+                {handTile(t, t.id === view.drawnTileId)}
+              </Fragment>
+            ))}
             {order.drawn ? (
               <>
                 <span className="hand__gap" aria-hidden />

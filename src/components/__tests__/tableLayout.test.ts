@@ -65,6 +65,19 @@ describe("table layout", () => {
     expect(crowded.side.rows * crowded.side.cols).toBeGreaterThanOrEqual(33);
   });
 
+  it("slides the ponds round into a pinwheel on a square felt, leaving the middle square", () => {
+    const layout = layoutTable({ width: 804, height: 804, capacity: 24, ...quiet });
+    const [bottom, right, top, left] = layout.ponds;
+    // Each towards its owner's left: the bottom one leftwards, the right one down, and so round.
+    expect(bottom.cx).toBeLessThan(402);
+    expect(right.cy).toBeGreaterThan(402);
+    expect(top.cx).toBeGreaterThan(402);
+    expect(left.cy).toBeLessThan(402);
+    expect(layout.console.w).toBeCloseTo(layout.console.h, 0);
+    // Centred on their edges, the ponds of this felt were 41px.
+    expect(layout.tile).toBeGreaterThanOrEqual(45);
+  });
+
   it("shrinks only the rack that is running out of room", () => {
     const layout = layoutTable({
       width: 1164,

@@ -317,139 +317,6 @@ body:has(.app--handset) {
   z-index: 20;
 }
 
-/* ------------------------------------------------ compact phone controller */
-
-/* The same controller with the air let out: one header line carrying the
-   prompt and the open melds, claims laid out sideways, and the hand without
-   its tray — so the tiles take the width the chrome gave back. */
-.app--handset:has(.phone--compact) {
-  /* The side margin a stretched hand runs out over. */
-  --side-pad: 4px;
-  padding-left: max(4px, env(safe-area-inset-left));
-  padding-right: max(4px, env(safe-area-inset-right));
-}
-
-@media (orientation: portrait) {
-  .screen > .app--handset:has(.phone--compact) {
-    padding-left: max(4px, env(safe-area-inset-top));
-    padding-right: max(4px, env(safe-area-inset-bottom));
-  }
-}
-
-.phone--landscape.phone--compact {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "bar"
-    "melds"
-    "controls"
-    "hand";
-  gap: 4px;
-}
-
-.phone--landscape.phone--compact:has(> .phone__dock > .helper) {
-  grid-template-rows: auto auto minmax(min-content, 1fr) auto auto;
-  grid-template-areas:
-    "bar"
-    "melds"
-    "controls"
-    "helper"
-    "hand";
-}
-
-.phone--compact .phone__bar {
-  gap: 8px;
-  padding: 0 4px;
-  border: none;
-  background: none;
-}
-
-.phone--compact .phone__score {
-  margin-left: 0;
-}
-
-.phone--compact .phone__prompt {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.phone--compact .phone__melds {
-  flex: 0 1 auto;
-  flex-wrap: nowrap;
-  gap: 2px;
-  --tile-sm: clamp(18px, 8.5cqh, 30px);
-}
-
-.phone--compact .phone__bar .phone__sets {
-  flex-wrap: nowrap;
-}
-
-/* On its own row compact has the width, so the sets match the roomy layout. */
-.phone--compact > .phone__melds {
-  justify-content: center;
-  max-width: none;
-  --tile-sm: clamp(20px, 9.5cqh, 36px);
-}
-
-.phone--compact .phone__melds .meld {
-  padding: 1px;
-}
-
-/* The menu is a glyph here; its label stays for screen readers. */
-.phone--compact .hamburger__text {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-.phone--compact .confirm-bar {
-  padding: 2px 8px;
-  gap: 8px;
-}
-
-.phone--compact .claims {
-  gap: 6px;
-}
-
-.phone--compact .claim {
-  --tile-sm: 24px;
-  flex-direction: row;
-  gap: 6px;
-  padding: 3px 8px;
-}
-
-.phone--compact .claims__pass {
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.phone--compact .claims__timer {
-  min-width: 34px;
-}
-
-.phone--compact .phone__hand {
-  gap: 3px;
-  padding: 10px 0 2px;
-  border: none;
-  background: none;
-  /* Fourteen tiles, the gap before the drawn one, and nothing else. */
-  --tile-lg: clamp(24px, min(calc((100cqw - 50px) / 14.2), 30cqh), 88px);
-}
-
-.phone--compact .hand__gap {
-  width: 8px;
-}
-
 /* Stretched: the rack runs out past the controller's margins to the edges of
    the screen — never into a safe area — and each tile is the width shared out
    by how many the hand holds, so a hand with sets laid down grows larger. The
@@ -515,11 +382,6 @@ body:has(.app--handset) {
   line-height: 1;
 }
 
-.phone--compact .phone__last {
-  --tile-sm: clamp(16px, 7cqh, 24px);
-  padding: 1px 4px 1px 3px;
-}
-
 /* Time left to discard: the count, and a bar draining under it. */
 .phone__timer {
   flex: none;
@@ -538,36 +400,6 @@ body:has(.app--handset) {
   margin-top: 2px;
   border-radius: 2px;
   background: linear-gradient(90deg, var(--gold) calc(var(--left, 1) * 100%), var(--line) 0);
-}
-
-/* Claims on offer, drawn faintly where your claimed sets go. Identity is the
-   dashed outline and the label, not the fading alone. */
-.meld--ghost {
-  position: relative;
-  align-items: flex-end;
-  opacity: 0.55;
-  background: transparent;
-  outline: 1.5px dashed var(--gold);
-  outline-offset: 1px;
-  transition: opacity 120ms ease;
-}
-
-.meld--ghost-lit {
-  opacity: 1;
-  outline-style: solid;
-}
-
-.meld__ghost-label {
-  align-self: center;
-  margin: 0 3px 0 1px;
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-  color: var(--gold);
-}
-
-.phone--compact .phone__melds {
-  grid-area: melds;
 }
 
 /* Sets already in the hand (Settings → Set hints): a line under their three
@@ -835,9 +667,4 @@ body:has(.app--handset) {
 
 .claim--win {
   min-width: 196px;
-}
-
-/* Compact lays a claim's name beside its tiles, so it starts out wider. */
-.phone--compact .claim--win {
-  min-width: 300px;
 }

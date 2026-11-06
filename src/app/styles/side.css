@@ -100,6 +100,62 @@
   gap: 8px;
 }
 
+/* A folded pane is its title alone. */
+.side__card--folded {
+  padding-bottom: 10px;
+}
+
+/* Folds the pane, before its title; the chevron says which way it will go. As
+   quiet as the close button, and as wide a target on a touch screen. */
+.side__fold {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -6px 0 -6px -8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+
+.side__fold:focus-visible {
+  outline: 2px solid var(--gold);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .side__fold:hover {
+    background: var(--raise-1);
+    color: var(--ink);
+  }
+}
+
+@media (pointer: coarse) {
+  .side__fold {
+    width: 44px;
+    height: 44px;
+    margin: -12px 0 -12px -12px;
+  }
+}
+
+.side__fold-icon {
+  flex: none;
+  transition: transform 140ms ease;
+}
+
+.side__card--folded .side__fold-icon {
+  transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side__fold-icon {
+    transition: none;
+  }
+}
+
 /* Closes the pane. Quiet until it is wanted, but a full finger's width on a
    touch screen. */
 .side__hide {
@@ -145,6 +201,7 @@
 }
 
 .side__title {
+  flex: 1;
   margin: 0;
   font-size: 12px;
   font-weight: 800;

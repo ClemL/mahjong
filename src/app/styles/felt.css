@@ -29,17 +29,6 @@
   gap: 8px;
 }
 
-.tabletop__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  padding: 6px 10px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-}
-
 /* Cloth inside a wooden rim. Everything on it is placed by tableLayout.ts:
    each box is positioned by its centre and turned to face its seat. */
 .felt {
@@ -188,14 +177,15 @@
   color: var(--ink);
 }
 
-/* The turn clock: a bar along the rack that drains as the time runs out, so
-   whose clock is short reads from across the table. Its last seconds pulse;
-   the pill keeps the count in words for anyone who cannot tell the colours. */
+/* The turn clock: a bar along the rack's inner edge, towards the middle where
+   everyone is looking, that drains as the time runs out, so whose clock is
+   short reads from across the table. Its last seconds pulse; the pill on it
+   keeps the count in words for anyone who cannot tell the colours. */
 .rack__clock {
   position: absolute;
   left: 14px;
   right: 14px;
-  bottom: 3px;
+  top: 3px;
   height: 4px;
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.4);
@@ -332,9 +322,9 @@
   color: var(--gold);
 }
 
-/* A claimed tile's place in its pond, left empty: an outline the size of a
+/* A claimed tile's place in its pond, left empty: a faint space the size of a
    tile, with the wind of whoever took it, so the pond still reads in the
-   order it was thrown. */
+   order it was thrown. No outline: it is a gap, not a tile to read. */
 .discards__gap {
   position: relative;
   display: grid;
@@ -342,8 +332,8 @@
   width: var(--tile-md);
   height: calc(var(--tile-md) * 1.38);
   box-sizing: border-box;
-  border: 1.5px dashed color-mix(in srgb, var(--ink) 32%, transparent);
   border-radius: calc(var(--tile-md) * 0.16);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
 }
 
 .discards__gap-wind {
@@ -411,20 +401,17 @@
 
 /* ------------------------------------------------------- tablet sizes */
 
-/* The table's own controls follow its size: the bar over the felt, or the
-   side panel beside a squared one. The discards and racks are sized by
+/* The table's own controls follow its size: the side panel beside a squared
+   felt. The discards and racks are sized by
    tableLayout.ts. */
-.tabletop--cosy > .tabletop__bar,
 .tabletop--cosy > .side {
   zoom: 1.12;
 }
 
-.tabletop--compact > .tabletop__bar,
 .tabletop--compact > .side {
   zoom: 0.92;
 }
 
-.tabletop--extra > .tabletop__bar,
 .tabletop--extra > .side {
   zoom: 0.84;
 }
@@ -432,14 +419,153 @@
 /* Zoom carries into fixed descendants, so the full-screen sheets, drawers,
    dialogs and the film opened from those controls are zoomed back, and still
    cover exactly the screen. */
-.tabletop--cosy > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+.tabletop--cosy > .side :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
   zoom: 0.892857; /* 1 / 1.12 */
 }
 
-.tabletop--compact > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+.tabletop--compact > .side :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
   zoom: 1.086957; /* 1 / 0.92 */
 }
 
-.tabletop--extra > :is(.tabletop__bar, .side) :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
+.tabletop--extra > .side :is(.sheet__backdrop, .drawer__backdrop, .modal__backdrop, .film__backdrop) {
   zoom: 1.190476; /* 1 / 0.84 */
+}
+
+/* ------------------------------------------------------------- corners */
+
+/* Where two racks meet, between two chairs and owned by neither: the table's
+   own controls and its counts, instead of a bar across the top that reads
+   from one side only. Sized by the rack, which the corner squares off. */
+.felt__corner {
+  position: absolute;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+}
+
+.felt__corner:has(.corner-menu__panel) {
+  z-index: 80;
+}
+
+.felt__corner--tl { left: 0; top: 0; }
+.felt__corner--tr { right: 0; top: 0; }
+.felt__corner--bl { left: 0; bottom: 0; }
+.felt__corner--br { right: 0; bottom: 0; }
+
+.felt__corner-btn,
+.felt__chip {
+  box-sizing: border-box;
+  width: min(52px, calc(100% - 8px));
+  min-width: 44px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--panel-border);
+  color: var(--ink);
+}
+
+.felt__corner-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.felt__corner-btn:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+.felt__corner-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .felt__corner-btn:hover:not(:disabled) {
+    background: var(--raise-2);
+  }
+}
+
+/* Paused: the button that resumes is lit, as the bar's Resume was. */
+.felt__corner-btn--on {
+  background: var(--gold);
+  color: var(--on-gold);
+}
+
+.felt__corner-btn--text {
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* Something behind the menu wants a look — the screen may sleep. Said in the
+   button's name too, not by the dot alone. */
+.felt__corner-alert {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 2px var(--felt-edge);
+}
+
+.felt__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.felt__chip-big {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.felt__chip-glyph {
+  font-size: 18px;
+  color: var(--gold);
+}
+
+.felt__chip-small {
+  font-size: 9.5px;
+  color: var(--ink-dim);
+}
+
+.corner-menu {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Opened over the cloth, from the corner inwards. */
+.corner-menu__panel {
+  position: absolute;
+  left: 6px;
+  top: calc(100% - 4px);
+  width: max-content;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--modal-bg);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.corner-menu__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
 }

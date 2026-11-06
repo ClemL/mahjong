@@ -657,18 +657,57 @@
   opacity: 0.7;
 }
 
-/* Compact: one bar, larger tiles, slimmer buttons. */
-.bench__layout--compact .bench__sketch-bar {
-  height: 6px;
-  width: 70%;
+/* Rail: the tile in play and the buttons side by side over one row of tiles. */
+.bench__layout--rail .bench__sketch-btns > span {
+  height: 16px;
 }
 
-.bench__layout--compact .bench__sketch-hand > span {
-  height: 28px;
+.bench__layout--rail .bench__sketch-btns > span:first-child {
+  flex: 0.6;
+  background: var(--raise-2);
+  opacity: 1;
 }
 
-.bench__layout--compact .bench__sketch-btns > span {
-  height: 6px;
+/* Shelves: two rows of larger tiles beside a column of buttons. */
+.bench__sketch-shelves {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+}
+
+.bench__sketch-rows {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  flex: 1;
+}
+
+.bench__layout--shelves .bench__sketch-hand {
+  margin-top: 0;
+}
+
+.bench__layout--shelves .bench__sketch-hand > span {
+  height: 21px;
+}
+
+.bench__sketch-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 26%;
+}
+
+.bench__sketch-col > span {
+  flex: 1;
+  border-radius: 2px;
+  background: var(--raise-2);
+}
+
+.bench__sketch-col > span:first-child {
+  background: var(--gold);
+  opacity: 0.7;
 }
 
 .bench__layout-name {

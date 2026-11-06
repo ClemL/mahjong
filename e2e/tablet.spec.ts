@@ -80,10 +80,20 @@ test("a widescreen tablet squares the felt, and a latecomer names themselves int
   await expect(table.page.locator('.rack[data-seat="1"]')).toContainText("Robot Srini");
   await expect(srini.page.getByRole("status")).toContainText("The table gave seat 2, South, to the computer");
 
-  // Close to square, the felt stays the full width under its bar.
+  // Close to square, the felt runs edge to edge, the table's controls in its corners.
   await table.page.setViewportSize(FOLDABLE);
-  await expect(table.page.locator(".tabletop__bar")).toBeVisible();
   await expect(table.page.locator(".side")).toHaveCount(0);
+  await expect(table.page.locator(".tabletop__bar")).toHaveCount(0);
+  const menu = table.page.getByRole("button", { name: /^Table menu/ });
+  await expect(menu).toBeVisible();
+  const feltBox = (await table.page.locator(".felt").boundingBox())!;
+  const menuBox = (await menu.boundingBox())!;
+  expect(menuBox.x - feltBox.x).toBeLessThan(90);
+  expect(menuBox.y - feltBox.y).toBeLessThan(90);
+  await menu.click();
+  await expect(table.page.getByRole("button", { name: "Redeal" })).toBeVisible();
+  await table.page.keyboard.press("Escape");
+  await expect(table.page.getByRole("button", { name: "Redeal" })).toHaveCount(0);
 
   for (const side of [table, kris, srini]) {
     expect(side.errors).toEqual([]);
