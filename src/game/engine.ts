@@ -26,12 +26,14 @@ import { type PatternHit, type ScoreResult, scoreHand } from "./scoring";
 import {
   DEFAULT_RULES,
   type RuleConfig,
+  deadWallOf,
   describeRounds,
   flowersInPlay,
   halfShare,
   liabilityInPlay,
   multipleWinnersInPlay,
   othersPayHalfInPlay,
+  playOutWallInPlay,
   roundsInGame,
 } from "./rules";
 import { createRng, shuffle } from "./rng";
@@ -201,17 +203,28 @@ function sortHand(p: PlayerState): void {
   p.hand = sortTiles(p.hand);
 }
 
+/**
+ * Tiles that can still be drawn: the whole wall, or all but the dead wall
+ * when the table keeps one back. A replacement taken from the back counts
+ * against it too, as though the dead wall were topped up from the live end.
+ */
+export function liveTiles(state: Pick<GameState, "wall" | "config">): number {
+  return Math.max(0, state.wall.length - deadWallOf(state.config));
+}
+
 /** Draw from the front of the live wall. */
 function drawFront(state: GameState): Tile | null {
+  if (liveTiles(state) === 0) return null;
   const tile = state.wall.shift() ?? null;
-  if (state.wall.length === 0) state.lastTileInPlay = true;
+  if (liveTiles(state) === 0) state.lastTileInPlay = true;
   return tile;
 }
 
 /** Draw a kong replacement from the back of the wall. */
 function drawBack(state: GameState): Tile | null {
+  if (liveTiles(state) === 0) return null;
   const tile = state.wall.pop() ?? null;
-  if (state.wall.length === 0) state.lastTileInPlay = true;
+  if (liveTiles(state) === 0) state.lastTileInPlay = true;
   return tile;
 }
 
@@ -358,7 +371,7 @@ function drawTile(state: GameState, seat: Seat, replacement: boolean): void {
 export function advanceTurn(previous: GameState): GameState {
   const state = clone(previous);
   if (state.phase !== "action" && state.phase !== "claiming") return state;
-  if (state.wall.length === 0) {
+  if (liveTiles(state) === 0) {
     endInWashout(state);
     return state;
   }
@@ -597,7 +610,7 @@ export function collectClaims(state: GameState, tile: Tile, from: Seat): Pending
   // The wall is spent, so nobody can draw again: a pung or chow would only
   // hand the turn to someone with nothing left to draw, and a kong has no
   // replacement tile. The last discard can only be taken to win.
-  const lastTile = state.wall.length === 0;
+  const lastTile = liveTiles(state) === 0;
   const claims: PendingClaim[] = [];
   for (let step = 1; step <= 3; step++) {
     const seat = nextSeat(from, step);
@@ -821,7 +834,7 @@ export function resolveClaims(previous: GameState, decisions: ClaimDecision[]): 
     }
     state.pendingClaims = [];
     state.phase = "action";
-    if (state.wall.length === 0) {
+    if (liveTiles(state) === 0) {
       endInWashout(state);
       return state;
     }
@@ -1075,7 +1088,13 @@ function endInWashout(state: GameState): void {
   state.pendingClaims = [];
   state.robbingKongTile = null;
   state.drawnTileId = null;
-  log(state, null, "The wall is exhausted — washed-out hand (流局)");
+  log(
+    state,
+    null,
+    playOutWallInPlay(state.config)
+      ? "The wall is exhausted — washed-out hand (流局)"
+      : "Only the dead wall is left — washed-out hand (流局)",
+  );
 }
 
 /** Change the table's faan minimum without disturbing the hand in progress. */
@@ -1115,6 +1134,22 @@ export function setLiability(previous: GameState, liability: boolean): GameState
   const state = clone(previous);
   state.config = { ...state.config, liability };
   log(state, null, liability ? "Liability (包) is in play" : "Liability (包) is switched off");
+  return state;
+}
+
+/**
+ * Whether every tile is drawn before a washout, or a dead wall is left
+ * standing. Read at every draw, so a change applies from the next one.
+ */
+export function setPlayOutWall(previous: GameState, playOutWall: boolean): GameState {
+  if (playOutWallInPlay(previous.config) === playOutWall) return previous;
+  const state = clone(previous);
+  state.config = { ...state.config, playOutWall };
+  log(
+    state,
+    null,
+    playOutWall ? "Every tile in the wall will be played" : "The last tiles stay in the wall as a dead wall",
+  );
   return state;
 }
 

@@ -14,11 +14,13 @@ import {
   liabilityInPlay,
   multipleWinnersInPlay,
   othersPayHalfInPlay,
+  playOutWallInPlay,
   roundsInGame,
 } from "@/game/rules";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
 import { QrCode } from "./QrCode";
+import { HomeScreenHint } from "./HomeScreenHint";
 import { positionOf } from "./tableLayout";
 import { SettingsMenu } from "./SettingsMenu";
 import { TableSettings, rulesInForce } from "./TableSettings";
@@ -210,6 +212,7 @@ export function TableLobby({
               ? "The table deals when everyone is ready."
               : `On a tablet, open “Be ${tableName(view.roomId)} on this screen” to deal. It goes in the middle, as the table.`}
           </p>
+          <HomeScreenHint />
         </div>
 
         <aside className="gather__invite" aria-labelledby="invite-title">
@@ -545,6 +548,18 @@ function RulesRow({ api, view }: { api: RoomApi; view: RoomView }) {
                   {o.label}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="field">
+            <span className="field__label">End of the wall</span>
+            <select
+              className="field__select"
+              value={playOutWallInPlay(config) ? "on" : "off"}
+              disabled={api.busy}
+              onChange={(e) => void api.control({ type: "playOutWall", value: e.target.value === "on" })}
+            >
+              <option value="on">Play out every tile</option>
+              <option value="off">Leave a dead wall</option>
             </select>
           </label>
           <label className="field">

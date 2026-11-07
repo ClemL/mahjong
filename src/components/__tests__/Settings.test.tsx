@@ -58,7 +58,7 @@ describe("the table's settings", () => {
     render(<TableSettings api={api} view={view} sound={sound} appearance={appearance} display={tabletDisplay()} />);
 
     expect(screen.getByRole("tab", { name: /^House rules/ }).getAttribute("aria-selected")).toBe("true");
-    for (const rule of ["Min 1 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half", "截糊 First winner only"]) {
+    for (const rule of ["Min 1 faan", "All four winds", "Flowers in", "包 Liability", "Others pay half", "截糊 First winner only", "Every tile played"]) {
       expect(screen.getAllByText(rule).length).toBeGreaterThan(0);
     }
 
@@ -70,6 +70,8 @@ describe("the table's settings", () => {
     expect(api.control).toHaveBeenCalledWith({ type: "multipleWinners", value: true });
     fireEvent.click(screen.getByRole("switch", { name: "包 Liability" }));
     expect(api.control).toHaveBeenCalledWith({ type: "liability", value: false });
+    fireEvent.click(screen.getByRole("switch", { name: "Play out every tile" }));
+    expect(api.control).toHaveBeenCalledWith({ type: "playOutWall", value: false });
   });
 
   it("lists who sits where and hands a person's chair to the computer once confirmed", () => {

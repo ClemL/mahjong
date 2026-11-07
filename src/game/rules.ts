@@ -79,8 +79,18 @@ export interface RuleConfig {
    * fourth set of any kind pays the whole of that player's self-drawn win.
    */
   liability: boolean;
+  /**
+   * Every tile in the wall is drawn before a hand washes out. Off, the last
+   * `DEAD_WALL_TILES` stay where they are as a dead wall (尾牌): kong and
+   * flower replacements still come from the back, and the hand is over once
+   * only the dead wall is left.
+   */
+  playOutWall: boolean;
   faan: FaanTable;
 }
+
+/** The tiles a table that does not play out the wall leaves standing: eight stacks. */
+export const DEAD_WALL_TILES = 16;
 
 export const DEFAULT_FAAN: FaanTable = {
   allChows: 1,
@@ -132,6 +142,7 @@ export const DEFAULT_RULES: RuleConfig = {
   flowers: true,
   rounds: 4,
   liability: true,
+  playOutWall: true,
   faan: DEFAULT_FAAN,
 };
 
@@ -155,6 +166,16 @@ export function flowersInPlay(config: Pick<RuleConfig, "flowers">): boolean {
 /** Whether this table plays 包. A table saved before the option existed gets the default. */
 export function liabilityInPlay(config: Pick<RuleConfig, "liability">): boolean {
   return config.liability !== false;
+}
+
+/** Whether every tile is drawn before a washout. A table saved before the option existed played them all. */
+export function playOutWallInPlay(config: Pick<RuleConfig, "playOutWall">): boolean {
+  return config.playOutWall !== false;
+}
+
+/** How many tiles stay in the wall when the hand washes out: none, or the dead wall. */
+export function deadWallOf(config: Pick<RuleConfig, "playOutWall">): number {
+  return playOutWallInPlay(config) ? 0 : DEAD_WALL_TILES;
 }
 
 /**
@@ -218,6 +239,15 @@ export function ruleNotes(config: RuleConfig = DEFAULT_RULES): RuleNote[] {
     {
       title: "Turn order",
       body: "Play passes East → South → West → North. Draw one tile, then discard one.",
+    },
+    {
+      title: "End of the wall",
+      body: playOutWallInPlay(config)
+        ? "Every tile in the wall is played: the hand washes out (流局) when the last one has been drawn " +
+          "and discarded without a win. The last tile drawn and the last discard can each score 海底 / 河底."
+        : `The last ${DEAD_WALL_TILES} tiles stay in the wall as a dead wall (尾牌): kong and bonus ` +
+          "replacements still come from the back, but nobody draws into it, and the hand washes out (流局) " +
+          "once only the dead wall is left. The last tile drawn before it can score 海底.",
     },
     {
       title: "Claiming a discard",

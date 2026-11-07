@@ -53,6 +53,7 @@ import {
   setLiability,
   setMultipleWinners,
   setOthersPayHalf,
+  setPlayOutWall,
   setMinFaan,
   setRounds,
   startHand,
@@ -354,6 +355,7 @@ export type TableCommand =
   | { type: "liability"; value: boolean }
   | { type: "othersPayHalf"; value: boolean }
   | { type: "multipleWinners"; value: boolean }
+  | { type: "playOutWall"; value: boolean }
   | { type: "takeBack"; value: boolean }
   | { type: "achievements"; value: boolean }
   | { type: "speed"; value: number }
@@ -472,6 +474,10 @@ export async function control(
         break;
       case "multipleWinners":
         r.state = setMultipleWinners(r.state, command.value === true);
+        break;
+      // Read at every draw, so a change applies from the next one.
+      case "playOutWall":
+        r.state = setPlayOutWall(r.state, command.value === true);
         break;
       case "speed":
         if (!SPEED_LEVELS.some((s) => s.level === command.value)) {
