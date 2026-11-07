@@ -19,6 +19,7 @@ import {
   claimTurn,
   createGame,
   discard,
+  liveTiles,
   nextHand,
   resolveClaims,
   startHand,
@@ -1307,7 +1308,8 @@ export function viewFor(room: Room, token: string | null, now = Date.now()): Roo
     roundWind: state.roundWind,
     handNumber: state.handNumber,
     dealership: state.dealership,
-    wallCount: state.wall.length,
+    // What can still be drawn: a dead wall left standing is not counted.
+    wallCount: liveTiles(state),
     lastDiscard: state.lastDiscard,
     // Settled, every hand is face up: the drawn tile is the self-drawn winner, shown to all.
     drawnTileId: settled || (you.role === "player" && you.seat === state.turn) ? state.drawnTileId : null,

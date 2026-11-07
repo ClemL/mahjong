@@ -48,6 +48,7 @@ import { usePhoneDisplay } from "@/hooks/useLocalSetting";
 import { ClaimChoices } from "./ClaimChoices";
 import { intoFrame, screenAngle } from "./screenFrame";
 import { MiniPonds } from "./MiniPonds";
+import { PhoneSummary } from "./PhoneSummary";
 import { AchievementToasts } from "./AchievementToasts";
 import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 
@@ -99,6 +100,9 @@ export function shelfBreak(codes: readonly TileCode[], after = 0): number {
   return best < 0 || longest > even + 2 ? even : best;
 }
 
+/** The controller's screens, in the order a swipe right moves through them. */
+type Page = "hand" | "discards" | "summary";
+
 /** How far a finger travels sideways across the middle before it counts as a swipe. */
 const SWIPE_REACH = 48;
 
@@ -109,6 +113,17 @@ function EyeIcon({ open }: { open: boolean }) {
       <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
       <circle cx="12" cy="12" r="2.8" />
       {open ? null : <path d="M4 20 20 4" />}
+    </svg>
+  );
+}
+
+/** A cup: the chips and achievements, on the button that brings them in. */
+function TrophyIcon() {
+  return (
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 4h8v5a4 4 0 0 1-8 0V4z" />
+      <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4" />
+      <path d="M12 13v4M9 20h6M10 17h4" />
     </svg>
   );
 }
@@ -233,7 +248,18 @@ export function PhoneView({
   // and the player asked for them, otherwise brought in over the middle.
   const roomy = useRoomyScreen();
   const docked = roomy && display.ponds === "on";
-  const [pondsOpen, setPondsOpen] = useState(false);
+  // The screens a swipe right moves through: the hand, everyone's discards
+  // (unless they are already kept beside it), then the chips and achievements.
+  // A swipe left goes back one.
+  const [page, setPage] = useState<Page>("hand");
+  const pages: Page[] = docked ? ["hand", "summary"] : ["hand", "discards", "summary"];
+  const turnPage = (by: 1 | -1) =>
+    setPage((current) => {
+      const at = Math.max(0, pages.indexOf(current));
+      return pages[Math.min(pages.length - 1, Math.max(0, at + by))];
+    });
+  const pondsOpen = page === "discards";
+  const summaryOpen = page === "summary";
   // The hand's result, put aside to look at the table, by the hand and phase it was for.
   const [resultAside, setResultAside] = useState<string | null>(null);
   // How many of the computer's turns for you have been acknowledged. The room
@@ -255,34 +281,38 @@ export function PhoneView({
     setZoomed(false);
   }, [view.turn, view.handNumber, view.phase]);
 
-  // Brought in over the middle, the discards cover the buttons for a call on a
-  // discard, a win or a kong, so a new one of those puts them away — once:
-  // opened again, they stay while it is weighed up.
+  // Whenever the move comes to you — your turn to throw, a call on a discard,
+  // a win or a kong — the screen comes back to the hand and its buttons. Once
+  // a move: swiped away again, the other screens stay while it is weighed up.
+  const myTurn = view.turn === seat && view.phase === "action" && Boolean(view.actions?.canDiscard);
   const decision = view.claim
     ? `claim:${view.lastDiscard?.tile.id}`
-    : view.actions?.canWin || (view.actions?.kongs?.length ?? 0) > 0
+    : myTurn || view.actions?.canWin || (view.actions?.kongs?.length ?? 0) > 0
       ? `move:${view.handNumber}:${view.turn}:${view.drawnTileId}`
       : null;
   useEffect(() => {
-    if (decision !== null) setPondsOpen(false);
+    if (decision !== null) setPage("hand");
   }, [decision]);
-  useEffect(() => setPondsOpen(false), [view.handNumber]);
+  useEffect(() => setPage("hand"), [view.handNumber]);
+  // The discards are kept beside the hand now: there is no screen of them to be on.
   useEffect(() => {
-    if (!pondsOpen) return;
+    if (docked) setPage((current) => (current === "discards" ? "hand" : current));
+  }, [docked]);
+  useEffect(() => {
+    if (page === "hand") return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") setPondsOpen(false);
+      if (e.key === "Escape") setPage("hand");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pondsOpen]);
+  }, [page]);
 
-  // A swipe right across the middle of the controller brings the discards in,
-  // a swipe left puts them away. Read in the controller's own frame: held
+  // A swipe right across the middle of the controller moves on a screen, a
+  // swipe left comes back one. Read in the controller's own frame: held
   // upright it is turned on its side, and right is along the glass.
   const swipe = useRef<{ id: number; x: number; y: number; angle: number } | null>(null);
   const onSwipeStart = (e: PointerEvent<HTMLDivElement>) => {
     swipe.current = null;
-    if (docked) return;
     const target = e.target as Element;
     if (!target.closest(".phone__controls, .phone__status, .minipond--sheet")) return;
     if (target.closest("button, a, input, select, textarea")) return;
@@ -294,7 +324,7 @@ export function PhoneView({
     const moved = intoFrame(e.clientX - start.x, e.clientY - start.y, start.angle);
     if (Math.abs(moved.x) < SWIPE_REACH || Math.abs(moved.x) < 1.5 * Math.abs(moved.y)) return;
     swipe.current = null;
-    setPondsOpen(moved.x > 0);
+    turnPage(moved.x > 0 ? 1 : -1);
   };
   const onSwipeEnd = (e: PointerEvent<HTMLDivElement>) => {
     if (swipe.current?.id === e.pointerId) swipe.current = null;
@@ -934,6 +964,12 @@ export function PhoneView({
         )}
         <span className="phone__wall">{view.wallCount} left</span>
         <span className="phone__bar-gap" />
+        {/* Which screen this is, of the ones a swipe moves through. */}
+        <span className="phone__pages" aria-hidden>
+          {pages.map((p) => (
+            <span key={p} className={p === page ? "phone__page phone__page--on" : "phone__page"} />
+          ))}
+        </span>
         {helperAvailable ? (
           <HelperButton
             open={helperOpen}
@@ -948,11 +984,21 @@ export function PhoneView({
             aria-pressed={pondsOpen}
             aria-label={pondsOpen ? "Put away everyone's discards" : "Show everyone's discards"}
             title="Everyone's discards — or swipe right across the middle"
-            onClick={() => setPondsOpen((o) => !o)}
+            onClick={() => setPage((current) => (current === "discards" ? "hand" : "discards"))}
           >
             <PondsIcon />
           </button>
         )}
+        <button
+          type="button"
+          className="btn btn--sm btn--ghost phone__toggle phone__summary-btn"
+          aria-pressed={summaryOpen}
+          aria-label={summaryOpen ? "Put away chips and achievements" : "Show chips and achievements"}
+          title="Chips and achievements — or swipe right past the discards"
+          onClick={() => setPage((current) => (current === "summary" ? "hand" : "summary"))}
+        >
+          <TrophyIcon />
+        </button>
         <button
           type="button"
           className="btn btn--sm btn--ghost phone__toggle"
@@ -988,12 +1034,12 @@ export function PhoneView({
       <div className="phone__status phone__now">
         {lastPlayed}
         {promptLine}
-        {turnTimer || hurryButton ? (
-          <span className="phone__now-row">
-            {turnTimer}
-            {hurryButton}
-          </span>
-        ) : null}
+        {/* Always there, empty or not, so the clock or Hurry up arriving in it
+            never moves the tile and the words above. */}
+        <span className="phone__now-row">
+          {turnTimer}
+          {hurryButton}
+        </span>
       </div>
 
       {exposed}
@@ -1006,8 +1052,11 @@ export function PhoneView({
           order={display.pondOrder}
           onOrder={display.setPondOrder}
           nameOf={nameOf}
-          onClose={docked ? undefined : () => setPondsOpen(false)}
+          onClose={docked ? undefined : () => setPage("hand")}
         />
+      ) : null}
+      {summaryOpen ? (
+        <PhoneSummary view={view} you={seat} nameOf={nameOf} onClose={() => setPage("hand")} />
       ) : null}
 
       {/* The hand is always last, with the choices and the helper above it, so

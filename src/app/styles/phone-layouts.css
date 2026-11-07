@@ -34,7 +34,8 @@
   align-self: stretch;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* From the top: whatever comes and goes below never moves what is above it. */
+  justify-content: flex-start;
   align-items: flex-start;
   gap: 8px;
   min-width: 0;
@@ -97,11 +98,20 @@
   color: var(--ink-dim);
 }
 
+/* The row for the clock and Hurry up keeps its height whether either is in it,
+   so neither arriving pushes the tile and the words above it. */
 .phone__now-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px 10px;
+  min-height: 36px;
+}
+
+@media (pointer: coarse) {
+  .phone__now-row {
+    min-height: 44px;
+  }
 }
 
 .phone__now .phone__timer {
@@ -385,4 +395,206 @@
    it is one more row, the width of the others. */
 .phone--shelves .phone__actions .btn--ghost {
   margin-left: 0;
+}
+
+/* ---- which screen: the hand, everyone's discards, chips and achievements ---- */
+
+.phone__pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding-inline: 4px;
+}
+
+.phone__page {
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-dim);
+}
+
+/* The current screen is filled, not only coloured. */
+.phone__page--on {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+/* Chips and achievements: a screen of its own under the header, the hand
+   included — there is nothing on it to decide. */
+.phone--landscape .phone-summary {
+  grid-row: 2 / -1;
+  grid-column: 1 / -1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  --tile-sm: 22px;
+}
+
+.phone-summary__round {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone-summary__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 10px 18px;
+  align-items: start;
+}
+
+.phone-summary__col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.phone-summary__board {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.phone-summary__board th,
+.phone-summary__board td {
+  padding: 3px 4px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+  white-space: nowrap;
+}
+
+.phone-summary__board thead th {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+
+.phone-summary__board .phone-summary__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-summary__wind {
+  color: var(--gold);
+}
+
+.phone-summary__row--you th,
+.phone-summary__row--you td {
+  font-weight: 800;
+}
+
+.phone-summary__chips {
+  font-weight: 700;
+}
+
+/* Up and down are said with a sign as well as a colour. */
+.phone-summary__up {
+  color: var(--score-pos);
+}
+
+.phone-summary__down {
+  color: var(--score-neg);
+}
+
+.phone-summary__line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-dim);
+}
+
+.phone-summary__hands {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.phone-summary__hand {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--raise-1);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.phone-summary__hand-no {
+  color: var(--ink-dim);
+}
+
+.phone-summary__hand-change {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-summary__title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--ink-dim);
+}
+
+.phone-summary__badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One still to earn is faded and its detail says how; one earned is ringed
+   in gold and says when. */
+.phone-summary__badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  opacity: 0.6;
+}
+
+.phone-summary__badge--got {
+  opacity: 1;
+  border-color: var(--gold);
+  background: var(--accent-wash);
+}
+
+.phone-summary__badge-icon {
+  flex: none;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.phone-summary__badge-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.phone-summary__badge-title {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.phone-summary__badge-detail {
+  font-size: 10.5px;
+  color: var(--ink-dim);
+}
+
+.phone-summary__others {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }

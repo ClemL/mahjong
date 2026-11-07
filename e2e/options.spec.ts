@@ -200,6 +200,19 @@ test("a foldable keeps everyone's discards beside the hand, and a phone swipes r
   await sweep(middle.x + 300, middle.x + 100);
   await expect(ponds(srini.page)).toHaveCount(0);
 
+  // Two swipes right go past the discards to the chips and achievements; two
+  // swipes left come back to the hand.
+  const summary = srini.page.getByRole("region", { name: "Chips and achievements" });
+  await sweep(middle.x + 60, middle.x + 260);
+  await sweep(middle.x + 60, middle.x + 260);
+  await expect(summary).toBeVisible();
+  await expect(summary.getByText(/Your achievements · 0 of 12/)).toBeVisible();
+  await sweep(middle.x + 300, middle.x + 100);
+  await expect(ponds(srini.page)).toBeVisible();
+  await sweep(middle.x + 300, middle.x + 100);
+  await expect(ponds(srini.page)).toHaveCount(0);
+  await expect(summary).toHaveCount(0);
+
   // Kris throws, and his own pond shows it, ringed as the newest.
   await kris.page.getByRole("button", { name: /Hand hidden/ }).tap();
   const live = kris.page.locator(".phone__hand [data-tile-id]:not([aria-disabled])");

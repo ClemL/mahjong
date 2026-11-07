@@ -5,6 +5,7 @@ import { type RoomView, openSeatName, robotName, seatedNames } from "@/game/room
 import { suggestName } from "@/game/names";
 import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import { tableName } from "@/game/tables";
+import { HomeScreenHint } from "./HomeScreenHint";
 
 interface Props {
   view: RoomView;
@@ -64,6 +65,7 @@ export function SeatPicker({ view, picked = null, onClaim, onReset, busy, error 
   return (
     <div className="lobby">
       <h1 className="lobby__title">Take a seat at {tableName(view.roomId)}</h1>
+      <HomeScreenHint />
       {/* Dropping back here without a word reads as the app losing the seat. */}
       {view.tableTakenOver ? (
         <p className="lobby__warn" role="status">

@@ -9,6 +9,7 @@ import {
   type RoomView,
   WALL_BUILD_MS,
 } from "@/game/room";
+import { deadWallOf } from "@/game/rules";
 import type { Seat } from "@/game/tiles";
 import type { TableLayout } from "./tableLayout";
 
@@ -144,7 +145,8 @@ export function wallTaken(view: RoomView, tiles: number): { head: number; tail: 
     (n, p) => n + p.flowers.length + p.melds.filter((m) => m.type === "kong").length,
     0,
   );
-  const taken = Math.max(0, tiles - view.wallCount);
+  // The count is what can still be drawn; a dead wall left standing is still on the felt.
+  const taken = Math.max(0, tiles - view.wallCount - deadWallOf(view.config));
   return { head: Math.max(0, taken - tail), tail: Math.min(tail, taken) };
 }
 

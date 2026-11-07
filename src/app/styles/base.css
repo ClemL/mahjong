@@ -114,9 +114,16 @@ body {
   min-height: 100%;
 }
 
+/* Safari 26 tints its own bars from the page's background colour, not from
+   theme-color and not from a gradient: a solid colour here keeps the bars
+   above and below the table the colour of the felt's edge, not white. */
+html {
+  background-color: var(--felt-edge);
+}
+
 body {
   background:
-    radial-gradient(ellipse at 50% 0%, var(--felt-light), var(--felt) 55%, var(--felt-edge) 100%);
+    radial-gradient(ellipse at 50% 0%, var(--felt-light), var(--felt) 55%, var(--felt-edge) 100%) var(--felt-edge);
   color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     "Noto Sans", sans-serif;
