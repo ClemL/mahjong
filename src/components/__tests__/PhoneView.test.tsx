@@ -688,6 +688,20 @@ describe("shelfBreak", () => {
 });
 
 describe("PhoneView — whose move it is", () => {
+  it("keeps the row for the clock and Hurry up in the play card, empty or not, so nothing above it moves", () => {
+    const { room, seat } = onTurn();
+    const other = playerView(room, ((seat + 1) % 4) as Seat);
+    const waiting = render(<PhoneView api={fakeApi(other)} view={other} sound={sound} />);
+    const row = waiting.container.querySelector(".phone__now > .phone__now-row");
+    expect(row).not.toBeNull();
+    expect(row!.previousElementSibling!.className).toContain("phone__prompt");
+    waiting.unmount();
+
+    const mine = playerView(room, seat);
+    const { container } = render(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    expect(container.querySelector(".phone__now > .phone__now-row")).not.toBeNull();
+  });
+
   it("lights the phone of the player to discard, and only theirs", () => {
     const { room, seat, view } = onTurn();
     const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
@@ -954,6 +968,57 @@ describe("PhoneView — everyone's discards", () => {
     expect(ponds()).toBeTruthy();
     fireEvent.keyDown(window, { key: "Escape" });
     expect(ponds()).toBeNull();
+  });
+
+  it("moves on to the chips and achievements with a second swipe right, and back one screen with each swipe left", () => {
+    screenOf(844, 390);
+    const { room, seat } = onTurn();
+    const view = playerView(room, ((seat + 1) % 4) as Seat);
+    const { container } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    const summary = () => screen.queryByRole("region", { name: "Chips and achievements" });
+
+    swipe(container, 120);
+    expect(ponds()).toBeTruthy();
+    swipe(container, 120);
+    expect(ponds()).toBeNull();
+    const page = summary()!;
+    expect(within(page).getAllByRole("row")).toHaveLength(5);
+    expect(within(page).getByText("Your achievements · 0 of 12")).toBeTruthy();
+    // It is the last screen: a further swipe right stays on it.
+    swipe(container, 120);
+    expect(summary()).toBeTruthy();
+    swipe(container, -120);
+    expect(ponds()).toBeTruthy();
+    swipe(container, -120);
+    expect(ponds()).toBeNull();
+    expect(summary()).toBeNull();
+
+    // The header button goes straight there, and Escape comes back.
+    fireEvent.click(screen.getByRole("button", { name: "Show chips and achievements" }));
+    expect(summary()).toBeTruthy();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(summary()).toBeNull();
+  });
+
+  it("comes back to the hand whenever the move comes to you, your own turn to throw included", () => {
+    screenOf(844, 390);
+    const { room, seat } = onTurn();
+    const mine = playerView(room, seat);
+    // As the phone stood a moment before: somebody else's turn, nothing to do.
+    const quiet: RoomView = { ...mine, turn: ((seat + 3) % 4) as Seat, actions: null, drawnTileId: null };
+    const summary = () => screen.queryByRole("region", { name: "Chips and achievements" });
+    const { rerender } = render(<PhoneView api={fakeApi(quiet)} view={quiet} sound={sound} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show chips and achievements" }));
+    expect(summary()).toBeTruthy();
+
+    rerender(<PhoneView api={fakeApi(mine)} view={mine} sound={sound} />);
+    expect(summary()).toBeNull();
+    expect(screen.getByText("Your turn — discard a tile.")).toBeTruthy();
+
+    // Looked at again while the turn is weighed up, it stays.
+    fireEvent.click(screen.getByRole("button", { name: "Show chips and achievements" }));
+    rerender(<PhoneView api={fakeApi(mine)} view={{ ...mine }} sound={sound} />);
+    expect(summary()).toBeTruthy();
   });
 
   it("puts them away when a discard is offered to claim, since they cover the buttons", () => {

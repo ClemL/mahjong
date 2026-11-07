@@ -10,6 +10,7 @@ import type { OnOff, TabletDensity, TabletDisplay } from "@/hooks/useLocalSettin
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import { THEMES, TILE_STYLES } from "@/game/appearance";
 import {
+  DEAD_WALL_TILES,
   MIN_FAAN_CHOICES,
   type RuleConfig,
   describeRounds,
@@ -18,6 +19,7 @@ import {
   liabilityInPlay,
   multipleWinnersInPlay,
   othersPayHalfInPlay,
+  playOutWallInPlay,
   roundsInGame,
 } from "@/game/rules";
 import { GAME_LENGTHS } from "./gameLength";
@@ -129,6 +131,7 @@ export function rulesInForce(config: RuleConfig): string[] {
     liabilityInPlay(config) ? "包 Liability" : "No liability",
     othersPayHalfInPlay(config) ? "Others pay half" : "Discarder pays alone",
     multipleWinnersInPlay(config) ? "雙響 Every winner paid" : "截糊 First winner only",
+    playOutWallInPlay(config) ? "Every tile played" : `${DEAD_WALL_TILES}-tile dead wall`,
   ];
 }
 
@@ -443,6 +446,17 @@ export function TableSettings({
                   value={String(rounds) as `${number}`}
                   disabled={api.busy}
                   onChange={(value) => void api.control({ type: "rounds", value: Number(value) })}
+                />
+                <SwitchRow
+                  label="Play out every tile"
+                  hint={
+                    playOutWallInPlay(config)
+                      ? "A hand washes out only once the last tile in the wall has been drawn"
+                      : `Off: the last ${DEAD_WALL_TILES} tiles stay in the wall as a dead wall, and the hand washes out when only they are left`
+                  }
+                  checked={playOutWallInPlay(config)}
+                  disabled={api.busy}
+                  onChange={(value) => void api.control({ type: "playOutWall", value })}
                 />
               </Card>
 
