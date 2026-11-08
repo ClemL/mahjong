@@ -166,9 +166,13 @@ test("a foldable keeps everyone's discards beside the hand, a phone swipes right
   // Sorting the discards is one of the helper's assists, off for Srini unless asked for.
   const srini = await open(browser, PHONE_LANDSCAPE, true, { "hk-mahjong.helper": "on" });
   await srini.page.goto(`/room/${ROOM}?seat=1&name=Srini`);
-  // The table's sound on, discards announced at normal speed, and its voice
-  // swapped for one that writes down what it is asked to say.
-  const table = await open(browser, TABLET, false, { "hk-mahjong.muted": "0", "hk-mahjong.announce": "normal" });
+  // The table's sound on, discards announced in English at normal speed, and
+  // its voice swapped for one that writes down what it is asked to say.
+  const table = await open(browser, TABLET, false, {
+    "hk-mahjong.muted": "0",
+    "hk-mahjong.announce": "normal",
+    "hk-mahjong.speech-language": "english",
+  });
   await table.page.addInitScript(() => {
     const said: { text: string; rate: number }[] = [];
     (window as unknown as { said: typeof said }).said = said;
@@ -255,10 +259,10 @@ test("a foldable keeps everyone's discards beside the hand, a phone swipes right
   await expect(ponds(kris.page).locator(".minipond__row--mine .minipond__tile")).toHaveCount(1);
   await expect(ponds(kris.page).locator(".minipond__tile--newest")).toHaveCount(1);
 
-  // The table says the tile aloud: by its English name, with no Chinese voice here.
+  // The table says the tile aloud by its English name, a wind by its direction alone.
   await expect
     .poll(() => table.page.evaluate(() => (window as unknown as { said: { text: string; rate: number }[] }).said))
-    .toContainEqual({ text: thrown, rate: 1 });
+    .toContainEqual({ text: thrown!.replace(/ Wind$/, ""), rate: 1 });
 
   for (const side of [kris, srini, table]) {
     expect(side.errors).toEqual([]);

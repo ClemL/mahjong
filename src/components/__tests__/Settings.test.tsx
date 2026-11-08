@@ -22,6 +22,8 @@ function tabletDisplay(): TabletDisplay {
     setCallouts: vi.fn(),
     announce: "off",
     setAnnounce: vi.fn(),
+    language: "cantonese",
+    setLanguage: vi.fn(),
   };
 }
 
@@ -153,7 +155,7 @@ describe("the table's settings", () => {
 });
 
 describe("announcing discards", () => {
-  it("offers no announcement or three speaking speeds, and says when the sound has silenced it", () => {
+  it("offers no announcement or three speaking speeds, Cantonese or English, and says when the sound has silenced it", () => {
     const view = tableView(lobby([0]));
     const display = tabletDisplay();
     const { unmount } = render(
@@ -165,6 +167,11 @@ describe("announcing discards", () => {
     expect(within(announce).getByRole("button", { name: "Off" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(within(announce).getByRole("button", { name: "Fast" }));
     expect(display.setAnnounce).toHaveBeenCalledWith("fast");
+    // Cantonese unless English is chosen, for the calls and the discards alike.
+    const language = screen.getByRole("group", { name: "Spoken language" });
+    expect(within(language).getByRole("button", { name: /^Cantonese/ }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(language).getByRole("button", { name: "English" }));
+    expect(display.setLanguage).toHaveBeenCalledWith("english");
     unmount();
 
     // Chosen, but the tablet is muted: the setting says why nothing is heard.
