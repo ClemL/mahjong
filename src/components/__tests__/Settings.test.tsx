@@ -20,6 +20,8 @@ function tabletDisplay(): TabletDisplay {
     setDensity: vi.fn(),
     callouts: "on",
     setCallouts: vi.fn(),
+    announce: "off",
+    setAnnounce: vi.fn(),
   };
 }
 
@@ -150,6 +152,37 @@ describe("the table's settings", () => {
   });
 });
 
+describe("announcing discards", () => {
+  it("offers no announcement or three speaking speeds, and says when the sound has silenced it", () => {
+    const view = tableView(lobby([0]));
+    const display = tabletDisplay();
+    const { unmount } = render(
+      <TableSettings api={fakeApi(view)} view={view} sound={sound} appearance={appearance} display={display} />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /This tablet/ }));
+    const announce = screen.getByRole("group", { name: "Announce discards" });
+    expect(within(announce).getAllByRole("button").map((b) => b.textContent)).toEqual(["Off", "Slow", "Normal", "Fast"]);
+    expect(within(announce).getByRole("button", { name: "Off" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(announce).getByRole("button", { name: "Fast" }));
+    expect(display.setAnnounce).toHaveBeenCalledWith("fast");
+    unmount();
+
+    // Chosen, but the tablet is muted: the setting says why nothing is heard.
+    render(
+      <TableSettings
+        api={fakeApi(view)}
+        view={view}
+        sound={{ muted: true, setMuted: vi.fn() }}
+        appearance={appearance}
+        display={{ ...display, announce: "slow" }}
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /This tablet/ }));
+    expect(screen.getByText("Silent while the sound is off")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /This tablet/ }).textContent).toContain("discards announced");
+  });
+});
+
 describe("this tablet's size", () => {
   it("offers cosy, normal, compact and extra compact, and says which is in use", () => {
     const view = tableView(lobby([0]));
@@ -170,7 +203,7 @@ describe("this tablet's size", () => {
 });
 
 describe("a phone's settings", () => {
-  it("offers the discards beside the hand only where the screen has room, and their order everywhere", () => {
+  it("offers the discards beside the hand only where the screen has room, and their order wherever the helper is on", () => {
     const config = tableView(lobby([0])).config;
     const display = phoneDisplay();
     const height = window.innerHeight;
@@ -184,7 +217,19 @@ describe("a phone's settings", () => {
     expect(screen.getByText(/Swipe right across the middle of the screen to see them/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "By suit" }));
     expect(display.setPondOrder).toHaveBeenCalledWith("sorted");
+    fireEvent.click(screen.getByRole("button", { name: "By tile" }));
+    expect(display.setPondOrder).toHaveBeenCalledWith("pooled");
     unmount();
+
+    // Without the helper the discards stay as thrown, and the setting says how to sort them.
+    const { unmount: away } = render(
+      <PhoneSettings sound={sound} config={config} appearance={appearance} display={{ ...display, helper: "off", pondOrder: "pooled" }} />,
+    );
+    const order = screen.getByRole("group", { name: "Discard order" });
+    expect(within(order).getByRole("button", { name: "As thrown" }).getAttribute("aria-pressed")).toBe("true");
+    expect(within(order).getByRole("button", { name: "By tile" })).toHaveProperty("disabled", true);
+    expect(screen.getByText(/Turn on the helper, under Assists, to sort them/)).toBeTruthy();
+    away();
 
     Object.defineProperty(window, "innerHeight", { configurable: true, value: 780 });
     render(<PhoneSettings sound={sound} config={config} appearance={appearance} display={display} />);

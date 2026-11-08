@@ -76,6 +76,10 @@ const ON_OFF: readonly OnOff[] = ["on", "off"];
 export type TabletDensity = "cosy" | "normal" | "compact" | "extra";
 export const TABLET_DENSITIES: readonly TabletDensity[] = ["cosy", "normal", "compact", "extra"];
 
+/** Every discard said aloud by the tablet, at one of three speaking rates, or not at all. */
+export type AnnounceSpeed = "off" | "slow" | "normal" | "fast";
+export const ANNOUNCE_SPEEDS: readonly AnnounceSpeed[] = ["off", "slow", "normal", "fast"];
+
 /** What the tablet draws besides the game itself. */
 export interface TabletDisplay {
   /** Light the discard area of the seat whose turn it is. */
@@ -90,6 +94,9 @@ export interface TabletDisplay {
   /** Claims and wins called out loud, as the players would at a real table. */
   callouts: OnOff;
   setCallouts: (value: OnOff) => void;
+  /** Each tile named aloud as it is thrown. */
+  announce: AnnounceSpeed;
+  setAnnounce: (value: AnnounceSpeed) => void;
 }
 
 export function useTabletDisplay(): TabletDisplay {
@@ -102,7 +109,9 @@ export function useTabletDisplay(): TabletDisplay {
     TABLET_DENSITIES,
   );
   const [callouts, setCallouts] = useLocalSetting<OnOff>("hk-mahjong.callouts", "on", ON_OFF);
-  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity, callouts, setCallouts };
+  // Off unless asked for: a voice on every throw is a lot to have on by surprise.
+  const [announce, setAnnounce] = useLocalSetting<AnnounceSpeed>("hk-mahjong.announce", "off", ANNOUNCE_SPEEDS);
+  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity, callouts, setCallouts, announce, setAnnounce };
 }
 
 /** The panes beside a squared felt, each of which the tablet can close. */
@@ -184,8 +193,13 @@ export function useFoldedPanes(): {
 
 export type PhoneSize = "compact" | "standard" | "comfy";
 
-/** How the phone lays out everyone's discards: in the order thrown, or by suit and number. */
-export type PondOrder = "thrown" | "sorted";
+/**
+ * How the phone lays out everyone's discards: in the order thrown; each
+ * person's by suit and number; or everyone's pooled, a row a suit. Only the
+ * first unless the helper is on.
+ */
+export type PondOrder = "thrown" | "sorted" | "pooled";
+const POND_ORDERS: readonly PondOrder[] = ["thrown", "sorted", "pooled"];
 
 /** What the phone shows besides the hand and its choices. */
 export interface PhoneDisplay {
@@ -247,7 +261,7 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
   const [keepAwake, setKeepAwake] = useLocalSetting<OnOff>("hk-mahjong.keep-awake", "off", ON_OFF);
   const [stretch, setStretch] = useLocalSetting<OnOff>("hk-mahjong.hand-stretch", "off", ON_OFF);
   const [ponds, setPonds] = useLocalSetting<OnOff>("hk-mahjong.ponds", "off", ON_OFF);
-  const [pondOrder, setPondOrder] = useLocalSetting<PondOrder>("hk-mahjong.pond-order", "thrown", ["thrown", "sorted"]);
+  const [pondOrder, setPondOrder] = useLocalSetting<PondOrder>("hk-mahjong.pond-order", "thrown", POND_ORDERS);
   const [setHintsChoice, setSetHints] = useStoredChoice<OnOff>("hk-mahjong.set-hints", ON_OFF);
   const [hurryChoice, setHurry] = useStoredChoice<OnOff>("hk-mahjong.hurry", ON_OFF);
   const [helperChoice, setHelper] = useStoredChoice<OnOff>("hk-mahjong.helper", ON_OFF);

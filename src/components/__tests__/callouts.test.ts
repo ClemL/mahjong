@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { RoomView } from "@/game/room";
-import { calloutFor, pickVoice } from "@/hooks/useCallouts";
+import { announcementFor, calloutFor, pickVoice, spokenTile } from "@/hooks/useCallouts";
 import type { ReplayStep } from "@/game/replay";
 import type { TileCode } from "@/game/tiles";
 import { describeStep } from "../HandReplay";
@@ -45,6 +45,38 @@ describe("calling out claims and wins", () => {
     expect(pickVoice([voice("en-US"), voice("yue_HK")])?.lang).toBe("yue_HK");
     expect(pickVoice([voice("en-GB"), voice("zh-TW")])?.lang).toBe("zh-TW");
     expect(pickVoice([voice("en-US")])).toBeNull();
+  });
+});
+
+describe("announcing every discard", () => {
+  const view = tableView(dealt());
+  const threw = (v: RoomView, id: string, code: TileCode, from = 1 as const): RoomView => ({
+    ...v,
+    lastPlayed: { tile: { id, code }, from },
+  });
+
+  it("names each tile once, as it is thrown", () => {
+    const first = threw(view, "p5#1", "p5");
+    expect(announcementFor(view, first)).toBe("p5");
+    // The next poll, the next player having drawn: the same tile, said already.
+    expect(announcementFor(first, { ...first, wallCount: first.wallCount - 1 })).toBeNull();
+    expect(announcementFor(first, threw(first, "dr#2", "dr"))).toBe("dr");
+  });
+
+  it("says nothing for a fresh deal, or a discard left over from the hand before", () => {
+    const thrown = threw(view, "p5#1", "p5");
+    expect(announcementFor(thrown, { ...threw(view, "s3#1", "s3"), handNumber: view.handNumber + 1 })).toBeNull();
+    expect(announcementFor(thrown, { ...thrown, lastPlayed: null })).toBeNull();
+  });
+
+  it("says a tile as a Hong Kong table does, or by its English name", () => {
+    expect(spokenTile("p5")).toEqual({ zh: "五筒", en: "5 Dots" });
+    expect(spokenTile("m9")).toEqual({ zh: "九萬", en: "9 Characters" });
+    expect(spokenTile("s1")).toEqual({ zh: "一索", en: "1 Bamboo" });
+    expect(spokenTile("we")).toEqual({ zh: "東風", en: "East Wind" });
+    expect(spokenTile("dr")).toEqual({ zh: "紅中", en: "Red Dragon" });
+    expect(spokenTile("dg").zh).toBe("發財");
+    expect(spokenTile("dw").zh).toBe("白板");
   });
 });
 

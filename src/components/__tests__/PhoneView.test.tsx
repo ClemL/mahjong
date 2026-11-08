@@ -1021,6 +1021,30 @@ describe("PhoneView — everyone's discards", () => {
     expect(summary()).toBeTruthy();
   });
 
+  it("sorts them only with the helper on, and shows them as thrown otherwise", () => {
+    screenOf(844, 390);
+    window.localStorage.setItem("hk-mahjong.pond-order", "pooled");
+    window.localStorage.setItem("hk-mahjong.helper", "off");
+    onTestFinished(() => {
+      window.localStorage.removeItem("hk-mahjong.pond-order");
+      window.localStorage.removeItem("hk-mahjong.helper");
+    });
+    const { room, seat } = onTurn();
+    const view = playerView(room, ((seat + 1) % 4) as Seat);
+    const { unmount } = render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show everyone's discards" }));
+    expect(ponds()!.getAttribute("data-order")).toBe("thrown");
+    expect(within(ponds()!).queryByRole("group", { name: "Discard order" })).toBeNull();
+    unmount();
+
+    window.localStorage.setItem("hk-mahjong.helper", "on");
+    render(<PhoneView api={fakeApi(view)} view={view} sound={sound} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show everyone's discards" }));
+    expect(ponds()!.getAttribute("data-order")).toBe("pooled");
+    fireEvent.click(within(ponds()!).getByRole("button", { name: "As thrown" }));
+    expect(ponds()!.getAttribute("data-order")).toBe("thrown");
+  });
+
   it("puts them away when a discard is offered to claim, since they cover the buttons", () => {
     screenOf(844, 390);
     const { room, claimer } = claimable();
