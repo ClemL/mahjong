@@ -1032,7 +1032,11 @@ export function TableTop({ api, view, sound }: { api: RoomApi; view: RoomView; s
   const fullscreen = useFullscreen("landscape");
   const display = useTabletDisplay();
   const voiced = sound?.muted !== true;
-  useCallouts(view, { calls: voiced && display.callouts === "on", announce: voiced ? display.announce : "off" });
+  useCallouts(view, {
+    calls: voiced && display.callouts === "on",
+    announce: voiced ? display.announce : "off",
+    language: display.language,
+  });
   const sheet = useResultSheet(view);
   const root = useRef<HTMLDivElement | null>(null);
   // Kept as state as well, to hand the result sheet somewhere to go.

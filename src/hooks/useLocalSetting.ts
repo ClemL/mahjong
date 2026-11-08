@@ -80,6 +80,10 @@ export const TABLET_DENSITIES: readonly TabletDensity[] = ["cosy", "normal", "co
 export type AnnounceSpeed = "off" | "slow" | "normal" | "fast";
 export const ANNOUNCE_SPEEDS: readonly AnnounceSpeed[] = ["off", "slow", "normal", "fast"];
 
+/** What the tablet speaks in: the Cantonese a Hong Kong table calls in, or the English names. */
+export type SpeechLanguage = "cantonese" | "english";
+export const SPEECH_LANGUAGES: readonly SpeechLanguage[] = ["cantonese", "english"];
+
 /** What the tablet draws besides the game itself. */
 export interface TabletDisplay {
   /** Light the discard area of the seat whose turn it is. */
@@ -97,6 +101,9 @@ export interface TabletDisplay {
   /** Each tile named aloud as it is thrown. */
   announce: AnnounceSpeed;
   setAnnounce: (value: AnnounceSpeed) => void;
+  /** The language of the calls, the discards and the win announced. */
+  language: SpeechLanguage;
+  setLanguage: (value: SpeechLanguage) => void;
 }
 
 export function useTabletDisplay(): TabletDisplay {
@@ -111,7 +118,25 @@ export function useTabletDisplay(): TabletDisplay {
   const [callouts, setCallouts] = useLocalSetting<OnOff>("hk-mahjong.callouts", "on", ON_OFF);
   // Off unless asked for: a voice on every throw is a lot to have on by surprise.
   const [announce, setAnnounce] = useLocalSetting<AnnounceSpeed>("hk-mahjong.announce", "off", ANNOUNCE_SPEEDS);
-  return { turnGlow, setTurnGlow, wall, setWall, density, setDensity, callouts, setCallouts, announce, setAnnounce };
+  const [language, setLanguage] = useLocalSetting<SpeechLanguage>(
+    "hk-mahjong.speech-language",
+    "cantonese",
+    SPEECH_LANGUAGES,
+  );
+  return {
+    turnGlow,
+    setTurnGlow,
+    wall,
+    setWall,
+    density,
+    setDensity,
+    callouts,
+    setCallouts,
+    announce,
+    setAnnounce,
+    language,
+    setLanguage,
+  };
 }
 
 /** The panes beside a squared felt, each of which the tablet can close. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { RoomView } from "@/game/room";
-import { announcementFor, calloutFor, pickVoice, spokenTile } from "@/hooks/useCallouts";
+import { announcementFor, calloutFor, mainTheme, pickVoice, spokenTile, winSummary } from "@/hooks/useCallouts";
+import type { PatternHit, ScoreResult } from "@/game/scoring";
 import type { ReplayStep } from "@/game/replay";
 import type { TileCode } from "@/game/tiles";
 import { describeStep } from "../HandReplay";
@@ -40,11 +41,15 @@ describe("calling out claims and wins", () => {
     expect(calloutFor(view, { ...laid(view, 1, "pung"), handNumber: view.handNumber + 1 })).toBeNull();
   });
 
-  it("speaks Cantonese where it can, any Chinese voice next, and English otherwise", () => {
+  it("picks a Cantonese voice where it can and any Chinese voice next, or the device's English one", () => {
     expect(pickVoice([voice("en-US"), voice("zh-CN"), voice("zh-HK")])?.lang).toBe("zh-HK");
     expect(pickVoice([voice("en-US"), voice("yue_HK")])?.lang).toBe("yue_HK");
     expect(pickVoice([voice("en-GB"), voice("zh-TW")])?.lang).toBe("zh-TW");
     expect(pickVoice([voice("en-US")])).toBeNull();
+    const english = [voice("zh-HK"), voice("en-GB"), { ...voice("en-US"), default: true } as SpeechSynthesisVoice];
+    expect(pickVoice(english, "english")?.lang).toBe("en-US");
+    expect(pickVoice([voice("zh-HK"), voice("en-AU")], "english")?.lang).toBe("en-AU");
+    expect(pickVoice([voice("zh-HK")], "english")).toBeNull();
   });
 });
 
@@ -69,14 +74,51 @@ describe("announcing every discard", () => {
     expect(announcementFor(thrown, { ...thrown, lastPlayed: null })).toBeNull();
   });
 
-  it("says a tile as a Hong Kong table does, or by its English name", () => {
+  it("says a tile as a Hong Kong table does, or by its English name, and a wind by its direction alone", () => {
     expect(spokenTile("p5")).toEqual({ zh: "五筒", en: "5 Dots" });
     expect(spokenTile("m9")).toEqual({ zh: "九萬", en: "9 Characters" });
     expect(spokenTile("s1")).toEqual({ zh: "一索", en: "1 Bamboo" });
-    expect(spokenTile("we")).toEqual({ zh: "東風", en: "East Wind" });
+    expect(spokenTile("we")).toEqual({ zh: "東", en: "East" });
+    expect(spokenTile("wn")).toEqual({ zh: "北", en: "North" });
     expect(spokenTile("dr")).toEqual({ zh: "紅中", en: "Red Dragon" });
     expect(spokenTile("dg").zh).toBe("發財");
     expect(spokenTile("dw").zh).toBe("白板");
+  });
+});
+
+describe("announcing a win", () => {
+  const hit = (key: string, chinese: string, name: string, faan: number): PatternHit => ({ key, chinese, name, faan });
+  const scored = (patterns: PatternHit[], scoredFaan = patterns.reduce((n, p) => n + p.faan, 0)): ScoreResult => ({
+    faan: patterns.reduce((n, p) => n + p.faan, 0),
+    scoredFaan,
+    patterns,
+    value: 0,
+    limitReached: false,
+  });
+  const selfDraw = hit("selfDraw", "自摸", "Self Draw", 1);
+  const noBonus = hit("noBonus", "無花", "No Bonus Tiles", 1);
+  const allChows = hit("allChows", "平糊", "All Sequences", 1);
+  const fullFlush = hit("fullFlush", "清一色", "Full Flush", 7);
+
+  it("says the hand's biggest pattern, then the faan it is paid at", () => {
+    expect(winSummary(scored([noBonus, selfDraw, fullFlush]))).toEqual({ zh: "清一色，九番", en: "Full Flush, 9 faan" });
+    // Past the limit, the faan paid, not the faan counted.
+    expect(winSummary(scored([fullFlush, hit("allPungs", "對對糊", "All Triplets", 3), noBonus], 10)).zh).toBe("清一色，十番");
+    expect(winSummary(scored([hit("thirteenOrphans", "十三么", "Thirteen Orphans", 13)])).zh).toBe("十三么，十三番");
+  });
+
+  it("names the hand by its shape over how it was kept on a tie, and never by the self-draw just called", () => {
+    expect(mainTheme(scored([noBonus, allChows]))?.key).toBe("allChows");
+    expect(mainTheme(scored([selfDraw, noBonus]))?.key).toBe("noBonus");
+    expect(winSummary(scored([selfDraw, allChows]))).toEqual({ zh: "平糊，兩番", en: "All Sequences, 2 faan" });
+    // Only the self-draw: there is no theme left to say, only the faan.
+    expect(winSummary(scored([selfDraw]))).toEqual({ zh: "一番", en: "1 faan" });
+  });
+
+  it("calls a hand of no patterns a chicken hand, and leaves a set's bracket unsaid", () => {
+    expect(winSummary(scored([]))).toEqual({ zh: "雞糊，零番", en: "Chicken Hand, 0 faan" });
+    const flowers = hit("flowerSet", "一台花 (花)", "Complete Set of Flowers", 2);
+    expect(winSummary(scored([flowers, allChows])).zh).toBe("一台花，三番");
   });
 });
 

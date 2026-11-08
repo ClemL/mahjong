@@ -6,7 +6,7 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Difficulty } from "@/game/ai";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import type { AnnounceSpeed, OnOff, TabletDensity, TabletDisplay } from "@/hooks/useLocalSetting";
+import type { AnnounceSpeed, OnOff, SpeechLanguage, TabletDensity, TabletDisplay } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import { THEMES, TILE_STYLES } from "@/game/appearance";
 import {
@@ -77,17 +77,24 @@ const DENSITY_OPTIONS: SegmentOption<TabletDensity>[] = [
 /** Each discard named aloud as it lands, at a speaking pace to suit the table, or not at all. */
 export const ANNOUNCE_OPTIONS: SegmentOption<AnnounceSpeed>[] = [
   { value: "off", label: "Off", hint: "Discards land without a word" },
-  { value: "slow", label: "Slow", hint: "Every tile named as it is thrown — 五筒, 紅中 — said slowly and clearly" },
-  {
-    value: "normal",
-    label: "Normal",
-    hint: "Every tile named as it is thrown — 五筒, 紅中 in Cantonese where the tablet has the voice, otherwise in English",
-  },
+  { value: "slow", label: "Slow", hint: "Every tile named as it is thrown — 五筒, 紅中, 東 — said slowly and clearly" },
+  { value: "normal", label: "Normal", hint: "Every tile named as it is thrown — 五筒, 紅中, 東 — at the voice's own pace" },
   {
     value: "fast",
     label: "Fast",
-    hint: "Every tile named as it is thrown — 五筒, 紅中 — quickly, to keep up with fast computer players",
+    hint: "Every tile named as it is thrown — 五筒, 紅中, 東 — quickly, to keep up with fast computer players",
   },
+];
+
+/** What the tablet speaks in, for the calls, the discards and the win alike. */
+export const LANGUAGE_OPTIONS: SegmentOption<SpeechLanguage>[] = [
+  {
+    value: "cantonese",
+    label: "Cantonese",
+    sub: "廣東話",
+    hint: "碰, 食糊, 五筒, 東 in the tablet's Cantonese voice. A tablet without one can add it in its text-to-speech settings",
+  },
+  { value: "english", label: "English", hint: "Pung, Mahjong, 5 Dots, East: the calls and tiles by their English names" },
 ];
 
 export const MIN_FAAN: SegmentOption<`${number}`>[] = MIN_FAAN_CHOICES.map((n) => ({
@@ -599,7 +606,7 @@ export function TableSettings({
                   />
                   <SwitchRow
                     label="Spoken calls"
-                    hint="The tablet says 碰, 上, 槓 and 食糊 aloud, in Cantonese where it has the voice; not while the sound is off"
+                    hint="The tablet says 碰, 上, 槓 and 食糊 aloud, then a winning hand's main pattern and its faan — 清一色，七番; not while the sound is off"
                     checked={display.callouts === "on"}
                     onChange={(on) => display.setCallouts(on ? "on" : "off")}
                   />
@@ -613,6 +620,12 @@ export function TableSettings({
                         : undefined
                     }
                     onChange={display.setAnnounce}
+                  />
+                  <Segmented
+                    label="Spoken language"
+                    options={LANGUAGE_OPTIONS}
+                    value={display.language}
+                    onChange={display.setLanguage}
                   />
                   <SwitchRow
                     label="Wall"
