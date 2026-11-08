@@ -48,11 +48,12 @@
   --tile-sm: clamp(16px, min(2.6cqw, 4.2cqh), 30px);
 }
 
-/* On a phone the discards come in over the middle, between the header and the
-   hand, so the hand stays in reach underneath. */
+/* On a phone the discards are a screen of their own under the header, the hand
+   included, like the chips: the screen comes back to the hand whenever there
+   is a move to make. */
 .minipond--sheet {
   grid-area: auto;
-  grid-row: melds-start / controls-end;
+  grid-row: 2 / -1;
   grid-column: 1 / -1;
   align-self: stretch;
   width: auto;
@@ -85,7 +86,10 @@
   min-width: 0;
 }
 
+/* It takes the spare width, so the close button keeps to the right edge
+   whether or not the order buttons are there to push it. */
 .minipond__title {
+  flex: 1 1 auto;
   margin: 0;
   font-size: 12px;
   font-weight: 700;
@@ -194,6 +198,47 @@
 .minipond__tile {
   display: inline-flex;
   border-radius: calc(var(--tile-sm) * 0.16);
+}
+
+/* The four rows share the screen's height, and the tiles are as large as
+   that allows — until the longest row (--most tiles wide, set by MiniPonds)
+   would run past the edge, when they shrink to fit it on one line. */
+.minipond--sheet .minipond__rows {
+  --who: 7.5rem;
+  --row-gap: 6px;
+  flex: 1 1 0;
+  container-type: size;
+  grid-template-columns: var(--who) minmax(0, 1fr);
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: var(--row-gap) 8px;
+}
+
+.minipond--sheet .minipond__row {
+  /* A tile is 1.38 times as tall as it is wide, plus its edge and shadow; the
+     6px leave the newest tile's ring and lift clear of the next row. */
+  --fit-height: calc(((100cqh - 3 * var(--row-gap)) / 4 - 6px) / 1.48);
+  --fit-width: calc((100cqw - var(--who) - 14px - (var(--most, 1) - 1) * 2px) / var(--most, 1));
+  --tile-sm: clamp(14px, min(var(--fit-height), var(--fit-width)), 96px);
+}
+
+.minipond--sheet .minipond__who {
+  max-width: none;
+  font-size: 14px;
+}
+
+.minipond--sheet .minipond__wind {
+  font-size: 18px;
+}
+
+.minipond--sheet .minipond__tiles {
+  gap: 2px;
+}
+
+/* By tile: a little air where one kind of tile gives way to the next, so the
+   copies of each read as a group to be counted. KIND_BREAK in MiniPonds.tsx
+   counts it into the row's width. */
+.minipond__tile--kind {
+  margin-left: calc(var(--tile-sm) * 0.3);
 }
 
 /* The newest discard is ringed and stands a little proud, so it does not rest

@@ -245,7 +245,7 @@ export function PhoneView({
   // Your open sets and flowers drawn large, for reading across a table.
   const [zoomed, setZoomed] = useState(false);
   // Everyone's discards: kept in the middle right where the screen has room
-  // and the player asked for them, otherwise brought in over the middle.
+  // and the player asked for them, otherwise a screen of their own under the header.
   const roomy = useRoomyScreen();
   const docked = roomy && display.ponds === "on";
   // The screens a swipe right moves through: the hand, everyone's discards
@@ -1050,7 +1050,8 @@ export function PhoneView({
           you={seat}
           newestId={view.lastPlayed?.tile.id ?? null}
           order={display.pondOrder}
-          onOrder={display.setPondOrder}
+          // Sorting the discards counts what has gone for you, so it is one of the helper's assists.
+          onOrder={display.helper === "on" ? display.setPondOrder : undefined}
           nameOf={nameOf}
           onClose={docked ? undefined : () => setPage("hand")}
         />

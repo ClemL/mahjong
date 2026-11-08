@@ -155,7 +155,7 @@ test("a phone stretches its hand to the edges, and the table can end the game ea
   await table.context.close();
 });
 
-test("a foldable keeps everyone's discards beside the hand, and a phone swipes right for them", async ({
+test("a foldable keeps everyone's discards beside the hand, a phone swipes right for them, and the table names each throw", async ({
   browser,
   request,
 }) => {
@@ -163,9 +163,26 @@ test("a foldable keeps everyone's discards beside the hand, and a phone swipes r
   const FOLDABLE = { width: 930, height: 780 };
   const kris = await open(browser, FOLDABLE, true, { "hk-mahjong.ponds": "on" });
   await kris.page.goto(`/room/${ROOM}?seat=0&name=Kris`);
-  const srini = await open(browser, PHONE_LANDSCAPE, true);
+  // Sorting the discards is one of the helper's assists, off for Srini unless asked for.
+  const srini = await open(browser, PHONE_LANDSCAPE, true, { "hk-mahjong.helper": "on" });
   await srini.page.goto(`/room/${ROOM}?seat=1&name=Srini`);
-  const table = await open(browser, TABLET, false);
+  // The table's sound on, discards announced at normal speed, and its voice
+  // swapped for one that writes down what it is asked to say.
+  const table = await open(browser, TABLET, false, { "hk-mahjong.muted": "0", "hk-mahjong.announce": "normal" });
+  await table.page.addInitScript(() => {
+    const said: { text: string; rate: number }[] = [];
+    (window as unknown as { said: typeof said }).said = said;
+    Object.defineProperty(window, "speechSynthesis", {
+      configurable: true,
+      value: {
+        speaking: false,
+        pending: false,
+        getVoices: () => [],
+        cancel: () => {},
+        speak: (u: SpeechSynthesisUtterance) => said.push({ text: u.text, rate: u.rate }),
+      },
+    });
+  });
   await table.page.goto(`/room/${ROOM}?seat=table`);
   await expect(table.page.getByText("2 of 4 seated")).toBeVisible();
   await table.page.getByRole("button", { name: "Deal" }).click();
@@ -195,8 +212,20 @@ test("a foldable keeps everyone's discards beside the hand, and a phone swipes r
   };
   await sweep(middle.x + 60, middle.x + 260);
   await expect(ponds(srini.page)).toBeVisible();
+  // A screen of its own under the header, its four rows sharing the height.
+  const sheet = (await ponds(srini.page).boundingBox())!;
+  const header = (await srini.page.locator(".phone__bar").boundingBox())!;
+  expect(sheet.y).toBeGreaterThanOrEqual(header.y + header.height);
+  expect(sheet.y + sheet.height).toBeGreaterThan(PHONE_LANDSCAPE.height - 20);
+  const rows = await ponds(srini.page).locator(".minipond__row").evaluateAll((els) =>
+    els.map((el) => el.getBoundingClientRect().height),
+  );
+  expect(rows).toHaveLength(4);
+  expect(Math.min(...rows) * 4, `rows: ${rows}`).toBeGreaterThan(sheet.height * 0.7);
   await srini.page.getByRole("button", { name: "By suit" }).click();
   await expect(srini.page.getByRole("button", { name: "By suit" })).toHaveAttribute("aria-pressed", "true");
+  await srini.page.getByRole("button", { name: "By tile" }).click();
+  await expect(ponds(srini.page).locator(".minipond__name")).toHaveText(["Characters", "Dots", "Bamboo", "Honours"]);
   await sweep(middle.x + 300, middle.x + 100);
   await expect(ponds(srini.page)).toHaveCount(0);
 
@@ -221,9 +250,15 @@ test("a foldable keeps everyone's discards beside the hand, and a phone swipes r
   await settleHand(kris.page);
   await tile.tap();
   await expect(kris.page.getByRole("status").filter({ hasText: /^Discard / })).toBeVisible();
+  const thrown = await tile.getAttribute("title");
   await tile.tap();
   await expect(ponds(kris.page).locator(".minipond__row--mine .minipond__tile")).toHaveCount(1);
   await expect(ponds(kris.page).locator(".minipond__tile--newest")).toHaveCount(1);
+
+  // The table says the tile aloud: by its English name, with no Chinese voice here.
+  await expect
+    .poll(() => table.page.evaluate(() => (window as unknown as { said: { text: string; rate: number }[] }).said))
+    .toContainEqual({ text: thrown, rate: 1 });
 
   for (const side of [kris, srini, table]) {
     expect(side.errors).toEqual([]);

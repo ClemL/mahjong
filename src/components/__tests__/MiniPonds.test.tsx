@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { PublicPlayer } from "@/game/room";
 import { type Seat, type TileCode, tileName } from "@/game/tiles";
+import type { PondOrder } from "@/hooks/useLocalSetting";
 import { MiniPonds } from "../MiniPonds";
 
 const NAMES = ["Kris", "Srini", "Teja", "Parth"];
@@ -34,7 +35,7 @@ const tilesIn = (row: HTMLElement) =>
     el.classList.contains("minipond__gap") ? `gap:${el.textContent}` : el.querySelector("[data-code]")!.getAttribute("data-code"),
   );
 
-function show(order: "thrown" | "sorted", you: Seat = 1, onClose?: () => void) {
+function show(order: PondOrder, you: Seat = 1, onClose?: () => void, sorting = true) {
   const onOrder = vi.fn();
   render(
     <MiniPonds
@@ -42,7 +43,7 @@ function show(order: "thrown" | "sorted", you: Seat = 1, onClose?: () => void) {
       you={you}
       newestId="m3#32"
       order={order}
-      onOrder={onOrder}
+      onOrder={sorting ? onOrder : undefined}
       nameOf={(s) => NAMES[s]}
       onClose={onClose}
     />,
@@ -77,12 +78,49 @@ describe("MiniPonds", () => {
     expect(within(teja).getByText(/none yet/)).toBeTruthy();
   });
 
+  it("pools everyone's discards by tile, a row a suit with the honours last, and no names", () => {
+    show("pooled");
+    const names = rows().map((r) => r.querySelector(".minipond__name")!.textContent);
+    expect(names).toEqual(["Characters", "Dots", "Bamboo", "Honours"]);
+    const [chars, dots, bamboo, honours] = rows();
+    expect(tilesIn(chars)).toEqual(["m1", "m3", "m7"]);
+    expect(tilesIn(dots)).toEqual(["p2", "p5"]);
+    expect(tilesIn(bamboo)).toEqual(["s9"]);
+    expect(tilesIn(honours)).toEqual(["we", "dr"]);
+    // Nobody's pond is kept, so neither are the spaces where tiles were claimed.
+    expect(document.querySelector(".minipond__gap")).toBeNull();
+    expect(chars.querySelector(".sr-only")!.textContent).toBe(
+      `Characters discarded: ${tileName("m1")}, ${tileName("m3")} (newest), ${tileName("m7")}`,
+    );
+  });
+
+  it("keeps copies of a tile together, counted for a screen reader, with a break before the next kind", () => {
+    const doubled = [player(0, ["p5", "p2"]), player(1, ["p5"]), player(2, []), player(3, [])];
+    render(<MiniPonds players={doubled} you={0} newestId={null} order="pooled" onOrder={vi.fn()} nameOf={(s) => NAMES[s]} />);
+    const dots = rows()[1];
+    expect(tilesIn(dots)).toEqual(["p2", "p5", "p5"]);
+    const breaks = [...dots.querySelectorAll(".minipond__tile")].map((el) => el.classList.contains("minipond__tile--kind"));
+    expect(breaks).toEqual([false, true, false]);
+    expect(dots.querySelector(".sr-only")!.textContent).toBe(`Dots discarded: ${tileName("p2")}, 2 × ${tileName("p5")}`);
+    // The longest row sets how large the tiles can be: three tiles and one break.
+    expect(screen.getByRole("region").style.getPropertyValue("--most")).toBe("3.3");
+  });
+
   it("switches order from its own buttons, and closes only when it was brought in", () => {
     const onOrder = show("thrown");
     expect(screen.getByRole("button", { name: "As thrown" }).getAttribute("aria-pressed")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "By suit" }));
     expect(onOrder).toHaveBeenCalledWith("sorted");
+    fireEvent.click(screen.getByRole("button", { name: "By tile" }));
+    expect(onOrder).toHaveBeenCalledWith("pooled");
     expect(screen.queryByRole("button", { name: "Close the discards" })).toBeNull();
+  });
+
+  it("offers no other order without the helper, and shows them as thrown whatever was chosen before", () => {
+    show("pooled", 1, undefined, false);
+    expect(screen.queryByRole("group", { name: "Discard order" })).toBeNull();
+    expect(rows().map((r) => r.querySelector(".minipond__name")!.textContent)).toEqual(["You", "Teja", "Parth", "Kris"]);
+    expect(tilesIn(rows()[0])).toEqual(["p5", "gap:東", "m7", "we"]);
   });
 
   it("can be put away when it was brought in over the controls", () => {

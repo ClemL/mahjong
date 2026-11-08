@@ -272,12 +272,6 @@
   align-self: stretch;
 }
 
-/* Brought in on a phone, the discards cover everything under the header. */
-.phone--landscape.phone--shelves .minipond--sheet {
-  grid-row: 2 / -1;
-  grid-column: 1 / -1;
-}
-
 .phone--landscape.phone--shelves .phone__hand {
   grid-area: hand;
   align-self: center;

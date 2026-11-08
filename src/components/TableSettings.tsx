@@ -6,7 +6,7 @@ import { SEAT_NAMES, type Seat, seatWind, tileGlyph } from "@/game/tiles";
 import type { RoomApi } from "@/hooks/useRoom";
 import type { Difficulty } from "@/game/ai";
 import type { AppearanceApi } from "@/hooks/useAppearance";
-import type { OnOff, TabletDensity, TabletDisplay } from "@/hooks/useLocalSetting";
+import type { AnnounceSpeed, OnOff, TabletDensity, TabletDisplay } from "@/hooks/useLocalSetting";
 import type { SoundToggle } from "@/hooks/useRoomSound";
 import { THEMES, TILE_STYLES } from "@/game/appearance";
 import {
@@ -71,6 +71,22 @@ const DENSITY_OPTIONS: SegmentOption<TabletDensity>[] = [
     value: "extra",
     label: "Extra compact",
     hint: "The smallest tiles and racks, for a small tablet or a long hand",
+  },
+];
+
+/** Each discard named aloud as it lands, at a speaking pace to suit the table, or not at all. */
+export const ANNOUNCE_OPTIONS: SegmentOption<AnnounceSpeed>[] = [
+  { value: "off", label: "Off", hint: "Discards land without a word" },
+  { value: "slow", label: "Slow", hint: "Every tile named as it is thrown — 五筒, 紅中 — said slowly and clearly" },
+  {
+    value: "normal",
+    label: "Normal",
+    hint: "Every tile named as it is thrown — 五筒, 紅中 in Cantonese where the tablet has the voice, otherwise in English",
+  },
+  {
+    value: "fast",
+    label: "Fast",
+    hint: "Every tile named as it is thrown — 五筒, 紅中 — quickly, to keep up with fast computer players",
   },
 ];
 
@@ -336,6 +352,7 @@ export function TableSettings({
       name: "This tablet",
       summary: [
         sound ? (sound.muted ? "Sound off" : "Sound on") : null,
+        display && display.announce !== "off" ? "discards announced" : null,
         display ? (display.wall === "on" ? "wall shown" : "wall hidden") : null,
         display ? DENSITY_OPTIONS.find((d) => d.value === display.density)?.label : null,
       ]
@@ -585,6 +602,17 @@ export function TableSettings({
                     hint="The tablet says 碰, 上, 槓 and 食糊 aloud, in Cantonese where it has the voice; not while the sound is off"
                     checked={display.callouts === "on"}
                     onChange={(on) => display.setCallouts(on ? "on" : "off")}
+                  />
+                  <Segmented
+                    label="Announce discards"
+                    options={ANNOUNCE_OPTIONS}
+                    value={display.announce}
+                    note={
+                      sound?.muted && display.announce !== "off"
+                        ? "Silent while the sound is off"
+                        : undefined
+                    }
+                    onChange={display.setAnnounce}
                   />
                   <SwitchRow
                     label="Wall"

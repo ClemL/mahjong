@@ -47,6 +47,11 @@ const SORT: SegmentOption<SortMode>[] = [
 const POND_ORDER: SegmentOption<PondOrder>[] = [
   { value: "thrown", label: "As thrown", hint: "Each person's discards in the order they went out, with a space where one was claimed" },
   { value: "sorted", label: "By suit", hint: "Each person's discards by suit and number, to count what has gone" },
+  {
+    value: "pooled",
+    label: "By tile",
+    hint: "Everyone's discards together, without names: a row a suit, each tile beside its copies",
+  },
 ];
 
 function Group({ title, children }: { title: string; children: ReactNode }) {
@@ -189,7 +194,13 @@ export function PhoneSettings({
               <Segmented
                 label="Discard order"
                 options={POND_ORDER}
-                value={display.pondOrder}
+                value={display.helper === "on" ? display.pondOrder : "thrown"}
+                disabled={display.helper !== "on"}
+                note={
+                  display.helper === "on"
+                    ? undefined
+                    : "As thrown. Turn on the helper, under Assists, to sort them by suit or by tile"
+                }
                 onChange={display.setPondOrder}
               />
             </>
@@ -207,7 +218,7 @@ export function PhoneSettings({
           />
           <SwitchRow
             label="Helper"
-            hint="A wheelchair button that shows what finishes each set you've started"
+            hint="A wheelchair button that shows what finishes each set you've started, and everyone's discards sorted by suit or by tile"
             checked={display.helper === "on"}
             onChange={(on) => display.setHelper(on ? "on" : "off")}
           />
