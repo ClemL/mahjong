@@ -40,7 +40,8 @@ export interface RoomApi {
   stale: boolean;
   setToken: (token: string | null) => void;
   act: (action: PlayerAction) => Promise<void>;
-  control: (command: TableCommand) => Promise<void>;
+  /** True when the room took the command; a refusal is in `error`. */
+  control: (command: TableCommand) => Promise<boolean>;
   /** Give up this seat and go back to the seat picker. */
   leave: () => Promise<void>;
   /** Empty the whole room, table included — from the seat picker, with no seat. */
@@ -209,8 +210,8 @@ export function useRoom(roomId: string): RoomApi {
   }, []);
 
   const send = useCallback(
-    async (path: string, payload: Record<string, unknown>) => {
-      if (!tokenRef.current) return;
+    async (path: string, payload: Record<string, unknown>): Promise<boolean> => {
+      if (!tokenRef.current) return false;
       setBusy(true);
       try {
         const response = await fetch(`/api/rooms/${roomId}/${path}`, {
@@ -221,12 +222,14 @@ export function useRoom(roomId: string): RoomApi {
         const body = (await response.json()) as RoomView & { error?: string };
         if (!response.ok) {
           setError(body.error ?? "That did not work");
-        } else {
-          setError(null);
-          take(body);
+          return false;
         }
+        setError(null);
+        take(body);
+        return true;
       } catch {
         setError("Could not reach the table");
+        return false;
       } finally {
         setBusy(false);
       }
@@ -286,7 +289,7 @@ export function useRoom(roomId: string): RoomApi {
     stale,
     resume,
     setToken,
-    act: useCallback((action: PlayerAction) => send("action", { action }), [send]),
+    act: useCallback(async (action: PlayerAction) => void (await send("action", { action })), [send]),
     control: useCallback((command: TableCommand) => send("control", { command }), [send]),
     refresh: useCallback(() => setNonce((n) => n + 1), []),
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { type FormEvent, type ReactNode, useId, useState } from "react";
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { PhoneLayout, PhoneLayoutApi } from "@/hooks/usePhoneLayout";
@@ -75,6 +75,77 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
+ * The name this phone's player goes by at the table, and a way to change it at
+ * any point in the game. Whoever scans a computer's chair mid-game names
+ * themselves at the door, and a typo there should not mean living with it, or
+ * leaving the chair to sit down again.
+ */
+function YourName({
+  name,
+  busy,
+  error,
+  onRename,
+}: {
+  name: string;
+  busy: boolean;
+  error: string | null;
+  onRename: (name: string) => Promise<boolean>;
+}) {
+  const id = useId();
+  // Kept here rather than read from the view: the room keeps polling while the
+  // menu is open, and a poll landing mid-edit must not snatch the text away.
+  const [draft, setDraft] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const next = (draft ?? "").trim();
+  const changed = draft !== null && next !== "" && next !== name;
+
+  // Saved, the box shows the name the room gave back, which may carry a number
+  // after it; refused, it keeps what was typed so it can be sent again.
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!changed || busy) return;
+    const ok = await onRename(next);
+    setFailed(!ok);
+    if (ok) setDraft(null);
+  };
+
+  return (
+    <form className="name-row" onSubmit={(e) => void save(e)}>
+      <label className="name-row__label" htmlFor={id}>
+        Your name
+      </label>
+      <span className="name-row__field">
+        <input
+          id={id}
+          className="name-row__input"
+          value={draft ?? name}
+          maxLength={16}
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="done"
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setFailed(false);
+          }}
+        />
+        <button type="submit" className="btn name-row__save" disabled={!changed || busy}>
+          Save
+        </button>
+      </span>
+      {failed && error ? (
+        <span className="name-row__error" role="alert">
+          Not saved: {error}
+        </span>
+      ) : (
+        <span className="name-row__hint">
+          How the table and the other phones show you. A name someone else here goes by gets a number after it
+        </span>
+      )}
+    </form>
+  );
+}
+
+/**
  * A phone's own settings: how this phone sounds and buzzes, how the hand is
  * laid out, and the assists. The house rules belong to the table; the rules and
  * faan table are here as what someone mid-hand reaches for.
@@ -90,6 +161,10 @@ export function PhoneSettings({
   display,
   sort,
   table,
+  name,
+  onRename,
+  busy = false,
+  error = null,
   onLeave,
 }: {
   sound: SoundToggle;
@@ -108,6 +183,12 @@ export function PhoneSettings({
   sort?: HandOrder;
   /** Which of the tables this phone is at, e.g. "Table 2". */
   table?: string;
+  /** The name this phone's player sits under, with `onRename` to change it. */
+  name?: string;
+  onRename?: (name: string) => Promise<boolean>;
+  /** A command to the room is on its way; and the last one's refusal, if it was refused. */
+  busy?: boolean;
+  error?: string | null;
   /** Give up the seat. */
   onLeave?: () => void;
 }) {
@@ -115,6 +196,12 @@ export function PhoneSettings({
   const roomy = useRoomyScreen();
   return (
     <>
+      {name !== undefined && onRename ? (
+        <Group title="You">
+          <YourName name={name} busy={busy} error={error} onRename={onRename} />
+        </Group>
+      ) : null}
+
       <Group title="On this phone">
         {display ? (
           <SwitchRow

@@ -1025,6 +1025,10 @@ export function PhoneView({
               display={display}
               sort={order}
               table={tableName(view.roomId)}
+              name={me.occupant.name ?? ""}
+              onRename={(next) => api.control({ type: "rename", seat, name: next })}
+              busy={api.busy}
+              error={api.error}
               onLeave={() => void api.leave()}
             />
           </SettingsMenu>
