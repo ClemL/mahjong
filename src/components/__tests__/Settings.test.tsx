@@ -33,6 +33,8 @@ function phoneDisplay(): PhoneDisplay {
     setPlayLog: vi.fn(),
     size: "standard",
     setSize: vi.fn(),
+    zoomOut: "0",
+    setZoomOut: vi.fn(),
     stretch: "off",
     setStretch: vi.fn(),
     vibrate: "on",
@@ -267,6 +269,8 @@ describe("a phone's settings", () => {
     expect(display.setHurry).toHaveBeenCalledWith("on");
     fireEvent.click(within(screen.getByRole("group", { name: "Button size" })).getByRole("button", { name: "Comfy" }));
     expect(display.setSize).toHaveBeenCalledWith("comfy");
+    fireEvent.click(within(screen.getByRole("group", { name: "Zoom out" })).getByRole("button", { name: "10%" }));
+    expect(display.setZoomOut).toHaveBeenCalledWith("10");
     fireEvent.click(within(screen.getByRole("group", { name: "Layout" })).getByRole("button", { name: "Shelves" }));
     expect(layout.setLayout).toHaveBeenCalledWith("shelves");
     fireEvent.click(screen.getByRole("switch", { name: "Stretch to the edges" }));

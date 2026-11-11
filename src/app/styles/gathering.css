@@ -344,7 +344,8 @@
   color: var(--ink);
   font: inherit;
   font-weight: 700;
-  font-size: clamp(15px, 2.2cqh, 20px);
+  /* 16px at least, or Safari on an iPhone zooms in as it is tapped. */
+  font-size: clamp(16px, 2.2cqh, 20px);
 }
 
 .gather__hint {

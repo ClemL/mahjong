@@ -64,6 +64,30 @@ body:has(.app--handset) {
   position: relative;
 }
 
+/* Zoomed out (Settings → Zoom out): the controller drawn smaller in the middle
+   of the screen, with a margin round every edge — for a corner that is hard to
+   tap, or that the browser's own bars cover. The tiles are sized by the
+   controller's box, so they shrink with it; the header and buttons are scaled
+   by the same share (wall.css). The margin is a share of each side of the
+   screen, so it is the same proportion either way round. */
+.phone--out-5 { --zoom-out: 0.05; }
+.phone--out-10 { --zoom-out: 0.1; }
+.phone--out-15 { --zoom-out: 0.15; }
+
+.phone--landscape {
+  --fit: calc(1 - var(--zoom-out, 0));
+  margin: calc(var(--zoom-out, 0) * 50vh) calc(var(--zoom-out, 0) * 50vw);
+  margin: calc(var(--zoom-out, 0) * 50dvh) calc(var(--zoom-out, 0) * 50dvw);
+}
+
+/* Held upright the page is turned on its side, and its height runs across the glass. */
+@media (orientation: portrait) {
+  .phone--landscape {
+    margin: calc(var(--zoom-out, 0) * 50vw) calc(var(--zoom-out, 0) * 50vh);
+    margin: calc(var(--zoom-out, 0) * 50dvw) calc(var(--zoom-out, 0) * 50dvh);
+  }
+}
+
 /* The dock's parts take their own places in the grid. */
 .phone--landscape .phone__dock {
   display: contents;

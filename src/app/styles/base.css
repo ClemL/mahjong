@@ -119,6 +119,14 @@ body {
    above and below the table the colour of the felt's edge, not white. */
 html {
   background-color: var(--felt-edge);
+  /* Safari on an iPhone enlarges text when the phone is turned sideways, and
+     every screen here is sideways. The sizes are chosen for that already. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* No double-tap zoom: on a game a double tap is two taps — arming and
+     throwing a tile — and a zoom it set off leaves the hand off the screen.
+     Pinching still zooms. */
+  touch-action: manipulation;
 }
 
 body {

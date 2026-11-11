@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { RuleConfig } from "@/game/rules";
 import type { AppearanceApi } from "@/hooks/useAppearance";
 import type { PhoneLayout, PhoneLayoutApi } from "@/hooks/usePhoneLayout";
-import type { PhoneDisplay, PhoneSize, PondOrder } from "@/hooks/useLocalSetting";
+import type { PhoneDisplay, PhoneSize, PhoneZoomOut, PondOrder } from "@/hooks/useLocalSetting";
 import { useRoomyScreen } from "@/hooks/useRoomyScreen";
 import type { HandOrder, SortMode } from "@/hooks/useHandOrder";
 import { canVibrate } from "@/hooks/useHaptics";
@@ -32,6 +32,17 @@ const SIZE: SegmentOption<PhoneSize>[] = [
   { value: "compact", label: "Compact", hint: "Smaller header, prompt and buttons" },
   { value: "standard", label: "Standard", hint: "The usual size" },
   { value: "comfy", label: "Comfy", hint: "Larger header, prompt and buttons, easier to tap" },
+];
+
+const ZOOM_OUT: SegmentOption<PhoneZoomOut>[] = [
+  {
+    value: "0",
+    label: "Off",
+    hint: "Everything fills the screen. Zoom out if an edge is hard to tap, or the browser's bars cover part of it",
+  },
+  { value: "5", label: "5%", hint: "Everything a little smaller in the middle, with a thin margin round the edges" },
+  { value: "10", label: "10%", hint: "Smaller, with a wider margin round the edges" },
+  { value: "15", label: "15%", hint: "Smaller still, well clear of every edge" },
 ];
 
 const SORT: SegmentOption<SortMode>[] = [
@@ -163,6 +174,12 @@ export function PhoneSettings({
           {display ? (
             <>
               <Segmented label="Button size" options={SIZE} value={display.size} onChange={display.setSize} />
+              <Segmented
+                label="Zoom out"
+                options={ZOOM_OUT}
+                value={display.zoomOut}
+                onChange={display.setZoomOut}
+              />
               <SwitchRow
                 label="Stretch to the edges"
                 hint={

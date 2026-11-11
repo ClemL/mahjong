@@ -219,6 +219,13 @@ export function useFoldedPanes(): {
 export type PhoneSize = "compact" | "standard" | "comfy";
 
 /**
+ * How far, in percent, the controller is zoomed out: drawn that much smaller,
+ * in the middle of the screen, with a margin round every edge.
+ */
+export type PhoneZoomOut = "0" | "5" | "10" | "15";
+export const PHONE_ZOOM_OUTS: readonly PhoneZoomOut[] = ["0", "5", "10", "15"];
+
+/**
  * How the phone lays out everyone's discards: in the order thrown; each
  * person's by suit and number; or everyone's pooled, a row a suit. Only the
  * first unless the helper is on.
@@ -232,6 +239,9 @@ export interface PhoneDisplay {
   setPlayLog: (value: OnOff) => void;
   size: PhoneSize;
   setSize: (value: PhoneSize) => void;
+  /** The whole controller drawn smaller, clear of the edges of the screen. */
+  zoomOut: PhoneZoomOut;
+  setZoomOut: (value: PhoneZoomOut) => void;
   /** The hand run out to the edges of the screen, its tiles scaled up to fill it. */
   stretch: OnOff;
   setStretch: (value: OnOff) => void;
@@ -282,6 +292,7 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     "standard",
     "comfy",
   ]);
+  const [zoomOut, setZoomOut] = useLocalSetting<PhoneZoomOut>("hk-mahjong.zoom-out", "0", PHONE_ZOOM_OUTS);
   const [vibrate, setVibrate] = useLocalSetting<OnOff>("hk-mahjong.vibrate", "on", ON_OFF);
   const [keepAwake, setKeepAwake] = useLocalSetting<OnOff>("hk-mahjong.keep-awake", "off", ON_OFF);
   const [stretch, setStretch] = useLocalSetting<OnOff>("hk-mahjong.hand-stretch", "off", ON_OFF);
@@ -301,6 +312,8 @@ export function usePhoneDisplay(name?: string | null): PhoneDisplay {
     setPlayLog,
     size,
     setSize,
+    zoomOut,
+    setZoomOut,
     stretch,
     setStretch,
     vibrate,
