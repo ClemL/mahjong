@@ -66,6 +66,28 @@ export async function resetTable(request: APIRequestContext, room: string): Prom
 }
 
 /**
+ * Drag one finger from `from` to `to` with real touch events. Playwright's own
+ * touchscreen only taps, and a mouse drag is not a touch: the controller reads
+ * a finger differently, and so does the browser's own scrolling.
+ */
+export async function fingerDrag(
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  steps = 10,
+): Promise<void> {
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [from] });
+  for (let i = 1; i <= steps; i++) {
+    const at = { x: from.x + ((to.x - from.x) * i) / steps, y: from.y + ((to.y - from.y) * i) / steps };
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [at] });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
+/**
  * Wait for a phone's hand to finish turning up and dealing in. A tap while the
  * row is still tipping over lands where the tile is about to be, not on it.
  */

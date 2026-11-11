@@ -192,16 +192,23 @@
 .phone--size-compact { --ui-zoom: 0.88; }
 .phone--size-comfy { --ui-zoom: 1.15; }
 
+/* --fit is the share left by Zoom out (phone-landscape.css). */
 .phone--landscape .phone__status,
 .phone--landscape .phone__melds,
 .phone--landscape .phone__controls,
 .phone--landscape .helper {
-  zoom: var(--ui-zoom, 1);
+  zoom: calc(var(--ui-zoom, 1) * var(--fit, 1));
 }
 
 /* The header is already full across a phone, so it only ever shrinks. */
 .phone--landscape .phone__bar {
-  zoom: min(var(--ui-zoom, 1), 1);
+  zoom: calc(min(var(--ui-zoom, 1), 1) * var(--fit, 1));
+}
+
+/* The settings drawer opens from the header and covers the whole screen, so
+   zooming the controller out is no reason to make its text smaller. */
+.phone--landscape .phone__bar .drawer__backdrop {
+  zoom: calc(1 / var(--fit, 1));
 }
 
 /* Your move on this phone, in the gold the table lights your rack with. Drawn

@@ -919,6 +919,7 @@ export function PhoneView({
         "phone--landscape",
         shelves ? "phone--shelves" : "phone--rail",
         `phone--size-${display.size}`,
+        display.zoomOut !== "0" ? `phone--out-${display.zoomOut}` : "",
         // Your move — your turn or your call on a discard — lit in the same
         // colour the table lights your rack with.
         yourTurn || view.claim ? "phone--acting" : "",

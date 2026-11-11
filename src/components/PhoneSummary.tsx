@@ -1,6 +1,8 @@
 "use client";
 
+import { useRef } from "react";
 import { ACHIEVEMENTS } from "@/game/achievements";
+import { useFrameScroll } from "@/hooks/useFrameScroll";
 import type { RoomView } from "@/game/room";
 import { type Seat, roundName, seatWind, tileGlyph } from "@/game/tiles";
 import { chipsOf } from "./TableEffects";
@@ -47,9 +49,18 @@ export function PhoneSummary({
   const earnedIds = new Set(earned.map((a) => a.id));
   const handOf = new Map(earned.map((a) => [a.id, a.hand]));
   const others = view.achievements.filter((a) => a.seat !== you).slice(-4).reverse();
+  // Longer than a phone is tall once the badges are in; the sheet keeps every
+  // touch for the swipe, so a finger scrolls it through this.
+  const sheet = useRef<HTMLElement>(null);
+  const scroll = useFrameScroll(sheet);
 
   return (
-    <section className="minipond minipond--sheet phone-summary" aria-label="Chips and achievements">
+    <section
+      ref={sheet}
+      className="minipond minipond--sheet phone-summary"
+      aria-label="Chips and achievements"
+      {...scroll}
+    >
       <header className="minipond__head">
         <h2 className="minipond__title">Chips &amp; achievements</h2>
         <span className="phone-summary__round">

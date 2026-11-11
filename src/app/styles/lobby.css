@@ -96,6 +96,10 @@
 
 .field__input {
   font: inherit;
+  /* Never under 16px: Safari on an iPhone zooms in on a smaller box as it is
+     tapped and stays zoomed, and the controller that follows the seat picker
+     then opens with its hand off the bottom right of the screen. */
+  font-size: 16px;
   color: var(--ink);
   background: var(--raise-1);
   border: 1px solid var(--line-strong);
