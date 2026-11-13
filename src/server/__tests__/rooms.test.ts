@@ -591,6 +591,21 @@ describe("table control", () => {
     expect((await readRoom(id, null)).players[1].occupant.name).toBe("Srini");
   });
 
+  it("lets somebody who sat down mid-game rename themselves, and keeps names apart", async () => {
+    const { id, tokens } = await dealtRoom([0]);
+    await control(id, tokens[0], { type: "rename", seat: 0, name: "Kris" });
+    // A latecomer takes a computer's chair from the table's code, mid-hand.
+    const late = (await claimSeat(id, { seat: 2, name: "Srnii" })).token;
+    expect((await readRoom(id, late)).started).toBe(true);
+    const fixed = await control(id, late, { type: "rename", seat: 2, name: "Srini" });
+    expect(fixed.players[2].occupant.name).toBe("Srini");
+    expect(fixed.players[2].handCount).toBeGreaterThan(0);
+    // The name another player already goes by is told apart, as it is at the door.
+    expect((await control(id, late, { type: "rename", seat: 2, name: "kris" })).players[2].occupant.name).toBe(
+      "kris 2",
+    );
+  });
+
   it("moves a player one chair round, trading places when it is taken", async () => {
     const id = await room();
     const table = (await claimSeat(id, { seat: "table" })).token;

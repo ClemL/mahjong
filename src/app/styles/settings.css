@@ -713,6 +713,62 @@
   font-size: 13px;
 }
 
+/* Your name, at the top of a phone's settings. */
+.name-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.name-row__label {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.name-row__field {
+  display: flex;
+  gap: 8px;
+}
+
+.name-row__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--shade-2);
+  color: var(--ink);
+  font: inherit;
+  /* 16px at least, or Safari on an iPhone zooms in as it is tapped and stays zoomed. */
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.name-row__input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 1px;
+}
+
+.name-row__save {
+  min-height: 44px;
+  min-width: 76px;
+  font-weight: 700;
+}
+
+.name-row__hint,
+.name-row__error {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+/* Said in words as well as in red. */
+.name-row__error {
+  color: var(--score-neg);
+  font-weight: 600;
+}
+
 .sgroup__leave {
   display: flex;
   flex-direction: column;

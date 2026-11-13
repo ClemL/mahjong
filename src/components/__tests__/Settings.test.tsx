@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { fireEvent, render, renderHook, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { DEFAULT_APPEARANCE } from "@/game/appearance";
 import type { AppearanceApi } from "@/hooks/useAppearance";
@@ -278,6 +278,52 @@ describe("a phone's settings", () => {
     // Set hints are one of the assists now.
     const assists = screen.getByRole("heading", { name: "Assists" }).parentElement!;
     expect(within(assists).getByRole("switch", { name: "Set hints" })).toBeTruthy();
+  });
+
+  it("changes the player's name at any point, keeping what was typed if the room refuses it", async () => {
+    const config = tableView(lobby([0])).config;
+    const onRename = vi.fn(async () => false);
+    const { rerender } = render(
+      <PhoneSettings sound={sound} config={config} appearance={appearance} name="Srnii" onRename={onRename} />,
+    );
+    const you = screen.getByRole("heading", { name: "You" }).parentElement!;
+    const box = within(you).getByRole("textbox", { name: "Your name" });
+    const save = within(you).getByRole("button", { name: "Save" });
+    expect(box).toHaveProperty("value", "Srnii");
+    // Nothing to save until the name is changed, and never a blank one.
+    expect(save).toHaveProperty("disabled", true);
+    fireEvent.change(box, { target: { value: "   " } });
+    expect(save).toHaveProperty("disabled", true);
+    fireEvent.change(box, { target: { value: "  Srini " } });
+    expect(save).toHaveProperty("disabled", false);
+
+    // Refused: the typed name stays to send again, and the reason is said beside it.
+    await act(async () => fireEvent.click(save));
+    expect(onRename).toHaveBeenCalledWith("Srini");
+    rerender(
+      <PhoneSettings
+        sound={sound}
+        config={config}
+        appearance={appearance}
+        name="Srnii"
+        onRename={onRename}
+        error="Could not reach the table"
+      />,
+    );
+    expect(box).toHaveProperty("value", "  Srini ");
+    expect(within(you).getByRole("alert").textContent).toContain("Could not reach the table");
+
+    // Taken: the box shows the name the room gave back, number and all.
+    onRename.mockResolvedValueOnce(true);
+    await act(async () => fireEvent.submit(box));
+    rerender(<PhoneSettings sound={sound} config={config} appearance={appearance} name="Srini 2" onRename={onRename} />);
+    expect(box).toHaveProperty("value", "Srini 2");
+    expect(within(you).queryByRole("alert")).toBeNull();
+  });
+
+  it("has no name to change where nobody is seated", () => {
+    render(<PhoneSettings sound={sound} config={tableView(lobby([0])).config} appearance={appearance} />);
+    expect(screen.queryByRole("heading", { name: "You" })).toBeNull();
   });
 
   it("keeps the screen awake and goes full screen from the settings, not the bar", () => {

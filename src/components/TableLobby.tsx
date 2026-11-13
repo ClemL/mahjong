@@ -167,6 +167,10 @@ export function TableLobby({
           wakeLock={phoneDisplay.keepAwake === "on" ? wakeLock : undefined}
           tableTakeBack={view.settings.takeBack !== false}
           table={tableName(view.roomId)}
+          name={me !== null ? (view.players[me].occupant.name ?? "") : undefined}
+          onRename={me !== null ? (next) => api.control({ type: "rename", seat: me, name: next }) : undefined}
+          busy={api.busy}
+          error={api.error}
           onLeave={() => void api.leave()}
         />
       )}
